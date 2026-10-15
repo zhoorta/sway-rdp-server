@@ -1402,7 +1402,10 @@ impl RdpServer {
                     }
                 }
             } else {
-                debug!("Skipping credential validation (no credentials in AcceptorResult)");
+                // sway-rdp-server patch: a client that sends no credentials must not get past a configured validator.
+                warn!("Credential validation rejected: the client sent no credentials");
+                send_access_denied(result.io_channel_id, result.user_channel_id, writer).await?;
+                bail!("client sent no credentials");
             }
         }
 

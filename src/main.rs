@@ -3,6 +3,7 @@
 //! sent as H.264 over the graphics pipeline (bitmap updates as a fallback), with keyboard and pointer injected.
 
 mod audio;
+mod auth;
 mod capture;
 mod clipboard;
 mod egfx;
@@ -380,6 +381,11 @@ async fn main() -> anyhow::Result<()> {
     let (mut no_egfx, mut bitrate, mut max_qp) = (false, 40_000_000u32, 20u8);
     // None = decide from the bind address: replacing is only safe where reaching the port already means trust.
     let mut replace: Option<bool> = None;
+    // Experiment: plain TLS login (the password travels inside TLS, no CredSSP/NLA). Off by default.
+    let mut tls_only = false;
+    // "file": NLA with the user:password of --credentials. "pam": the account's own password, checked through PAM,
+    // over plain TLS login (see auth.rs for what that trades away).
+    let mut auth_mode = "file".to_string();
     let mut creds_file: Option<PathBuf> = None;
     // Off by default: the Windows App on macOS hangs the session when it has to hand over its clipboard
     // (see docs/NOTES.md), while FreeRDP is fine.
@@ -398,6 +404,8 @@ async fn main() -> anyhow::Result<()> {
             "--no-egfx" => no_egfx = true,
             // A new connection ends the open one. It does so before the new client has logged in, so use
             // it only where reaching the port already means trust (loopback, SSH tunnel, VPN).
+            "--tls-only" => tls_only = true,
+            "--auth" => auth_mode = args.next().context("--auth needs file or pam")?,
             "--no-replace" => replace = Some(false),
             "--replace" => replace = Some(true),
             // First line "user:password" (split at the first colon). No built-in default credential.
@@ -409,8 +417,13 @@ async fn main() -> anyhow::Result<()> {
             other => anyhow::bail!("unknown argument {other}"),
         }
     }
-    let (username, password) = {
-        let f = creds_file.context("--credentials FILE is required (first line user:password)")?;
+    anyhow::ensure!(matches!(auth_mode.as_str(), "file" | "pam"), "--auth must be file or pam");
+    let pam = auth_mode == "pam";
+    let tls_only = tls_only || pam;
+    let (username, password) = if pam {
+        (String::new(), String::new())
+    } else {
+        let f = creds_file.context("--credentials FILE is required with --auth file (first line user:password)")?;
         let text = std::fs::read_to_string(&f).with_context(|| format!("reading {}", f.display()))?;
         let line = text.lines().next().unwrap_or("");
         let (u, p) = line.split_once(':').context("credentials file must start with user:password")?;
@@ -430,9 +443,10 @@ async fn main() -> anyhow::Result<()> {
         cfg: Arc::new(Config { opts: session::Options { default_layout: layout, spawn_terminal, workspace, hook } }),
         egfx: (!no_egfx).then(|| (egfx_state.clone(), egfx::Tuning { bitrate, max_qp, fps: 30 })),
     };
-    let mut server = RdpServer::builder()
-        .with_addr(bind.parse::<std::net::SocketAddr>().context("bad --bind address")?)
-        .with_hybrid(acceptor, identity.pub_key)
+    let pam_validator = if pam { Some(Arc::new(auth::PamValidator::new("sway-rdp-server")?)) } else { None };
+    let builder = RdpServer::builder().with_addr(bind.parse::<std::net::SocketAddr>().context("bad --bind address")?);
+    let builder = if tls_only { builder.with_tls(acceptor) } else { builder.with_hybrid(acceptor, identity.pub_key) };
+    let mut server = builder
         .with_input_handler(handler.clone())
         .with_display_handler(handler)
         .with_gfx_factory((!no_egfx).then(|| {
@@ -442,13 +456,14 @@ async fn main() -> anyhow::Result<()> {
         .with_sound_factory(audio.then(|| Box::new(audio::Factory::new()) as Box<dyn ironrdp_server::SoundServerFactory>))
         .with_honor_client_desktop_size(true)
         .with_replace_on_new_connection(replace)
+        .with_credential_validator(pam_validator.clone().map(|v| v as std::sync::Arc<dyn ironrdp_server::CredentialValidator>))
         .with_connection_handler(Some(Box::new(Conn { slot })))
         .build();
-    server.set_credentials(Some(Credentials {
-        username,
-        password,
-        domain: None,
-    }));
-    info!(%bind, "sway-rdp-server listening (NLA)");
+    if let Some(v) = &pam_validator {
+        info!(user = v.user(), "login: PAM service sway-rdp-server, plain TLS login (no NLA)");
+    } else {
+        server.set_credentials(Some(Credentials { username, password, domain: None }));
+    }
+    info!(%bind, "sway-rdp-server listening");
     server.run().await.context("server stopped")
 }

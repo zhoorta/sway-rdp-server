@@ -10,8 +10,15 @@ and the window can be resized live. Status: **early, one author, tested mostly w
 - Input: virtual keyboard and pointer (layout taken from the client's keyboard id), Command works as Ctrl on Macs.
 - Audio: RDPSND from a PipeWire/PulseAudio null sink (`sway-rdp-server`), PCM 44.1 kHz.
 - Clipboard: text only, **off by default** (`--clipboard`); it works with FreeRDP but hangs the macOS Windows App.
-- Security: TLS and NLA always on. There is **no built-in credential**: `--credentials FILE` with `user:password` on the first
-  line (password of at least 8 characters). One user. A self-signed certificate is fine for a start (`--cert`, `--key`).
+- Security: TLS always on. There is **no built-in credential**. Two ways to log in (one user, the one running the server):
+  - `--auth file` (default): NLA with the `user:password` on the first line of `--credentials FILE` (password of at least 8
+    characters). NLA protects the password even if you accept an unverified certificate.
+  - `--auth pam`: the account's own password, checked through PAM (service `sway-rdp-server`, see `contrib/pam/`), so no
+    password is stored anywhere. This needs plain TLS login without NLA, because NLA has to know the password itself.
+    **The password then travels inside the TLS connection**: someone who intercepts it and shows another certificate could
+    read it, so verify the certificate fingerprint on first use, and prefer loopback, a tunnel or a VPN on networks you do
+    not control. Failures are delayed 2 s, and after 5 failed attempts in a row every login is refused for 60 s.
+  - A self-signed certificate is fine for a start (`--cert`, `--key`). `--tls-only` forces plain TLS login with `--auth file` (testing).
 - Built on [IronRDP](https://github.com/Devolutions/IronRDP) (`ironrdp-server` 0.13 with three small local patches in
   `patches/`, see `patches/ironrdp-server.diff`) and `ironrdp-egfx`.
 
@@ -19,9 +26,10 @@ and the window can be resized live. Status: **early, one author, tested mostly w
 
 ```
 sway-rdp-server --bind 127.0.0.1:3389 --cert cert.pem --key key.pem --credentials rdp.cred
+# or, with your login password: sway-rdp-server --bind 127.0.0.1:3389 --cert cert.pem --key key.pem --auth pam
 ```
 
-Run it inside the sway session it should serve (it needs `SWAYSOCK` and `WAYLAND_DISPLAY`). Needs `swaymsg`, `foot` (only for
+Run it inside the sway session it should serve (it needs `SWAYSOCK` and `WAYLAND_DISPLAY`). Needs libpam (`libpam0g`) for `--auth pam`, and `swaymsg`, `foot` (only for
 the first terminal, `--no-terminal` skips it), `libopenh264.so.8`, and `parec`/`pactl` for audio (`--no-audio` skips).
 
 Useful options: `--bind ADDR`, `--kb-layout xkb` (fallback layout), `--workspace NAME` (default `Remote`),
