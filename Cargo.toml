@@ -1,0 +1,36 @@
+[package]
+name = "sway-rdp-server"
+version = "0.0.1"
+edition = "2021"
+description = "RDP server for sway: one headless output per connection, H.264 over the graphics pipeline, keyboard, pointer and audio"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+ironrdp-server = { version = "0.13", features = ["helper", "egfx"] }
+ironrdp-displaycontrol = "0.8"
+ironrdp-egfx = "0.3"
+ironrdp-cliprdr = "0.7"
+ironrdp-rdpsnd = "0.9"
+ironrdp-core = "0.2"
+ironrdp-dvc = "0.8"
+ironrdp-svc = "0.8"
+ironrdp-pdu = "0.9"
+# H.264 comes from the system's libopenh264 (Debian ships it) loaded at run time: sway-rdp-server ships no encoder code of its own.
+openh264 = { version = "0.9", default-features = false, features = ["libloading"] }
+yuv = "0.8"
+anyhow = "1"
+serde_json = "1"
+libc = "0.2"
+memmap2 = "0.9"
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+wayland-protocols-misc = { version = "0.3", features = ["client"] }
+xkbcommon = "0.9"
+async-trait = "0.1"
+tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Local patch: frame markers around surface updates (see patches/ironrdp-server.diff).
+[patch.crates-io]
+ironrdp-server = { path = "patches/ironrdp-server" }

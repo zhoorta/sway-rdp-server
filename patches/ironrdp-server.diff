@@ -1,0 +1,235 @@
+diff -ru /tmp/claude-501/orig/ironrdp-server/src/builder.rs patches/ironrdp-server/src/builder.rs
+--- /tmp/claude-501/orig/ironrdp-server/src/builder.rs	2006-07-24 02:21:28
++++ patches/ironrdp-server/src/builder.rs	2026-10-15 19:37:39
+@@ -43,6 +43,7 @@
+     display_suppressed: Option<Arc<AtomicBool>>,
+     autodetect_rtt: Option<Arc<AtomicU32>>,
+     honor_client_desktop_size: bool,
++    replace_on_new_connection: bool,
+ }
+ 
+ pub struct RdpServerBuilder<State> {
+@@ -144,6 +145,7 @@
+                 display_suppressed: None,
+                 autodetect_rtt: None,
+                 honor_client_desktop_size: false,
++                replace_on_new_connection: false,
+             },
+         }
+     }
+@@ -166,6 +168,7 @@
+                 display_suppressed: None,
+                 autodetect_rtt: None,
+                 honor_client_desktop_size: false,
++                replace_on_new_connection: false,
+             },
+         }
+     }
+@@ -258,6 +261,18 @@
+     /// the display handler serves a fixed framebuffer.
+     ///
+     /// [`request_initial_size`]: crate::RdpServerDisplay::request_initial_size
++    /// When `true`, a new TCP connection that arrives while a client is connected ends that client and is
++    /// served instead (the usual wish of a user who reconnects after a drop). Defaults to `false`.
++    ///
++    /// The old client is dropped as soon as the new connection is accepted, before the new client has
++    /// authenticated: only enable this where reaching the listening port already implies trust (loopback,
++    /// a VPN, an SSH tunnel).
++    #[must_use]
++    pub fn with_replace_on_new_connection(mut self, replace: bool) -> Self {
++        self.state.replace_on_new_connection = replace;
++        self
++    }
++
+     pub fn with_honor_client_desktop_size(mut self, honor: bool) -> Self {
+         self.state.honor_client_desktop_size = honor;
+         self
+@@ -297,6 +312,7 @@
+                 codecs: self.state.codecs,
+                 max_request_size: self.state.max_request_size,
+                 honor_client_desktop_size: self.state.honor_client_desktop_size,
++                replace_on_new_connection: self.state.replace_on_new_connection,
+             },
+             self.state.handler,
+             self.state.display,
+diff -ru /tmp/claude-501/orig/ironrdp-server/src/encoder/mod.rs patches/ironrdp-server/src/encoder/mod.rs
+--- /tmp/claude-501/orig/ironrdp-server/src/encoder/mod.rs	2006-07-24 02:21:28
++++ patches/ironrdp-server/src/encoder/mod.rs	2026-10-15 18:43:26
+@@ -11,7 +11,9 @@
+     CachedPointerAttribute, ColorPointerAttribute, Point16, PointerAttribute, PointerPositionAttribute,
+ };
+ use ironrdp_pdu::rdp::capability_sets::{CmdFlags, EntropyBits};
+-use ironrdp_pdu::surface_commands::{ExtendedBitmapDataPdu, SurfaceBitsPdu, SurfaceCommand};
++use ironrdp_pdu::surface_commands::{
++    ExtendedBitmapDataPdu, FrameAction, FrameMarkerPdu, SurfaceBitsPdu, SurfaceCommand,
++};
+ use tracing::{debug, warn};
+ 
+ use self::bitmap::BitmapEncoder;
+@@ -759,5 +761,21 @@
+         extended_bitmap_data,
+     };
+     let cmd = SurfaceCommand::SetSurfaceBits(pdu);
+-    Ok(UpdateFragmenter::new(UpdateCode::SurfaceCommands, encode_vec(&cmd)?))
++
++    // Wrap the bitmap in a frame begin/end marker pair so clients that present on frame boundaries
++    // (the macOS Windows App) repaint right away instead of waiting for some other redraw trigger.
++    static FRAME_ID: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
++    let frame_id = FRAME_ID.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
++    let begin = SurfaceCommand::FrameMarker(FrameMarkerPdu {
++        frame_action: FrameAction::Begin,
++        frame_id: Some(frame_id),
++    });
++    let end = SurfaceCommand::FrameMarker(FrameMarkerPdu {
++        frame_action: FrameAction::End,
++        frame_id: Some(frame_id),
++    });
++    let mut payload = encode_vec(&begin)?;
++    payload.extend(encode_vec(&cmd)?);
++    payload.extend(encode_vec(&end)?);
++    Ok(UpdateFragmenter::new(UpdateCode::SurfaceCommands, payload))
+ }
+diff -ru /tmp/claude-501/orig/ironrdp-server/src/handler.rs patches/ironrdp-server/src/handler.rs
+--- /tmp/claude-501/orig/ironrdp-server/src/handler.rs	2006-07-24 02:21:28
++++ patches/ironrdp-server/src/handler.rs	2026-10-15 19:05:19
+@@ -73,6 +73,13 @@
+ pub trait RdpServerInputHandler: Send {
+     fn keyboard(&mut self, event: KeyboardEvent);
+     fn mouse(&mut self, event: MouseEvent);
++
++    /// Called once per connection, before the desktop size is negotiated, with the keyboard layout the
++    /// client announced (the low word of a Windows locale identifier, e.g. 0x0409 for US English,
++    /// 0x0816 for Portuguese). `0` when the client did not announce one.
++    fn keyboard_layout(&mut self, klid: u32) {
++        let _ = klid;
++    }
+ }
+ 
+ impl From<(u8, fast_path::KeyboardFlags)> for KeyboardEvent {
+diff -ru /tmp/claude-501/orig/ironrdp-server/src/server.rs patches/ironrdp-server/src/server.rs
+--- /tmp/claude-501/orig/ironrdp-server/src/server.rs	2006-07-24 02:21:28
++++ patches/ironrdp-server/src/server.rs	2026-10-15 19:37:48
+@@ -230,6 +230,9 @@
+     /// Deactivation-Reactivation resize. Defaults to `false`. Set via
+     /// [`RdpServerBuilder::with_honor_client_desktop_size`](crate::RdpServerBuilder::with_honor_client_desktop_size).
+     pub honor_client_desktop_size: bool,
++    /// When `true`, a new connection ends the current one and replaces it. Defaults to `false`. Set via
++    /// [`RdpServerBuilder::with_replace_on_new_connection`](crate::RdpServerBuilder::with_replace_on_new_connection).
++    pub replace_on_new_connection: bool,
+ }
+ 
+ impl RdpServerOptions {
+@@ -958,35 +961,15 @@
+                     debug!(?peer, "Received connection");
+                     drop(ev_receiver);
+ 
+-                    let accepted = self.connection_handler
+-                        .as_mut()
+-                        .is_none_or(|h| h.on_accept(peer));
+-
+-                    if !accepted {
+-                        debug!(?peer, "Connection rejected by handler");
+-                        drop(stream);
+-                    } else {
+-                        let started = tokio::time::Instant::now();
+-                        let result = self.run_connection(stream).await;
+-                        let duration = started.elapsed();
+-
+-                        if let Err(ref error) = result {
+-                            error!(?error, "Connection error");
++                    // With `replace_on_new_connection`, a connection that arrives while another is served
++                    // comes back as `next` and is served right after the old one has been ended.
++                    let mut next = Some((stream, peer));
++                    while let Some((stream, peer)) = next.take() {
++                        let (replacement, stop) = self.serve_connection(&listener, stream, peer).await;
++                        if stop {
++                            return Ok(());
+                         }
+-
+-                        self.static_channels = StaticChannelSet::new();
+-
+-                        if let Some(ref mut handler) = self.connection_handler {
+-                            let action = handler.on_disconnected(
+-                                peer,
+-                                duration,
+-                                result.as_ref().err(),
+-                            );
+-                            if action == PostConnectionAction::Stop {
+-                                debug!(?peer, "Handler requested stop after disconnect");
+-                                break;
+-                            }
+-                        }
++                        next = replacement;
+                     }
+                 }
+                 else => break,
+@@ -996,6 +979,60 @@
+         Ok(())
+     }
+ 
++    /// Serves one accepted connection. Returns the connection that replaced it, if any, and whether the
++    /// connection handler asked the server to stop.
++    async fn serve_connection(
++        &mut self,
++        listener: &tokio::net::TcpListener,
++        stream: tokio::net::TcpStream,
++        peer: SocketAddr,
++    ) -> (Option<(tokio::net::TcpStream, SocketAddr)>, bool) {
++        let accepted = self.connection_handler.as_mut().is_none_or(|h| h.on_accept(peer));
++        if !accepted {
++            debug!(?peer, "Connection rejected by handler");
++            drop(stream);
++            return (None, false);
++        }
++
++        let started = tokio::time::Instant::now();
++        let mut replacement = None;
++        let result = if self.opts.replace_on_new_connection {
++            tokio::select! {
++                result = self.run_connection(stream) => result,
++                accepted = listener.accept() => match accepted {
++                    Ok((new_stream, new_peer)) => {
++                        // Dropping the future above closes the old client's socket.
++                        debug!(?peer, ?new_peer, "Replacing the current connection");
++                        replacement = Some((new_stream, new_peer));
++                        Err(anyhow::anyhow!("replaced by a new connection from {new_peer}"))
++                    }
++                    Err(error) => Err(anyhow::anyhow!(error).context("accept failed while serving a client")),
++                },
++            }
++        } else {
++            self.run_connection(stream).await
++        };
++        let duration = started.elapsed();
++
++        match (&result, replacement.is_some()) {
++            (Err(error), true) => debug!(?error, "Connection ended"),
++            (Err(error), false) => error!(?error, "Connection error"),
++            _ => {}
++        }
++
++        self.static_channels = StaticChannelSet::new();
++
++        let mut stop = false;
++        if let Some(ref mut handler) = self.connection_handler {
++            let action = handler.on_disconnected(peer, duration, result.as_ref().err());
++            if action == PostConnectionAction::Stop {
++                debug!(?peer, "Handler requested stop after disconnect");
++                stop = true;
++            }
++        }
++        (replacement, stop)
++    }
++
+     pub fn get_svc_processor<T: SvcProcessor + 'static>(&mut self) -> Option<&mut T> {
+         self.static_channels
+             .get_by_type_mut::<T>()
+@@ -1368,6 +1405,8 @@
+                 debug!("Skipping credential validation (no credentials in AcceptorResult)");
+             }
+         }
++
++        self.handler.lock().await.keyboard_layout(result.keyboard_layout);
+ 
+         if !result.input_events.is_empty() {
+             debug!("Handling input event backlog from acceptor sequence");
