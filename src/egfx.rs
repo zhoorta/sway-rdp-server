@@ -340,18 +340,31 @@ fn extract_sps_pps(data: &[u8]) -> Option<Vec<u8>> {
     (sps && pps).then_some(out)
 }
 
-/// The encoder library of the system (Debian: `libopenh264-8`), checked for the exact version the crate was built for.
-/// `SWAY_RDP_OPENH264` overrides the path (for example a copy downloaded from Cisco).
+/// The encoder library of the system (Debian: `libopenh264-8`).
+///
+/// The crate's own `from_blob_path` only accepts Cisco's binaries (it compares a SHA-256 list), which would reject every
+/// distribution build. The bindings were generated for OpenH264 2.6, so a system library is accepted when the file it
+/// resolves to is a 2.6 release; anything else is refused instead of risking an ABI mismatch.
+/// `SWAY_RDP_OPENH264` names a library to use instead (for example a copy downloaded from Cisco); that one keeps the
+/// crate's hash check.
 fn load_openh264() -> anyhow::Result<OpenH264API> {
-    let paths: Vec<String> = std::env::var("SWAY_RDP_OPENH264").into_iter().chain(
-        ["/usr/lib/aarch64-linux-gnu/libopenh264.so.8", "/usr/lib/x86_64-linux-gnu/libopenh264.so.8", "libopenh264.so.8"].map(String::from),
-    ).collect();
-    let mut last = None;
-    for p in &paths {
-        match OpenH264API::from_blob_path(p) {
+    if let Ok(p) = std::env::var("SWAY_RDP_OPENH264") {
+        return OpenH264API::from_blob_path(&p).map_err(|e| anyhow::anyhow!("SWAY_RDP_OPENH264={p}: {e}"));
+    }
+    let mut problems = Vec::new();
+    for dir in ["/usr/lib/aarch64-linux-gnu", "/usr/lib/x86_64-linux-gnu", "/usr/lib64", "/usr/lib"] {
+        let link = std::path::Path::new(dir).join("libopenh264.so.8");
+        let Ok(real) = std::fs::canonicalize(&link) else { continue };
+        let name = real.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_owned();
+        if !name.starts_with("libopenh264.so.2.6.") {
+            problems.push(format!("{}: is {name}, need an OpenH264 2.6 release", link.display()));
+            continue;
+        }
+        // SAFETY: the file is a 2.6 release of the library the bindings were generated for, as checked above.
+        match unsafe { OpenH264API::from_blob_path_unchecked(&real) } {
             Ok(api) => return Ok(api),
-            Err(e) => last = Some(format!("{p}: {e}")),
+            Err(e) => problems.push(format!("{}: {e}", real.display())),
         }
     }
-    anyhow::bail!("no usable libopenh264 (install the libopenh264-8 package): {}", last.unwrap_or_default())
+    anyhow::bail!("no usable libopenh264 (install the libopenh264-8 package, version 2.6): {}", problems.join("; "))
 }
