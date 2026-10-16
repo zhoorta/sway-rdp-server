@@ -8,6 +8,7 @@ mod capture;
 mod clipboard;
 mod egfx;
 mod input;
+mod proto;
 mod session;
 
 use std::num::{NonZeroU16, NonZeroUsize};
