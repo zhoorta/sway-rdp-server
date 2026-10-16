@@ -1,0 +1,9 @@
+#!/bin/sh
+# Starts the session's shell: DankMaterialShell through the account's systemd user session when it is installed,
+# otherwise sway's own bar.
+export XDG_CURRENT_DESKTOP=sway XDG_SESSION_TYPE=wayland
+dbus-update-activation-environment --systemd --all 2>/dev/null
+if command -v dms >/dev/null 2>&1 && systemctl --user start sway-session.target 2>/dev/null; then
+    exit 0
+fi
+swaymsg 'bar bar-0 mode dock' >/dev/null 2>&1

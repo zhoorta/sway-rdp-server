@@ -19,7 +19,13 @@ An account logs in over RDP with its normal password (plain TLS login: use a VPN
 headless sway that **survives disconnects**: reconnecting returns to the same windows, and a second client of the same
 account replaces the first, only after logging in. Sessions end after 8 hours without a client (`--idle-timeout`) or
 when the account quits its sway. Accounts cannot reach each other's sockets. The self-signed certificate is made at
-install time and its fingerprint is printed. Design, threat model and what is not done yet:
+install time and its fingerprint is printed.
+
+`sway-rdp-desktop` (second package, same build) makes those sessions a Windows-like desktop: a system sway config
+(`/etc/xdg/sway-rdp/sway.conf`: floating windows with title bars, Alt+Tab, Alt+F4, `Super+d` launcher, screenshots;
+an account's `~/.config/sway-rdp/config` replaces it), the glue that starts [DankMaterialShell](https://danklinux.com)
+through the account's systemd user session when it is installed (it is not in Debian), and `sway-rdp-setup`, a
+whiptail wizard for DMS and developer, creative and AI apps. Design, threat model and what is not done yet:
 [docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
 exists (run the binary inside your own sway).
 

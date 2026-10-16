@@ -80,7 +80,7 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
 - Reconnect: step 4 returns the existing control socket; the session sends a full frame.
 - Second client for the same user: replaces the first (after authentication succeeded).
 - Logout in the shell: `sway exit` ends the session, the control socket disappears, the helper cleans up.
-- The headless sway uses `WLR_BACKENDS=headless` and a config from `/etc/sway-rdp/sway.conf` plus an optional
+- The headless sway uses `WLR_BACKENDS=headless` and a config from `/etc/xdg/sway-rdp/sway.conf` plus an optional
   `~/.config/sway-rdp/config`. The output is created at session start (replaces `create_output` on a shared sway);
   workspace and focus handling in `session.rs` mostly goes away, since the sway is the user's own.
 
@@ -180,6 +180,20 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
   unit hardening was not scored with `systemd-analyze security`; the DMS desktop and the app wizard are not part
   of the package (a `sway-rdp-desktop` metapackage was the idea).
 - The worker is spawned by the daemon in the single-account and `--per-user` forms, by the helper in the helper form.
+
+### Desktop package (2026-10-16)
+
+`sway-rdp-desktop` (architecture `all`, built by the same script) is the "Windows-like desktop" layer on top of
+`sway-rdp`, not a distribution: it is Debian 13 plus these two packages. It ships `/etc/xdg/sway-rdp/sway.conf`
+(the worker starts the session's sway with `-c`: `~/.config/sway-rdp/config` first, then this file; it lives under
+`/etc/xdg` because `/etc/sway-rdp` is closed to the accounts, it holds the TLS key), `sway-rdp-shell`,
+`sway-rdp-launcher`, `sway-rdp-setup` (the app wizard from `~/Sites/burin/installer`, copied to `packaging/desktop/setup`),
+`sway-session.target` for the user manager and a wants-link that starts `dms.service` with it. Tested in the VM: with
+DMS installed (by `sway-rdp-setup`'s `dms.sh`, from the DankLinux and DMS OBS repositories), alice's session showed the
+DMS bar with launcher, task list, clock and tray, a floating terminal with a title bar and DMS's Spotlight search
+opened with `sway-rdp-launcher`. Known: DMS's first-run "Welcome" window opens tiny; the installer copy in
+`packaging/desktop/setup` is not kept in sync with the original; without DMS the fallback is sway's own bar and
+`wmenu-run` (not tested); the Windows App was not tried.
 
 ## 9. Open questions
 

@@ -1,0 +1,17 @@
+Package: sway-rdp-desktop
+Version: @VERSION@
+Architecture: all
+Maintainer: José Mendonça <jmendonca@gmail.com>
+Section: x11
+Priority: optional
+Depends: sway-rdp (>= @VERSION@), foot, qt6-wayland, fonts-inter, fonts-jetbrains-mono, fonts-noto, grim, slurp, wl-clipboard, dbus-user-session, dbus-bin, xdg-utils
+Recommends: wmenu, whiptail
+Suggests: dms
+Description: Windows-like desktop for sway-rdp sessions
+ Default sway configuration for the sessions of sway-rdp (floating windows,
+ Alt+Tab, a launcher, screenshots), the glue that starts DankMaterialShell
+ when it is installed, and sway-rdp-setup, a wizard that installs the shell
+ and developer, creative and AI apps.
+ .
+ DankMaterialShell is not in Debian: sway-rdp-setup adds its third-party
+ repositories after asking.

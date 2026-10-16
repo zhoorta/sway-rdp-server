@@ -1,0 +1,6 @@
+# id<TAB>name<TAB>command<TAB>icon<TAB>categories<TAB>in-terminal(yes|no)
+# Programs that have no .desktop file of their own get one here, so they appear in the DMS app list.
+git	Lazygit	lazygit	utilities-terminal	Development;	yes
+claude-code	Claude Code	claude	utilities-terminal	Development;	yes
+aider	Aider	aider	utilities-terminal	Development;	yes
+opencode	OpenCode	opencode	utilities-terminal	Development;	yes

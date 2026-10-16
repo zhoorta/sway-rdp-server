@@ -428,7 +428,17 @@ impl OwnSway {
         use std::os::unix::process::CommandExt;
         let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);
         let uid = unsafe { libc::getuid() };
-        let child = std::process::Command::new("sway")
+        // The account's own config for these sessions wins, then the system's; without either, sway's usual lookup.
+        let config = std::env::var_os("HOME")
+            .map(|h| std::path::PathBuf::from(h).join(".config/sway-rdp/config"))
+            .filter(|p| p.is_file())
+            .or_else(|| Some(std::path::PathBuf::from("/etc/xdg/sway-rdp/sway.conf")).filter(|p| p.is_file()));
+        let mut cmd = std::process::Command::new("sway");
+        if let Some(path) = &config {
+            cmd.arg("-c").arg(path);
+            info!(config = %path.display(), "sway config");
+        }
+        let child = cmd
             .env("WLR_BACKENDS", "headless")
             .env("WLR_LIBINPUT_NO_DEVICES", "1")
             // No default output: the session creates its own, at the client's size.

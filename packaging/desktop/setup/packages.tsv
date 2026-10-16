@@ -1,0 +1,66 @@
+# Package manifest for the remote desktop installer (Debian 13 "trixie").
+# Fields are TAB separated:
+#   id  layer  method  target  label  description  tags
+# layer:  base (always installed) | desktop | dev | creative | ai
+# method: apt | flatpak | mise | script
+#   apt     target = Debian package name(s), space separated
+#   flatpak target = Flathub app id
+#   mise    target = tool@version, installed globally with `mise use -g`
+#   script  target = <binary-to-check>::<shell command>   (skipped if the binary exists)
+# tags (comma separated): default = pre-ticked in its layer; gpu = needs a GPU to be pleasant;
+#   x86only = hidden by the wizard on arm64 machines
+# Names are not verified against trixie yet: run `./install.sh --check`.
+
+# --- base ---------------------------------------------------------------
+foot	base	apt	foot	foot	Terminal emulator	default
+shell	base	apt	zsh starship tmux fzf ripgrep fd-find bat eza zoxide btop jq	Shell and CLI essentials	Modern shell tools	default
+firefox	base	apt	firefox-esr	Firefox	Web browser	default
+files	base	apt	thunar	Thunar	File manager	default
+office	base	apt	libreoffice	LibreOffice	Office suite	default
+pdf	base	apt	okular	Okular	PDF and document viewer	default
+passwords	base	apt	keepassxc	KeePassXC	Password manager	default
+screenshot	base	apt	grim slurp cliphist	Screenshot and clipboard	grim, slurp and cliphist for Wayland	default
+media	base	apt	mpv imv	mpv and imv	Video and image viewers	default
+fonts	base	apt	fonts-inter fonts-jetbrains-mono fonts-noto fonts-noto-color-emoji	Fonts	Inter, JetBrains Mono, Noto	default
+sync	base	apt	syncthing	Syncthing	File sync in and out of the desktop	default
+
+# --- desktop ------------------------------------------------------------
+dms	desktop	script	dms::bash "$INSTALLER_DIR/dms.sh"	DankMaterialShell	Desktop shell: bar, launcher, app list, notifications	default
+
+# --- dev ----------------------------------------------------------------
+git	dev	apt	git lazygit gh	Git tools	git, lazygit, gh	default
+neovim	dev	apt	neovim	Neovim	Terminal editor	default
+vscode	dev	flatpak	com.visualstudio.code	VS Code	Code editor	default
+zed	dev	flatpak	dev.zed.Zed	Zed	Fast native editor
+chromium	dev	apt	chromium	Chromium	Second browser for testing	default
+mise	dev	script	mise::curl -fsSL https://mise.run | sh	mise	Language runtime manager (node, php, python, go, rust)	default
+uv	dev	script	uv::curl -LsSf https://astral.sh/uv/install.sh | sh	uv	Python package and tool manager	default
+direnv-just	dev	apt	direnv just	direnv and just	Per-folder env and task runner	default
+podman	dev	apt	podman podman-compose	Podman	Rootless containers	default
+docker	dev	apt	docker.io docker-compose	Docker	Docker engine (alternative to Podman)
+php	dev	apt	php-cli php-mbstring php-xml php-curl php-sqlite3 composer	PHP and Composer	For Laravel work
+dbeaver	dev	flatpak	io.dbeaver.DBeaverCommunity	DBeaver	Database client
+bruno	dev	flatpak	com.usebruno.Bruno	Bruno	API client (Flathub has no arm64 build)	x86only
+pandoc	dev	apt	pandoc	Pandoc	Document converter
+
+# --- creative -----------------------------------------------------------
+gimp	creative	apt	gimp	GIMP	Photo editing	default
+krita	creative	apt	krita	Krita	Digital painting	default
+inkscape	creative	apt	inkscape	Inkscape	Vector graphics	default
+darktable	creative	apt	darktable	darktable	RAW photo workflow	gpu
+obsidian	creative	flatpak	md.obsidian.Obsidian	Obsidian	Notes and writing	default
+drawing	creative	apt	drawing	Drawing	Simple sketching app
+kdenlive	creative	apt	kdenlive	Kdenlive	Video editor	gpu
+obs	creative	apt	obs-studio	OBS Studio	Recording and streaming
+audio	creative	apt	audacity	Audacity	Audio editor	default
+ardour	creative	apt	ardour	Ardour	Digital audio workstation
+handbrake	creative	apt	handbrake	HandBrake	Video transcoder
+ffmpeg	creative	apt	ffmpeg	ffmpeg	Media Swiss army knife	default
+blender	creative	apt	blender	Blender	3D modelling and rendering	gpu
+scribus	creative	apt	scribus	Scribus	Page layout
+
+# --- ai -----------------------------------------------------------------
+claude-code	ai	script	claude::curl -fsSL https://claude.ai/install.sh | bash	Claude Code	Coding agent in the terminal	default
+aider	ai	script	aider::uv tool install aider-chat	Aider	Pair programming agent (needs uv)
+opencode	ai	script	opencode::curl -fsSL https://opencode.ai/install | bash	OpenCode	Terminal coding agent
+ollama	ai	script	ollama::curl -fsSL https://ollama.com/install.sh | sh	Ollama	Local models, GPU strongly recommended	gpu

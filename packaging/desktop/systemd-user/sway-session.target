@@ -1,0 +1,4 @@
+[Unit]
+Description=sway-rdp session
+Requires=graphical-session.target
+After=graphical-session.target
