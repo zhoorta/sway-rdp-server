@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+if [ "$1" = purge ]; then
+    rm -rf /etc/sway-rdp
+    rm -f /etc/default/sway-rdp
+    getent passwd sway-rdp >/dev/null && deluser --system sway-rdp >/dev/null 2>&1 || true
+fi
+systemctl daemon-reload >/dev/null 2>&1 || true
+exit 0

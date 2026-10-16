@@ -1,0 +1,14 @@
+# /etc/default/sway-rdp: settings of the sway-rdp services.
+
+# Where the RDP port listens. Loopback by default: reach it through an SSH tunnel or a VPN. Put a VPN or private
+# address here to serve a network; do not publish it to the internet without reading docs/MULTIUSER-DESIGN.md.
+SWAY_RDP_BIND=127.0.0.1:3389
+
+# Extra options of the network daemon (see the README): --quality must be the same here and in the session args.
+SWAY_RDP_ARGS=
+
+# Options of the sessions the helper starts, for example: --idle-timeout 28800 --end-on-disconnect --kb-layout pt
+#   --idle-timeout SECONDS   a session without a client ends after this long (default 28800 = 8 h, 0 = never)
+#   --end-on-disconnect      a session ends as soon as its client leaves
+#   --bitrate BITS           H.264 bitrate (default 40000000); lower it for slow links, with --quality MAXQP
+SWAY_RDP_SESSION_ARGS=

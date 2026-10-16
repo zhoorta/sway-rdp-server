@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    getent passwd sway-rdp >/dev/null || adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin --gecos "sway-rdp daemon" sway-rdp
+    mkdir -p /etc/sway-rdp
+    if [ ! -f /etc/sway-rdp/key.pem ]; then
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=$(hostname)" \
+            -keyout /etc/sway-rdp/key.pem -out /etc/sway-rdp/cert.pem >/dev/null 2>&1
+        echo "sway-rdp: made a self-signed certificate. Check this fingerprint in your RDP client on first connect:"
+        openssl x509 -in /etc/sway-rdp/cert.pem -noout -fingerprint -sha256 | sed 's/^/    /'
+    fi
+    chown root:sway-rdp /etc/sway-rdp
+    chmod 750 /etc/sway-rdp
+    chown sway-rdp:sway-rdp /etc/sway-rdp/key.pem /etc/sway-rdp/cert.pem
+    chmod 600 /etc/sway-rdp/key.pem
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl enable sway-rdp-helper.service sway-rdp.service >/dev/null 2>&1 || true
+    systemctl restart sway-rdp-helper.service sway-rdp.service >/dev/null 2>&1 || true
+fi
+exit 0

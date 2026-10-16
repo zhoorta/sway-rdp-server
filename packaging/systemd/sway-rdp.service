@@ -1,0 +1,38 @@
+[Unit]
+Description=sway-rdp (RDP for per-account sway desktops)
+Documentation=file:///usr/share/doc/sway-rdp/README.md
+After=network.target sway-rdp-helper.service
+Requires=sway-rdp-helper.service
+
+[Service]
+Type=simple
+User=sway-rdp
+Group=sway-rdp
+EnvironmentFile=-/etc/default/sway-rdp
+ExecStart=/usr/bin/sway-rdp-server --bind ${SWAY_RDP_BIND} --cert /etc/sway-rdp/cert.pem --key /etc/sway-rdp/key.pem --auth helper $SWAY_RDP_ARGS
+Restart=on-failure
+RestartSec=2
+# The network-facing part: no privileges, no files of the accounts, only the sockets it needs.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -1,6 +1,6 @@
 # sway-rdp: multi-user design (draft, 2026-10-16)
 
-Status: milestones 1 to 5 are built and tested in a VM (see section 8); the rest is design. It describes where `sway-rdp-server` (one user, one client at a time,
+Status: milestones 1 to 6 are built and tested in a VM (see section 8); milestone 7 (review) is not done. It describes where `sway-rdp-server` (one user, one client at a time,
 all sessions on one shared sway) goes to become an out-of-the-box multi-user remote desktop for Debian.
 Written from reading the current code (`main.rs`, `session.rs`, `auth.rs`, `input.rs`, `capture.rs`) and the
 vendored IronRDP patches. Statements about systemd, logind and PAM behaviour are from experience and have to be
@@ -163,6 +163,21 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
   sessions or resources yet (logind slice limits belong to milestone 6), no way for a user to log out of the
   RDP session other than quitting sway, keys held down when a client is replaced stay pressed, and the idle timer
   does not look at activity inside the session.
+- 6 done: `packaging/build-deb.sh` builds `sway-rdp_<version>_<arch>.deb` in Docker (arm64 tested; amd64 not built).
+  It installs `/usr/bin/sway-rdp-server`, the units `sway-rdp-helper.service` (root; `RuntimeDirectory=sway-rdp`,
+  `KillMode=control-group`, moderate hardening) and `sway-rdp.service` (account `sway-rdp`, empty capability set,
+  `ProtectSystem=strict`, `ProtectHome`, `PrivateDevices`, syscall filter, only inet/unix sockets), `/etc/default/sway-rdp`
+  (bind address, extra options), `/etc/pam.d/sway-rdp-server` (includes the system's `common-auth` and `common-account`),
+  and a postinst that creates the `sway-rdp` account, makes the self-signed certificate (fingerprint printed) and
+  enables and starts both services. The helper starts the account's systemd user manager when `/run/user/<uid>` is
+  missing, so `enable-linger` is no longer needed. Tested in the VM: `apt install` (a conffile prompt for the PAM file
+  I had written by hand, `--force-confnew` answered it), both services active, alice logged in under systemd
+  with her runtime directory created on demand, a wrong password was rejected, and stopping the helper service
+  ended the session and the daemon (`Requires=`). Gaps: the sessions live in the helper's cgroup, not in the
+  account's `user-<uid>.slice`, so there are no per-account memory or task limits (the planned logind-slice
+  route needs `pam_systemd` or `systemd-run`); amd64 and a clean-VM install were not tested; no Lintian run; the
+  unit hardening was not scored with `systemd-analyze security`; the DMS desktop and the app wizard are not part
+  of the package (a `sway-rdp-desktop` metapackage was the idea).
 - The worker is spawned by the daemon in the single-account and `--per-user` forms, by the helper in the helper form.
 
 ## 9. Open questions

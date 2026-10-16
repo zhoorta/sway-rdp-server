@@ -1,8 +1,27 @@
 # sway-rdp-server
 
-An RDP server for [sway](https://swaywm.org). Every connection gets its **own headless sway output**, sized and scaled
-from what the client asks for, so a Retina Mac or a laptop with 200 % scaling gets a sharp desktop at its own resolution
-and the window can be resized live. Status: **early, one author, tested mostly with the Windows App on macOS and FreeRDP.**
+An RDP server for [sway](https://swaywm.org). Every client gets a headless sway output sized and scaled from what the
+client asks for, so a Retina Mac or a laptop with 200 % scaling gets a sharp desktop at its own resolution and the
+window can be resized live. Status: **early, one author, tested mostly with FreeRDP in a VM; the Windows App on macOS
+was tested before the multi-user work and not since.**
+
+## Multi-user (Debian 13)
+
+`apt install ./sway-rdp_*.deb` (build it with `packaging/build-deb.sh [arm64|amd64]`, Docker needed) installs two
+systemd services:
+
+- `sway-rdp-helper`: runs as root and does only two things: check a password through PAM and start a session as that
+  account. It never touches the network.
+- `sway-rdp`: the network-facing RDP daemon, as the unprivileged system account `sway-rdp` (heavily sandboxed), on
+  `127.0.0.1:3389` by default (`/etc/default/sway-rdp`).
+
+An account logs in over RDP with its normal password (plain TLS login: use a VPN or an SSH tunnel) and gets its own
+headless sway that **survives disconnects**: reconnecting returns to the same windows, and a second client of the same
+account replaces the first, only after logging in. Sessions end after 8 hours without a client (`--idle-timeout`) or
+when the account quits its sway. Accounts cannot reach each other's sockets. The self-signed certificate is made at
+install time and its fingerprint is printed. Design, threat model and what is not done yet:
+[docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
+exists (run the binary inside your own sway).
 
 - Capture: `wlr-screencopy` (frame diff), cursor included.
 - Video: H.264 (AVC420) over the RDP graphics pipeline; plain bitmaps as fallback. The encoder is the system's
@@ -48,8 +67,9 @@ because the old client is dropped before the new one has authenticated (so anyon
 
 ## Known gaps
 
-No dynamic hardware encoding (VA-API), no Opus, one client at a time, clipboard with the Windows App, relative mouse and
-Unicode key events, Caps Lock sync.
+No dynamic hardware encoding (VA-API), no Opus, clipboard with the Windows App, relative mouse and Unicode key events,
+Caps Lock sync. In the multi-user form sound and clipboard are off, and sessions share the helper's control group (no
+per-account resource limits yet). See docs/MULTIUSER-DESIGN.md.
 
 ## Licence
 

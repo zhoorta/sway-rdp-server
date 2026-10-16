@@ -1,0 +1,15 @@
+Package: sway-rdp
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: José Mendonça <jmendonca@gmail.com>
+Section: x11
+Priority: optional
+Depends: sway, foot, libopenh264-8 (>= 2.6), libpam0g, libpam-runtime, libxkbcommon0, openssl, systemd, adduser
+Recommends: pipewire, wireplumber
+Description: RDP server giving each account its own sway desktop
+ Accounts log in over RDP with their normal password and get a private,
+ headless sway session that survives disconnects. A small root helper checks
+ passwords (PAM) and starts the sessions; the network-facing daemon runs as
+ an unprivileged account.
+ .
+ Early software, one author. Plain TLS login: use a VPN or an SSH tunnel.

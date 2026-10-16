@@ -1,0 +1,8 @@
+# Build container for the sway-rdp package: Debian 13, same libraries as the target system.
+FROM debian:13
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential pkg-config curl ca-certificates git cmake nasm \
+    libwayland-dev libxkbcommon-dev libssl-dev libpam0g-dev dpkg-dev \
+ && rm -rf /var/lib/apt/lists/*
+ENV RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal

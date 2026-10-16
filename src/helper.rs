@@ -207,6 +207,30 @@ fn reply(sock: &mut UnixStream, resp: &HelperResp) -> bool {
     proto::write_frame(sock, &resp.encode()).is_ok()
 }
 
+/// Makes sure the account has a runtime directory (`/run/user/<uid>`): starts its systemd user manager if need be. That
+/// is what `loginctl enable-linger` does too, but without changing the account's settings for good.
+fn ensure_runtime_dir(user: &UserInfo) -> Result<()> {
+    let dir = PathBuf::from(format!("/run/user/{}", user.uid));
+    if dir.is_dir() {
+        return Ok(());
+    }
+    info!(user = %user.name, "starting the user manager for its runtime directory");
+    let status = std::process::Command::new("systemctl")
+        .arg("start")
+        .arg(format!("user@{}.service", user.uid))
+        .stdin(std::process::Stdio::null())
+        .status()
+        .context("cannot run systemctl")?;
+    ensure!(status.success(), "systemctl start user@{}.service failed ({status})", user.uid);
+    for _ in 0..100 {
+        if dir.is_dir() {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    anyhow::bail!("{} did not appear", dir.display())
+}
+
 /// The running session of the account, or a new one (started and waited for until it registers).
 fn session_for(user: &UserInfo, cfg: &Config, sessions: &Sessions, register_path: &std::path::Path) -> Result<UnixStream> {
     let gate = sessions.gate(user.uid);
@@ -215,6 +239,7 @@ fn session_for(user: &UserInfo, cfg: &Config, sessions: &Sessions, register_path
         info!(user = %user.name, "reconnecting to the running session");
         return Ok(s);
     }
+    ensure_runtime_dir(user)?;
     let (child, _) = spawn_worker(&cfg.exe, &cfg.worker_args, &cfg.workspace, Some(user), true, Some(register_path))?;
     info!(user = %user.name, pid = child.id(), "session process started");
     sessions.children.lock().unwrap().push(child);
