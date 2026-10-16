@@ -1,6 +1,6 @@
 # sway-rdp: multi-user design (draft, 2026-10-16)
 
-Status: milestones 1 and 2 are built and tested in a VM (see section 8); the rest is design. It describes where `sway-rdp-server` (one user, one client at a time,
+Status: milestones 1 to 3 are built and tested in a VM (see section 8); the rest is design. It describes where `sway-rdp-server` (one user, one client at a time,
 all sessions on one shared sway) goes to become an out-of-the-box multi-user remote desktop for Debian.
 Written from reading the current code (`main.rs`, `session.rs`, `auth.rs`, `input.rs`, `capture.rs`) and the
 vendored IronRDP patches. Statements about systemd, logind and PAM behaviour are from experience and have to be
@@ -123,6 +123,17 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
   input and resize requests and sends credits; frames are encoded in the session. Killing the daemon (even with
   SIGKILL) or sending SIGTERM to the session makes the session remove its output and end. Not tested: window resize
   under load, the Windows App on macOS after the split, bitmap fallback.
+- 3 done (development form): `--per-user --auth pam`. The daemon **runs as root** (it warns about it) and, after a PAM
+  login (any ordinary account, or the ones in `--allow-users`), starts the session process as that account (groups,
+  gid, uid, clean environment). The session starts its own headless sway (`WLR_BACKENDS=headless`, no default
+  output) whose sockets live in the account's `/run/user/<uid>` (mode 0700, needs `loginctl enable-linger`). Tested
+  with two accounts: each had its own sway and worker under its own uid, `ls`, `grim` and `swaymsg` against the other
+  account's runtime directory were refused, a screenshot of one's own sway showed that account's terminal, root,
+  an unknown account and a wrong password were rejected, and everything was gone after both disconnected. Failure
+  counting is per account name now (it was global). Gaps: the daemon being root is exactly what milestone 4
+  removes; sound is off in this mode (still in the daemon); the same account connecting twice gets two swaies
+  (milestone 5 makes it one); the binary has to be readable by the accounts (installed to /usr/local/bin); a plain
+  `sway` config is used (no DMS autostart, which needs the account's systemd user session).
 - The worker is spawned by the daemon here; in the final design the root helper starts it as the user (milestone 4).
 
 ## 9. Open questions

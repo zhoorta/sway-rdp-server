@@ -13,6 +13,7 @@ use anyhow::{bail, Context as _, Result};
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
+use crate::auth::UserInfo;
 use crate::proto::{self, Down, FrameKind, Up};
 
 /// Numbers of the sessions that exist (1, 2, ...). The lowest free one names the session's workspace, so two
@@ -57,17 +58,56 @@ pub struct Link {
 impl Link {
     /// Starts `exe --session-worker args...` with one end of a socket pair as fd 3 and waits until it has its
     /// output and reports the size.
-    pub async fn spawn(exe: &Path, args: &[String], workspace: &str, size: (u16, u16), klid: u32) -> Result<Arc<Link>> {
-        // The first session keeps the configured name; later ones get a number.
+    ///
+    /// `user`: the account the session belongs to. When it is not the account running the daemon, the daemon has to be
+    /// root: the process then starts as that account (groups, gid, uid, a clean environment). `own_sway`: the session
+    /// starts its own headless sway instead of using the one the daemon runs in.
+    pub async fn spawn(exe: &Path, args: &[String], workspace: &str, size: (u16, u16), klid: u32, user: Option<&UserInfo>, own_sway: bool) -> Result<Arc<Link>> {
         let slot = Slot::take();
-        let workspace = if slot.0 == 1 { workspace.to_owned() } else { format!("{workspace} {}", slot.0) };
+        // On a shared sway the first session keeps the configured name and later ones get a number; with a sway
+        // of its own there is nothing to keep apart.
+        let workspace = if own_sway || slot.0 == 1 { workspace.to_owned() } else { format!("{workspace} {}", slot.0) };
+        let switch = user.filter(|u| u.uid != unsafe { libc::getuid() });
+        if switch.is_some() && unsafe { libc::getuid() } != 0 {
+            bail!("starting a session as another account needs the daemon to run as root");
+        }
+        if own_sway {
+            if let Some(u) = switch {
+                let dir = format!("/run/user/{}", u.uid);
+                if !Path::new(&dir).is_dir() {
+                    bail!("{dir} does not exist: the account needs a runtime directory (loginctl enable-linger {})", u.name);
+                }
+            }
+        }
         let (parent, child_end) = std::os::unix::net::UnixStream::pair().context("socket pair")?;
         let child_fd = child_end.as_raw_fd();
         let mut cmd = Command::new(exe);
         cmd.arg("--session-worker").args(args).args(["--workspace", &workspace]).stdin(Stdio::null());
-        // SAFETY: only async-signal-safe calls (dup2, fcntl) between fork and exec.
+        if own_sway {
+            cmd.arg("--own-sway");
+        }
+        let ids = switch.map(|u| (u.uid, u.gid, u.groups.clone()));
+        if let Some(u) = switch {
+            cmd.env_clear()
+                .env("PATH", "/usr/local/bin:/usr/bin:/bin")
+                .env("HOME", &u.home)
+                .env("USER", &u.name)
+                .env("LOGNAME", &u.name)
+                .env("XDG_RUNTIME_DIR", format!("/run/user/{}", u.uid))
+                .env("LANG", "C.UTF-8")
+                .current_dir(&u.home);
+            if let Ok(level) = std::env::var("SWAY_RDP_LOG") {
+                cmd.env("SWAY_RDP_LOG", level);
+            }
+        }
+        // SAFETY: only async-signal-safe calls (setgroups, setgid, setuid, dup2, fcntl) between fork and exec.
         unsafe {
             cmd.pre_exec(move || {
+                if let Some((uid, gid, groups)) = &ids {
+                    if libc::setgroups(groups.len(), groups.as_ptr()) != 0 || libc::setgid(*gid) != 0 || libc::setuid(*uid) != 0 {
+                        return Err(std::io::Error::last_os_error());
+                    }
+                }
                 let ok = if child_fd == 3 { libc::fcntl(3, libc::F_SETFD, 0) >= 0 } else { libc::dup2(child_fd, 3) >= 0 };
                 if ok {
                     Ok(())

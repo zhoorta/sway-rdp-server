@@ -22,6 +22,8 @@ pub struct Config {
     pub opts: session::Options,
     /// None: no H.264, bitmaps only.
     pub tuning: Option<Tuning>,
+    /// Start a headless sway of this session's own (see `OwnSway`).
+    pub own_sway: bool,
 }
 
 struct Worker {
@@ -79,6 +81,9 @@ pub async fn run(cfg: Config) -> Result<()> {
             }
         }
     });
+
+    // Declared before the session so that it is dropped after it: the session's cleanup still needs the sway.
+    let _sway = if cfg.own_sway { Some(OwnSway::start().await?) } else { None };
 
     let layout = if klid == 0 { cfg.opts.default_layout.clone() } else { session::xkb_layout_for_klid(klid).to_owned() };
     info!(width, height, klid = format!("{klid:#06x}"), %layout, "creating session");
@@ -203,5 +208,86 @@ impl Worker {
             }
         }
         Ok(())
+    }
+}
+
+/// A headless sway that belongs to this session (and so to its account): its Wayland and IPC sockets live in the
+/// account's own runtime directory, which no other account can enter. Stopped when dropped.
+struct OwnSway {
+    child: std::process::Child,
+}
+
+impl OwnSway {
+    async fn start() -> Result<Self> {
+        use std::os::unix::process::CommandExt;
+        let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);
+        let uid = unsafe { libc::getuid() };
+        let child = std::process::Command::new("sway")
+            .env("WLR_BACKENDS", "headless")
+            .env("WLR_LIBINPUT_NO_DEVICES", "1")
+            // No default output: the session creates its own, at the client's size.
+            .env("WLR_HEADLESS_OUTPUTS", "0")
+            .env("WLR_RENDERER", "pixman")
+            .env("GSETTINGS_BACKEND", "memory")
+            .env("NO_AT_BRIDGE", "1")
+            .env_remove("WAYLAND_DISPLAY")
+            .env_remove("SWAYSOCK")
+            .env_remove("DISPLAY")
+            .stdin(std::process::Stdio::null())
+            .process_group(0)
+            .spawn()
+            .context("cannot start sway")?;
+        let mut me = Self { child };
+        let ipc = runtime.join(format!("sway-ipc.{uid}.{}.sock", me.child.id()));
+        for _ in 0..100 {
+            if ipc.exists() {
+                break;
+            }
+            if let Ok(Some(status)) = me.child.try_wait() {
+                bail!("sway ended right away ({status})");
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        anyhow::ensure!(ipc.exists(), "sway has no IPC socket after 10 s");
+
+        // The Wayland socket has an automatic name: ask sway to tell us what its children inherit.
+        let note = runtime.join(format!("sway-rdp-{}.wayland", me.child.id()));
+        let out = std::process::Command::new("swaymsg")
+            .arg("-s")
+            .arg(&ipc)
+            .arg("exec")
+            .arg(format!("printenv WAYLAND_DISPLAY > '{}'", note.display()))
+            .output()
+            .context("cannot run swaymsg")?;
+        anyhow::ensure!(out.status.success(), "swaymsg exec failed: {}", String::from_utf8_lossy(&out.stderr));
+        let mut socket = String::new();
+        for _ in 0..50 {
+            socket = std::fs::read_to_string(&note).unwrap_or_default().trim().to_owned();
+            if !socket.is_empty() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        let _ = std::fs::remove_file(&note);
+        anyhow::ensure!(!socket.is_empty(), "could not find out the Wayland socket of sway");
+        std::env::set_var("SWAYSOCK", &ipc);
+        std::env::set_var("WAYLAND_DISPLAY", &socket);
+        info!(pid = me.child.id(), wayland = %socket, "own headless sway started");
+        Ok(me)
+    }
+}
+
+impl Drop for OwnSway {
+    fn drop(&mut self) {
+        let pgid = self.child.id() as i32;
+        unsafe { libc::kill(-pgid, libc::SIGTERM) };
+        for _ in 0..60 {
+            if matches!(self.child.try_wait(), Ok(Some(_))) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        unsafe { libc::kill(-pgid, libc::SIGKILL) };
+        let _ = self.child.wait();
     }
 }

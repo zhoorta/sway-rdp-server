@@ -4,15 +4,54 @@
 //! "right or wrong". The password therefore travels inside the TLS connection: verify the certificate fingerprint on
 //! first use, and prefer a tunnel or VPN on networks you do not control.
 //!
-//! Only the user that runs the server can log in (a process that is not root can only check its own password; PAM's
-//! `unix_chkpwd` helper does that). Failures are slowed down and, after a few in a row, refused for a while.
+//! A process that is not root can only check its own password (PAM's `unix_chkpwd` helper does that), so then only the
+//! user running the server can log in. Run as root (development setups only, see docs/MULTIUSER-DESIGN.md) and any
+//! ordinary account (uid 1000 and up, or the ones named with `--allow-users`) can. Failures are slowed down and,
+//! per account name, a few in a row are refused for a while.
 
 use std::ffi::{c_char, c_int, c_void, CString};
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use ironrdp_server::{CredentialDecision, CredentialValidationError, CredentialValidator, Credentials};
 use tracing::{info, warn};
+
+/// An account, as the system knows it.
+#[derive(Clone, Debug)]
+pub struct UserInfo {
+    pub name: String,
+    pub uid: u32,
+    pub gid: u32,
+    pub home: PathBuf,
+    /// All group ids of the account (including `gid`).
+    pub groups: Vec<u32>,
+}
+
+/// Looks an account up by name.
+pub fn lookup_user(name: &str) -> Option<UserInfo> {
+    let cname = CString::new(name).ok()?;
+    let mut pwd: libc::passwd = unsafe { std::mem::zeroed() };
+    let mut buf = vec![0u8; 16384];
+    let mut res: *mut libc::passwd = std::ptr::null_mut();
+    let rc = unsafe { libc::getpwnam_r(cname.as_ptr(), &mut pwd, buf.as_mut_ptr() as *mut c_char, buf.len(), &mut res) };
+    if rc != 0 || res.is_null() {
+        return None;
+    }
+    let home = PathBuf::from(unsafe { std::ffi::CStr::from_ptr(pwd.pw_dir) }.to_string_lossy().into_owned());
+    let (uid, gid) = (pwd.pw_uid, pwd.pw_gid);
+    let mut n: c_int = 64;
+    let mut groups: Vec<libc::gid_t> = vec![0; n as usize];
+    if unsafe { libc::getgrouplist(cname.as_ptr(), gid, groups.as_mut_ptr(), &mut n) } < 0 {
+        groups = vec![0; n.max(1) as usize];
+        if unsafe { libc::getgrouplist(cname.as_ptr(), gid, groups.as_mut_ptr(), &mut n) } < 0 {
+            return None;
+        }
+    }
+    groups.truncate(n.max(0) as usize);
+    Some(UserInfo { name: name.to_owned(), uid, gid, home, groups })
+}
 
 #[repr(C)]
 struct PamMessage {
@@ -87,35 +126,63 @@ struct Guard {
     locked_until: Option<Instant>,
 }
 
-pub struct PamValidator {
+/// Who may log in and how failures are counted. One per server.
+pub struct PamPolicy {
     service: String,
-    /// The only account that may log in: the one running this server.
-    user: String,
-    guard: Mutex<Guard>,
+    /// The account running the server.
+    running: UserInfo,
+    root: bool,
+    /// Names allowed besides the running user (as root); None = every ordinary account.
+    allow: Option<Vec<String>>,
+    guards: Mutex<HashMap<String, Guard>>,
 }
 
 const FAIL_DELAY: Duration = Duration::from_secs(2);
 const MAX_FAILURES: u32 = 5;
 const LOCKOUT: Duration = Duration::from_secs(60);
+/// Accounts tracked at once; unknown names are tracked too, so this bounds the memory an attacker can use.
+const MAX_TRACKED: usize = 4096;
 
-impl PamValidator {
-    pub fn new(service: &str) -> anyhow::Result<Self> {
-        let user = std::env::var("USER").ok().filter(|u| !u.is_empty()).or_else(|| {
-            let pw = unsafe { libc::getpwuid(libc::getuid()) };
-            (!pw.is_null()).then(|| unsafe { std::ffi::CStr::from_ptr((*pw).pw_name) }.to_string_lossy().into_owned())
-        });
-        let user = user.ok_or_else(|| anyhow::anyhow!("cannot find the name of the user running the server"))?;
-        Ok(Self { service: service.to_owned(), user, guard: Mutex::new(Guard { failures: 0, locked_until: None }) })
+impl PamPolicy {
+    pub fn new(service: &str, allow: Option<Vec<String>>) -> anyhow::Result<Arc<Self>> {
+        let uid = unsafe { libc::getuid() };
+        let name = unsafe {
+            let pw = libc::getpwuid(uid);
+            (!pw.is_null()).then(|| std::ffi::CStr::from_ptr((*pw).pw_name).to_string_lossy().into_owned())
+        };
+        let name = name.ok_or_else(|| anyhow::anyhow!("cannot find the name of the user running the server"))?;
+        let running = lookup_user(&name).ok_or_else(|| anyhow::anyhow!("cannot look up {name}"))?;
+        Ok(Arc::new(Self { service: service.to_owned(), running, root: uid == 0, allow, guards: Mutex::new(HashMap::new()) }))
     }
 
-    pub fn user(&self) -> &str {
-        &self.user
+    pub fn running_user(&self) -> &str {
+        &self.running.name
+    }
+
+    pub fn is_root(&self) -> bool {
+        self.root
+    }
+
+    /// The account `name` if it may log in at all (before the password is looked at).
+    fn candidate(&self, name: &str) -> Option<UserInfo> {
+        let info = lookup_user(name)?;
+        if info.uid == self.running.uid {
+            return Some(info);
+        }
+        // Another account: only possible as root, never root itself or a system account.
+        let ordinary = info.uid >= 1000 && info.uid != 65534;
+        (self.root && ordinary && self.allow.as_ref().is_none_or(|a| a.iter().any(|n| n == name))).then_some(info)
     }
 
     /// Counts this attempt as a failure right away (it is cleared again on success), so an attempt that is cancelled
     /// half way, for example because the client reconnects at once, still counts. Returns false while locked out.
-    fn begin_attempt(&self) -> bool {
-        let mut g = self.guard.lock().unwrap();
+    fn begin_attempt(&self, name: &str) -> bool {
+        let mut guards = self.guards.lock().unwrap();
+        if guards.len() >= MAX_TRACKED {
+            let now = Instant::now();
+            guards.retain(|_, g| g.locked_until.is_some_and(|t| t > now));
+        }
+        let g = guards.entry(name.to_owned()).or_insert(Guard { failures: 0, locked_until: None });
         if let Some(t) = g.locked_until {
             if t > Instant::now() {
                 return false;
@@ -126,38 +193,58 @@ impl PamValidator {
         g.failures += 1;
         if g.failures > MAX_FAILURES {
             g.locked_until = Some(Instant::now() + LOCKOUT);
-            warn!("too many failed logins: refusing all logins for {}s", LOCKOUT.as_secs());
+            warn!(user = name, "too many failed logins: refusing this account for {}s", LOCKOUT.as_secs());
             return false;
         }
         true
     }
 
-    fn succeeded(&self) {
-        self.guard.lock().unwrap().failures = 0;
+    fn succeeded(&self, name: &str) {
+        self.guards.lock().unwrap().remove(name);
+    }
+}
+
+/// The validator of one connection: the policy is shared, and `outcome` receives the account that logged in.
+pub struct PamValidator {
+    policy: Arc<PamPolicy>,
+    outcome: Arc<Mutex<Option<UserInfo>>>,
+}
+
+impl PamValidator {
+    pub fn new(policy: Arc<PamPolicy>, outcome: Arc<Mutex<Option<UserInfo>>>) -> Self {
+        Self { policy, outcome }
     }
 }
 
 #[async_trait::async_trait]
 impl CredentialValidator for PamValidator {
     async fn validate(&self, credentials: &Credentials) -> Result<CredentialDecision, CredentialValidationError> {
-        if !self.begin_attempt() {
+        let name = credentials.username.clone();
+        if !self.policy.begin_attempt(&name) {
             return Ok(CredentialDecision::Reject);
         }
-        // Only the account running the server; the domain part is ignored.
-        let ok = if credentials.username == self.user && !credentials.password.is_empty() {
-            let (service, user, password) = (self.service.clone(), self.user.clone(), credentials.password.clone());
-            tokio::task::spawn_blocking(move || pam_check(&service, &user, &password)).await.unwrap_or(false)
-        } else {
-            false
+        // Same answer and same delay for an unknown account and a wrong password; the domain part is ignored.
+        let candidate = if credentials.password.is_empty() { None } else { self.policy.candidate(&name) };
+        let accepted = match candidate {
+            Some(info) => {
+                let (service, user, password) = (self.policy.service.clone(), name.clone(), credentials.password.clone());
+                let ok = tokio::task::spawn_blocking(move || pam_check(&service, &user, &password)).await.unwrap_or(false);
+                ok.then_some(info)
+            }
+            None => None,
         };
-        if ok {
-            self.succeeded();
-            info!(user = %self.user, "login accepted (PAM)");
-            Ok(CredentialDecision::Accept)
-        } else {
-            warn!("login rejected (PAM)");
-            tokio::time::sleep(FAIL_DELAY).await;
-            Ok(CredentialDecision::Reject)
+        match accepted {
+            Some(info) => {
+                self.policy.succeeded(&name);
+                info!(user = %name, uid = info.uid, "login accepted (PAM)");
+                *self.outcome.lock().unwrap() = Some(info);
+                Ok(CredentialDecision::Accept)
+            }
+            None => {
+                warn!(user = %name, "login rejected (PAM)");
+                tokio::time::sleep(FAIL_DELAY).await;
+                Ok(CredentialDecision::Reject)
+            }
         }
     }
 }

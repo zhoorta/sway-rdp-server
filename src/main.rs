@@ -132,11 +132,14 @@ struct Slot {
     wanted: Mutex<Option<(u16, u16, u32)>>,
     /// A worker is applying resizes.
     applying: AtomicBool,
+    /// The account that logged in (PAM logins only).
+    user: Arc<Mutex<Option<auth::UserInfo>>>,
 }
 
 impl Slot {
-    fn new() -> Self {
+    fn new(user: Arc<Mutex<Option<auth::UserInfo>>>) -> Self {
         Self {
+            user,
             link: Mutex::new(None),
             klid: AtomicU32::new(0),
             scale: AtomicU32::new(100),
@@ -185,6 +188,8 @@ struct Config {
     args: Vec<String>,
     /// Base name of the session workspaces.
     workspace: String,
+    /// Sessions run as the account that logged in, each in a sway of its own.
+    per_user: bool,
 }
 
 #[derive(Clone)]
@@ -228,7 +233,12 @@ impl RdpServerDisplay for Handler {
         }
         let klid = self.slot.klid.load(Ordering::Relaxed);
         info!(?client_size, klid = format!("{klid:#06x}"), "starting a session process");
-        match Link::spawn(&self.cfg.exe, &self.cfg.args, &self.cfg.workspace, (client_size.width, client_size.height), klid).await {
+        let user = if self.cfg.per_user { self.slot.user.lock().unwrap().clone() } else { None };
+        if self.cfg.per_user && user.is_none() {
+            error!("no account for this connection");
+            return client_size;
+        }
+        match Link::spawn(&self.cfg.exe, &self.cfg.args, &self.cfg.workspace, (client_size.width, client_size.height), klid, user.as_ref(), self.cfg.per_user).await {
             Ok(link) => {
                 if let Some((st, _)) = &self.egfx {
                     let to = link.clone();
@@ -362,6 +372,10 @@ async fn main() -> anyhow::Result<()> {
     let mut max_sessions = 8usize;
     // Internal: run as the session process of one connection (started by the daemon, with a socket as fd 3).
     let mut worker = false;
+    let mut own_sway = false;
+    // One sway per logged-in account, started as that account (needs --auth pam, and root for other accounts).
+    let mut per_user = false;
+    let mut allow_users: Option<Vec<String>> = None;
     while let Some(a) = args.next() {
         match a.as_str() {
             "--bind" => bind = args.next().context("--bind needs a value")?,
@@ -374,6 +388,9 @@ async fn main() -> anyhow::Result<()> {
             "--session-hook" => hook = args.next().map(PathBuf::from),
             "--no-egfx" => no_egfx = true,
             "--session-worker" => worker = true,
+            "--own-sway" => own_sway = true,
+            "--per-user" => per_user = true,
+            "--allow-users" => allow_users = Some(args.next().context("--allow-users needs a comma separated list")?.split(',').map(str::to_owned).collect()),
             // A new connection ends the open one. It does so before the new client has logged in, so use
             // it only where reaching the port already means trust (loopback, SSH tunnel, VPN).
             "--tls-only" => tls_only = true,
@@ -393,7 +410,7 @@ async fn main() -> anyhow::Result<()> {
     if worker {
         let tuning = (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 });
         let opts = session::Options { default_layout: layout, spawn_terminal, workspace, hook };
-        return worker::run(worker::Config { opts, tuning }).await;
+        return worker::run(worker::Config { opts, tuning, own_sway }).await;
     }
     // What the session processes are started with.
     let mut worker_args = vec!["--kb-layout".to_string(), layout.clone(), "--workspace".into(), workspace.clone()];
@@ -408,6 +425,7 @@ async fn main() -> anyhow::Result<()> {
         worker_args.extend(["--session-hook".to_string(), h.display().to_string()]);
     }
     anyhow::ensure!(matches!(auth_mode.as_str(), "file" | "pam"), "--auth must be file or pam");
+    anyhow::ensure!(!per_user || auth_mode == "pam", "--per-user needs --auth pam (the account comes from the login)");
     let pam = auth_mode == "pam";
     let tls_only = tls_only || pam;
     let (username, password) = if pam {
@@ -425,18 +443,24 @@ async fn main() -> anyhow::Result<()> {
     let acceptor = identity.make_acceptor().context("TLS acceptor")?;
 
     let common = Arc::new(Common {
-        cfg: Arc::new(Config { exe: std::env::current_exe().context("path of this program")?, args: worker_args, workspace: workspace.clone() }),
+        cfg: Arc::new(Config { exe: std::env::current_exe().context("path of this program")?, args: worker_args, workspace: workspace.clone(), per_user }),
         acceptor,
         pub_key: identity.pub_key,
         tls_only,
-        pam_validator: if pam { Some(Arc::new(auth::PamValidator::new("sway-rdp-server")?)) } else { None },
+        pam: if pam { Some(auth::PamPolicy::new("sway-rdp-server", allow_users)?) } else { None },
         credentials: (username, password),
         egfx: (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 }),
         clipboard,
-        audio,
+        audio: audio && !per_user,
     });
-    if let Some(v) = &common.pam_validator {
-        info!(user = v.user(), "login: PAM service sway-rdp-server, plain TLS login (no NLA)");
+    if let Some(p) = &common.pam {
+        info!(user = p.running_user(), root = p.is_root(), per_user, "login: PAM service sway-rdp-server, plain TLS login (no NLA)");
+        if p.is_root() {
+            warn!("running as root: any ordinary account can log in and the whole daemon, including the network side, has root rights. Development only (see docs/MULTIUSER-DESIGN.md).");
+        }
+    }
+    if per_user && audio {
+        warn!("--per-user: sound is off (it still runs in the daemon, not in the account's own session)");
     }
     if replace == Some(true) {
         warn!("--replace is ignored: every connection now gets its own session");
@@ -482,7 +506,7 @@ struct Common {
     acceptor: ironrdp_server::tokio_rustls::TlsAcceptor,
     pub_key: Vec<u8>,
     tls_only: bool,
-    pam_validator: Option<Arc<auth::PamValidator>>,
+    pam: Option<Arc<auth::PamPolicy>>,
     credentials: (String, String),
     /// None = no graphics pipeline, bitmaps only.
     egfx: Option<encode::Tuning>,
@@ -510,7 +534,8 @@ impl Drop for AudioLease {
 /// Runs one client from accept to disconnect, then removes its session.
 async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common: Arc<Common>) {
     let started = std::time::Instant::now();
-    let slot = Arc::new(Slot::new());
+    let login = Arc::new(Mutex::new(None));
+    let slot = Arc::new(Slot::new(login.clone()));
     let egfx_state = Arc::new(egfx::EgfxState::default());
     let handler = Handler {
         slot: slot.clone(),
@@ -536,9 +561,9 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
         .with_sound_factory(audio_lease.is_some().then(|| Box::new(audio::Factory::new()) as Box<dyn ironrdp_server::SoundServerFactory>))
         .with_honor_client_desktop_size(true)
         .with_replace_on_new_connection(false)
-        .with_credential_validator(common.pam_validator.clone().map(|v| v as Arc<dyn ironrdp_server::CredentialValidator>))
+        .with_credential_validator(common.pam.clone().map(|p| Arc::new(auth::PamValidator::new(p, login.clone())) as Arc<dyn ironrdp_server::CredentialValidator>))
         .build();
-    if common.pam_validator.is_none() {
+    if common.pam.is_none() {
         let (username, password) = common.credentials.clone();
         server.set_credentials(Some(Credentials { username, password, domain: None }));
     }
