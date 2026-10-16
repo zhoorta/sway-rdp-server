@@ -1,7 +1,7 @@
 //! Graphics pipeline (EGFX) output: the captured frames go to the client as H.264 (AVC420).
 //! The Windows App on macOS is built around this path and mishandles the older bitmap updates.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context as _, Result};
@@ -19,15 +19,64 @@ use crate::encode::surface_size;
 #[derive(Default)]
 pub struct EgfxState {
     ready: AtomicBool,
+    /// Frames that may still be sent. The client's acknowledgements give them back; see `Credits` below.
+    credits: AtomicU32,
+    credit_notify: tokio::sync::Notify,
     sent: AtomicU64,
     acked: AtomicU64,
     handle: Mutex<Option<GfxServerHandle>>,
     sender: Mutex<Option<UnboundedSender<ServerEvent>>>,
 }
 
+/// Frames that may be in flight (sent, not acknowledged yet). Matches the pipeline's own default
+/// (`ironrdp_egfx` DEFAULT_MAX_FRAMES_IN_FLIGHT), which our handler does not change.
+const MAX_CREDITS: u32 = 3;
+/// The client's queue depth when it has switched acknowledgements off: it will never give a credit back.
+const ACKS_SUSPENDED: u32 = 0xFFFF_FFFF;
+
+// Credits are the flow control between whoever encodes and whoever talks to the client. The sender may only
+// encode and send while it holds one; each frame uses one, each acknowledgement returns one. With the encoder in a
+// separate process the same numbers travel as `proto::Down::Credit` messages.
 impl EgfxState {
     pub fn is_ready(&self) -> bool {
         self.ready.load(Ordering::Acquire)
+    }
+
+    pub fn credits(&self) -> u32 {
+        self.credits.load(Ordering::Acquire)
+    }
+
+    /// Waits until at least one frame may be sent.
+    pub async fn wait_credit(&self) {
+        loop {
+            let notified = self.credit_notify.notified();
+            if self.credits() > 0 {
+                return;
+            }
+            notified.await;
+        }
+    }
+
+    /// Atomically replaces the credits with `f(credits)`.
+    fn update_credits(&self, f: impl Fn(u32) -> u32) {
+        let mut cur = self.credits.load(Ordering::Acquire);
+        while let Err(seen) = self.credits.compare_exchange_weak(cur, f(cur), Ordering::AcqRel, Ordering::Acquire) {
+            cur = seen;
+        }
+    }
+
+    fn take_credit(&self) {
+        self.update_credits(|c| c.saturating_sub(1));
+    }
+
+    fn give_credit(&self) {
+        self.update_credits(|c| (c + 1).min(MAX_CREDITS));
+        self.credit_notify.notify_one();
+    }
+
+    fn set_credits(&self, n: u32) {
+        self.credits.store(n, Ordering::Release);
+        self.credit_notify.notify_one();
     }
 
     fn handle(&self) -> Option<GfxServerHandle> {
@@ -62,10 +111,16 @@ impl GraphicsPipelineHandler for Handler {
 
     fn on_ready(&mut self, negotiated: &CapabilitySet) {
         info!(?negotiated, "EGFX ready");
+        self.st.set_credits(MAX_CREDITS);
         self.st.ready.store(true, Ordering::Release);
     }
 
     fn on_frame_ack(&mut self, frame_id: u32, queue_depth: u32, total_frames_decoded: u32) {
+        if queue_depth == ACKS_SUSPENDED {
+            self.st.set_credits(1000);
+        } else {
+            self.st.give_credit();
+        }
         let n = self.st.acked.fetch_add(1, Ordering::Relaxed) + 1;
         if n <= 3 || n % 200 == 0 {
             info!(frame_id, queue_depth, total_frames_decoded, acked = n, sent = self.st.sent.load(Ordering::Relaxed), "client acknowledged frame");
@@ -73,6 +128,7 @@ impl GraphicsPipelineHandler for Handler {
     }
 
     fn on_close(&mut self) {
+        self.st.credits.store(0, Ordering::Release);
         self.st.ready.store(false, Ordering::Release);
     }
 }
@@ -101,6 +157,7 @@ impl GfxServerFactory for Factory {
     fn build_server_with_handle(&self) -> Option<(GfxDvcBridge, GfxServerHandle)> {
         // New client: nothing is ready until its capabilities arrive.
         self.st.ready.store(false, Ordering::Release);
+        self.st.credits.store(0, Ordering::Release);
         // The desktop size is only known per session; `Out::send` sends ResetGraphics with it.
         let server = GraphicsPipelineServer::new(Box::new(Handler { st: self.st.clone() }));
         let handle: GfxServerHandle = Arc::new(Mutex::new(server));
@@ -121,12 +178,10 @@ pub struct Out {
     start: std::time::Instant,
 }
 
-/// Whether a frame can be sent right now.
+/// Whether the client can take frames at all.
 pub enum Prepare {
-    /// Yes: the surface exists and the client has room.
+    /// Yes: the surface exists. (Whether there is room right now is a matter of credits.)
     Ready,
-    /// Too many frames in flight: try again shortly (nothing was consumed).
-    Backpressure,
     /// The client cannot do AVC420: use the bitmap path instead.
     Unsupported,
 }
@@ -142,15 +197,12 @@ impl Out {
         self.surface.is_none()
     }
 
-    /// Checks the client and creates the surface the first time. Call before encoding a frame.
+    /// Checks the client and creates the surface the first time. Call before encoding a frame, after a credit is there.
     pub fn prepare(&mut self) -> Result<Prepare> {
         let handle = self.st.handle().context("no EGFX server handle")?;
         let mut server = handle.lock().unwrap();
         if !server.supports_avc420() {
             return Ok(Prepare::Unsupported);
-        }
-        if server.should_backpressure() {
-            return Ok(Prepare::Backpressure);
         }
         if self.surface.is_none() {
             let monitor = ironrdp_pdu::gcc::Monitor {
@@ -196,7 +248,10 @@ impl Out {
         if n <= 3 {
             info!(n, bytes = data.len(), ?dirty, left = region.left, top = region.top, right = region.right, bottom = region.bottom, "sending first frames");
         }
+        self.st.take_credit();
         if server.send_avc420_frame(surface, data, &[region], ts).is_none() {
+            // Refused frames are never acknowledged, so the credit would be lost for good.
+            self.st.give_credit();
             warn!("send_avc420_frame refused a frame after encoding it");
         }
         self.st.flush(&mut server)

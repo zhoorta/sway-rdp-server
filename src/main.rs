@@ -96,6 +96,12 @@ impl RdpServerDisplayUpdates for Updates {
                 if self.egfx.as_ref().is_some_and(|l| l.out.needs_surface()) {
                     self.shared.force_full();
                 }
+                // Wait for room before taking a frame: changes keep merging into the dirty rectangle meanwhile.
+                let st = self.egfx.as_ref().unwrap().st.clone();
+                tokio::select! {
+                    _ = st.wait_credit() => {}
+                    _ = self.slot.resize_notify.notified() => continue,
+                }
                 let (frame, r) = tokio::select! {
                     next = self.shared.next() => next,
                     _ = self.slot.resize_notify.notified() => continue,
@@ -103,12 +109,6 @@ impl RdpServerDisplayUpdates for Updates {
                 let link = self.egfx.as_mut().unwrap();
                 match link.out.prepare()? {
                     egfx::Prepare::Ready => {}
-                    egfx::Prepare::Backpressure => {
-                        // Nothing was consumed by the encoder: put the area back and wait a moment.
-                        self.shared.mark_dirty(r);
-                        tokio::time::sleep(std::time::Duration::from_millis(8)).await;
-                        continue;
-                    }
                     egfx::Prepare::Unsupported => {
                         warn!("client has no AVC420; using bitmap updates");
                         link.unsupported = true;
