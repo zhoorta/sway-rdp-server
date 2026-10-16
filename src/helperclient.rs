@@ -4,6 +4,7 @@
 use std::io;
 use std::os::unix::net::UnixStream;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Context as _, Result};
@@ -64,11 +65,13 @@ impl Drop for HelperConn {
 pub struct HelperValidator {
     conn: Arc<HelperConn>,
     source: String,
+    /// Set when the login was accepted.
+    authed: Arc<AtomicBool>,
 }
 
 impl HelperValidator {
-    pub fn new(conn: Arc<HelperConn>, source: String) -> Self {
-        Self { conn, source }
+    pub fn new(conn: Arc<HelperConn>, source: String, authed: Arc<AtomicBool>) -> Self {
+        Self { conn, source, authed }
     }
 }
 
@@ -78,7 +81,10 @@ impl CredentialValidator for HelperValidator {
         let (conn, user, password, source) = (self.conn.clone(), credentials.username.clone(), credentials.password.clone(), self.source.clone());
         let result = tokio::task::spawn_blocking(move || conn.authenticate(&user, &password, &source)).await;
         Ok(match result {
-            Ok(Ok(true)) => CredentialDecision::Accept,
+            Ok(Ok(true)) => {
+                self.authed.store(true, Ordering::Release);
+                CredentialDecision::Accept
+            }
             Ok(Ok(false)) => CredentialDecision::Reject,
             Ok(Err(e)) => {
                 warn!("login check failed: {e:#}");

@@ -7,16 +7,15 @@ Before=sway-rdp.service
 [Service]
 Type=simple
 EnvironmentFile=-/etc/default/sway-rdp
-ExecStart=/usr/bin/sway-rdp-server --helper --daemon-user sway-rdp $SWAY_RDP_SESSION_ARGS
+ExecStart=/usr/bin/sway-rdp-server --helper --daemon-user sway-rdp --systemd-sessions
 Restart=on-failure
 RestartSec=2
 # The helper's runtime directory holds its two sockets.
 RuntimeDirectory=sway-rdp
 RuntimeDirectoryMode=0755
-# Sessions it starts run as the logged-in accounts and are part of this service's control group, so stopping the
-# service ends them too.
+# Sessions are separate units (sway-rdp-session@<uid>.service), so none of this sandbox reaches the accounts'
+# desktops, and they keep running when this service restarts (the sessions register again).
 KillMode=control-group
-# Hardening that does not get in the way of starting sessions as other accounts.
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
@@ -26,6 +25,7 @@ ProtectControlGroups=yes
 RestrictRealtime=yes
 LockPersonality=yes
 RestrictNamespaces=yes
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target

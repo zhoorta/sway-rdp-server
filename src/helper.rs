@@ -39,10 +39,16 @@ pub struct Config {
     pub exe: PathBuf,
     pub worker_args: Vec<String>,
     pub workspace: String,
+    /// Start sessions as `sway-rdp-session@<uid>.service` (the packaged way: they get the account's own slice and none
+    /// of the helper's sandbox) instead of as children of the helper.
+    pub systemd_sessions: bool,
 }
 
 /// Connections served at once.
 const MAX_CONNECTIONS: usize = 64;
+/// Registration connections open at once, in all and per account (any local account may open this socket).
+const MAX_REGISTRATIONS: usize = 256;
+const MAX_REGISTRATIONS_PER_ACCOUNT: usize = 4;
 /// How long a new session process may take to register.
 const REGISTER_TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -62,6 +68,8 @@ struct Sessions {
     gates: Mutex<HashMap<u32, Arc<Mutex<()>>>>,
     /// Session processes, to be reaped when they end.
     children: Mutex<Vec<Child>>,
+    /// Open registration connections, per account and in all.
+    registrations: Mutex<HashMap<u32, usize>>,
 }
 
 impl Sessions {
@@ -111,6 +119,7 @@ pub fn run(cfg: Config) -> Result<()> {
         next_generation: AtomicU64::new(1),
         gates: Mutex::new(HashMap::new()),
         children: Mutex::new(Vec::new()),
+        registrations: Mutex::new(HashMap::new()),
     });
 
     {
@@ -189,6 +198,17 @@ fn registration(mut conn: UnixStream, sessions: &Sessions) {
         warn!(uid, "registration refused");
         return;
     }
+    {
+        let mut counts = sessions.registrations.lock().unwrap();
+        let total: usize = counts.values().sum();
+        let mine = counts.entry(uid).or_insert(0);
+        if total >= MAX_REGISTRATIONS || *mine >= MAX_REGISTRATIONS_PER_ACCOUNT {
+            warn!(uid, total, "too many registrations, refused");
+            return;
+        }
+        *mine += 1;
+    }
+    let _count = CountGuard { sessions, uid };
     let Ok(sock) = conn.try_clone() else { return };
     let generation = sessions.next_generation.fetch_add(1, Ordering::Relaxed);
     sessions.by_uid.lock().unwrap().insert(uid, Registered { sock, generation });
@@ -201,6 +221,24 @@ fn registration(mut conn: UnixStream, sessions: &Sessions) {
         map.remove(&uid);
     }
     info!(uid, "session ended");
+}
+
+/// Gives a registration slot back when the connection ends, however it ends.
+struct CountGuard<'a> {
+    sessions: &'a Sessions,
+    uid: u32,
+}
+
+impl Drop for CountGuard<'_> {
+    fn drop(&mut self) {
+        let mut counts = self.sessions.registrations.lock().unwrap();
+        if let Some(n) = counts.get_mut(&self.uid) {
+            *n = n.saturating_sub(1);
+            if *n == 0 {
+                counts.remove(&self.uid);
+            }
+        }
+    }
 }
 
 fn reply(sock: &mut UnixStream, resp: &HelperResp) -> bool {
@@ -240,9 +278,16 @@ fn session_for(user: &UserInfo, cfg: &Config, sessions: &Sessions, register_path
         return Ok(s);
     }
     ensure_runtime_dir(user)?;
-    let (child, _) = spawn_worker(&cfg.exe, &cfg.worker_args, &cfg.workspace, Some(user), true, Some(register_path))?;
-    info!(user = %user.name, pid = child.id(), "session process started");
-    sessions.children.lock().unwrap().push(child);
+    if cfg.systemd_sessions {
+        let unit = format!("sway-rdp-session@{}.service", user.uid);
+        let status = std::process::Command::new("systemctl").arg("start").arg(&unit).stdin(std::process::Stdio::null()).status().context("cannot run systemctl")?;
+        ensure!(status.success(), "systemctl start {unit} failed ({status})");
+        info!(user = %user.name, %unit, "session unit started");
+    } else {
+        let (child, _) = spawn_worker(&cfg.exe, &cfg.worker_args, &cfg.workspace, Some(user), true, Some(register_path))?;
+        info!(user = %user.name, pid = child.id(), "session process started");
+        sessions.children.lock().unwrap().push(child);
+    }
 
     let deadline = Instant::now() + REGISTER_TIMEOUT;
     let mut map = sessions.by_uid.lock().unwrap();

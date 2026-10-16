@@ -1,6 +1,7 @@
 # sway-rdp: multi-user design (draft, 2026-10-16)
 
-Status: milestones 1 to 6 are built and tested in a VM (see section 8); milestone 7 (review) is not done. It describes where `sway-rdp-server` (one user, one client at a time,
+Status: milestones 1 to 6 are built and tested in a VM (see section 8); milestone 7 has a first self-review in
+SECURITY-REVIEW.md (7 findings fixed, 10 open); nobody else has reviewed it. It describes where `sway-rdp-server` (one user, one client at a time,
 all sessions on one shared sway) goes to become an out-of-the-box multi-user remote desktop for Debian.
 Written from reading the current code (`main.rs`, `session.rs`, `auth.rs`, `input.rs`, `capture.rs`) and the
 vendored IronRDP patches. Statements about systemd, logind and PAM behaviour are from experience and have to be

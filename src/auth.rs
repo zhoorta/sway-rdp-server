@@ -168,10 +168,14 @@ impl PamPolicy {
     /// The account `name` if it may log in at all (before the password is looked at).
     fn candidate(&self, name: &str) -> Option<UserInfo> {
         let info = lookup_user(name)?;
+        // Never root, whoever runs the server (a root daemon would otherwise match "the account running the server").
+        if info.uid == 0 {
+            return None;
+        }
         if info.uid == self.running.uid {
             return Some(info);
         }
-        // Another account: only possible as root, never root itself or a system account.
+        // Another account: only possible as root, and only an ordinary one, never a system account.
         let ordinary = info.uid >= 1000 && info.uid != 65534;
         (self.root && ordinary && self.allow.as_ref().is_none_or(|a| a.iter().any(|n| n == name))).then_some(info)
     }
@@ -255,5 +259,32 @@ impl CredentialValidator for PamValidator {
             }
             None => CredentialDecision::Reject,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn root_and_system_accounts_never_log_in() {
+        // Whoever runs the tests (root in the build container, an ordinary user elsewhere) the answer is the same.
+        let policy = PamPolicy::new("sway-rdp-server", None).unwrap();
+        assert!(policy.candidate("root").is_none());
+        assert!(policy.candidate("nobody").is_none());
+        assert!(policy.candidate("no such account").is_none());
+        assert!(policy.candidate("").is_none());
+        assert!(policy.candidate("a\0b").is_none());
+    }
+
+    #[test]
+    fn failures_are_counted_per_key_and_lock_out() {
+        let policy = PamPolicy::new("sway-rdp-server", None).unwrap();
+        for _ in 0..5 {
+            assert!(policy.begin_attempt("user:x", 5));
+        }
+        assert!(!policy.begin_attempt("user:x", 5), "the sixth failure in a row is refused");
+        assert!(policy.begin_attempt("user:y", 5), "another account is not affected");
+        policy.succeeded("user:y");
     }
 }

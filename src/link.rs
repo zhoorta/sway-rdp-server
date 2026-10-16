@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{bail, ensure, Context as _, Result};
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
@@ -35,6 +35,26 @@ impl Drop for Slot {
     }
 }
 
+/// A picture size a session may report: what `session::clamp_size` can produce.
+fn valid_size(width: u16, height: u16) -> bool {
+    crate::session::clamp_size(width, height) == (width, height)
+}
+
+/// Longest H.264 frame accepted (a whole 4096x2304 picture is far smaller than this at any sensible quality).
+const MAX_H264_FRAME: usize = 8 * 1024 * 1024;
+
+/// Checks a frame against the current picture size before it goes anywhere near the RDP encoder.
+fn check_frame(size: (u16, u16), (x, y, w, h): (u16, u16, u16, u16), kind: FrameKind, len: usize) -> Result<(), String> {
+    if w == 0 || h == 0 || u32::from(x) + u32::from(w) > u32::from(size.0) || u32::from(y) + u32::from(h) > u32::from(size.1) {
+        return Err(format!("rectangle {w}x{h} at {x},{y} does not fit a {}x{} picture", size.0, size.1));
+    }
+    match kind {
+        FrameKind::Bgra if len != usize::from(w) * usize::from(h) * 4 => Err(format!("{len} bytes for a {w}x{h} bitmap")),
+        FrameKind::H264 if len == 0 || len > MAX_H264_FRAME => Err(format!("H.264 frame of {len} bytes")),
+        _ => Ok(()),
+    }
+}
+
 pub enum Event {
     Frame { x: u16, y: u16, w: u16, h: u16, kind: FrameKind, data: Vec<u8> },
     /// The picture has a new size from now on; frames before this message have the old one.
@@ -45,7 +65,7 @@ pub enum Event {
 
 pub struct Link {
     tx: mpsc::UnboundedSender<Down>,
-    pub events: tokio::sync::Mutex<mpsc::UnboundedReceiver<Event>>,
+    pub events: tokio::sync::Mutex<mpsc::Receiver<Event>>,
     size: Mutex<(u16, u16)>,
     /// Notified when a resize has finished.
     pub resized: tokio::sync::Notify,
@@ -87,6 +107,7 @@ impl Link {
             .context("the session did not start in 30 s")??
             .context("the session process ended before it was ready")?;
         let Up::Ready { width, height } = Up::decode(&first)? else { bail!("first message of the session is not Ready") };
+        ensure!(valid_size(width, height), "the session reported a picture size of {width}x{height}");
         info!(width, height, pid = child.as_ref().map(Child::id), "session process ready");
 
         let (tx, mut tx_rx) = mpsc::unbounded_channel::<Down>();
@@ -98,7 +119,9 @@ impl Link {
             }
             // `wr` is dropped here: the session sees the end of the stream and shuts down.
         });
-        let (ev_tx, ev_rx) = mpsc::unbounded_channel::<Event>();
+        // Bounded: a session that sends faster than the client takes frames is slowed down (its socket fills up), not
+        // queued without limit in the daemon, which serves everybody.
+        let (ev_tx, ev_rx) = mpsc::channel::<Event>(8);
         let link = Arc::new(Link {
             tx,
             events: tokio::sync::Mutex::new(ev_rx),
@@ -120,12 +143,25 @@ impl Link {
                 };
                 match Up::decode(&body) {
                     Ok(Up::Frame { x, y, w, h, kind, data }) => {
-                        let _ = ev_tx.send(Event::Frame { x, y, w, h, kind, data });
+                        // The session belongs to an account that is not the daemon's: nothing it sends is trusted.
+                        if let Err(why) = check_frame(reader.size(), (x, y, w, h), kind, data.len()) {
+                            warn!("bad frame from the session: {why}");
+                            break;
+                        }
+                        if ev_tx.send(Event::Frame { x, y, w, h, kind, data }).await.is_err() {
+                            break;
+                        }
                     }
                     Ok(Up::Resized { width, height }) => {
+                        if !valid_size(width, height) {
+                            warn!(width, height, "bad size from the session");
+                            break;
+                        }
                         *reader.size.lock().unwrap() = (width, height);
                         reader.resized.notify_waiters();
-                        let _ = ev_tx.send(Event::Resized(width, height));
+                        if ev_tx.send(Event::Resized(width, height)).await.is_err() {
+                            break;
+                        }
                     }
                     Ok(Up::Ready { .. }) | Ok(Up::Audio { .. }) | Ok(Up::Clipboard { .. }) => {}
                     Ok(Up::Bye) => break,
@@ -135,7 +171,7 @@ impl Link {
                     }
                 }
             }
-            let _ = ev_tx.send(Event::Closed);
+            let _ = ev_tx.send(Event::Closed).await;
         });
         Ok(link)
     }
@@ -179,5 +215,33 @@ impl Link {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frames_that_do_not_fit_or_have_the_wrong_length_are_refused() {
+        let size = (1280, 800);
+        assert!(check_frame(size, (0, 0, 1280, 800), FrameKind::Bgra, 1280 * 800 * 4).is_ok());
+        assert!(check_frame(size, (10, 10, 4, 4), FrameKind::H264, 100).is_ok());
+        assert!(check_frame(size, (0, 0, 0, 4), FrameKind::H264, 100).is_err());
+        assert!(check_frame(size, (1279, 0, 2, 1), FrameKind::H264, 100).is_err());
+        assert!(check_frame(size, (65535, 65535, 65535, 65535), FrameKind::H264, 100).is_err());
+        assert!(check_frame(size, (0, 0, 4, 4), FrameKind::Bgra, 63).is_err(), "bitmap too short");
+        assert!(check_frame(size, (0, 0, 4, 4), FrameKind::Bgra, 65).is_err(), "bitmap too long");
+        assert!(check_frame(size, (0, 0, 4, 4), FrameKind::H264, 0).is_err());
+        assert!(check_frame(size, (0, 0, 4, 4), FrameKind::H264, MAX_H264_FRAME + 1).is_err());
+    }
+
+    #[test]
+    fn only_sizes_a_session_can_make_are_accepted() {
+        assert!(valid_size(1280, 800));
+        assert!(valid_size(4096, 2304));
+        assert!(!valid_size(65534, 800));
+        assert!(!valid_size(1281, 800), "odd width");
+        assert!(!valid_size(100, 100));
     }
 }

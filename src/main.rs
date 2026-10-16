@@ -400,7 +400,7 @@ async fn main() -> anyhow::Result<()> {
     // (see docs/NOTES.md), while FreeRDP is fine.
     let mut clipboard = false;
     let mut audio = true;
-    let mut max_sessions = 8usize;
+    let mut max_sessions = 64usize;
     // Internal: run as the session process of one connection (started by the daemon, with a socket as fd 3).
     let mut worker = false;
     let mut own_sway = false;
@@ -411,6 +411,7 @@ async fn main() -> anyhow::Result<()> {
     let mut run_helper = false;
     let mut helper_socket = PathBuf::from("/run/sway-rdp/helper.sock");
     let mut daemon_user = "sway-rdp".to_string();
+    let mut systemd_sessions = false;
     // How long a session without a client lives (seconds, 0 = for ever), and whether it ends when the client leaves.
     let mut idle_timeout = 8 * 3600u64;
     let mut end_on_disconnect = false;
@@ -430,6 +431,7 @@ async fn main() -> anyhow::Result<()> {
             "--session-worker" => worker = true,
             "--own-sway" => own_sway = true,
             "--helper" => run_helper = true,
+            "--systemd-sessions" => systemd_sessions = true,
             "--idle-timeout" => idle_timeout = args.next().context("--idle-timeout needs seconds")?.parse()?,
             "--end-on-disconnect" => end_on_disconnect = true,
             "--register" => register = args.next().map(PathBuf::from),
@@ -476,7 +478,7 @@ async fn main() -> anyhow::Result<()> {
     }
     if run_helper {
         let exe = std::env::current_exe().context("path of this program")?;
-        return helper::run(helper::Config { socket: helper_socket, daemon_user, allow_users, exe, worker_args, workspace });
+        return helper::run(helper::Config { socket: helper_socket, daemon_user, allow_users, exe, worker_args, workspace, systemd_sessions });
     }
     anyhow::ensure!(matches!(auth_mode.as_str(), "file" | "pam" | "helper"), "--auth must be file, pam or helper");
     anyhow::ensure!(!per_user || auth_mode == "pam", "--per-user needs --auth pam (the account comes from the login)");
@@ -557,6 +559,9 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// How long a connection may take to log in.
+const PRE_LOGIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
 /// What every connection shares (read only).
 struct Common {
     cfg: Arc<Config>,
@@ -608,6 +613,8 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
         None => None,
     };
     let slot = Arc::new(Slot::new(login.clone(), helper.clone()));
+    // Set when a login was accepted, whichever way logins are checked.
+    let authed = Arc::new(AtomicBool::new(false));
     let egfx_state = Arc::new(egfx::EgfxState::default());
     let handler = Handler {
         slot: slot.clone(),
@@ -635,7 +642,7 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
         .with_replace_on_new_connection(false)
         .with_credential_validator(match (&common.pam, &helper) {
             (Some(p), _) => Some(Arc::new(auth::PamValidator::new(p.clone(), login.clone(), peer.ip().to_string())) as Arc<dyn ironrdp_server::CredentialValidator>),
-            (None, Some(h)) => Some(Arc::new(helperclient::HelperValidator::new(h.clone(), peer.ip().to_string())) as Arc<dyn ironrdp_server::CredentialValidator>),
+            (None, Some(h)) => Some(Arc::new(helperclient::HelperValidator::new(h.clone(), peer.ip().to_string(), authed.clone())) as Arc<dyn ironrdp_server::CredentialValidator>),
             (None, None) => None,
         })
         .build();
@@ -645,7 +652,22 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
     }
 
     info!(%peer, "client connected");
-    let result = server.run_connection(stream).await;
+    // A connection that does not log in soon is cut: otherwise a few idle connections would use up all the slots.
+    let needs_login = common.pam.is_some() || helper.is_some();
+    let login_deadline = {
+        let (authed, login) = (authed.clone(), login.clone());
+        async move {
+            tokio::time::sleep(PRE_LOGIN_TIMEOUT).await;
+            if needs_login && !authed.load(Ordering::Acquire) && login.lock().unwrap().is_none() {
+                return;
+            }
+            std::future::pending::<()>().await
+        }
+    };
+    let result = tokio::select! {
+        r = server.run_connection(stream) => r,
+        _ = login_deadline => Err(anyhow::anyhow!("no login within {} s", PRE_LOGIN_TIMEOUT.as_secs())),
+    };
     match &result {
         Ok(()) => info!(%peer, duration = ?started.elapsed(), "client disconnected"),
         Err(e) => info!(%peer, duration = ?started.elapsed(), error = %format!("{e:#}"), "client disconnected"),

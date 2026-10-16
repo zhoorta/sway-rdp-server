@@ -59,17 +59,28 @@ impl Source {
 }
 
 /// Connects to the helper's registration socket (the helper learns our account from the kernel) and turns every
-/// descriptor it sends into a client socket.
+/// descriptor it sends into a client socket. If the helper goes away (a restart, an upgrade) it connects again, so the
+/// session stays reachable.
 fn register(path: &std::path::Path) -> Result<Source> {
-    let reg = std::os::unix::net::UnixStream::connect(path).with_context(|| format!("cannot register at {}", path.display()))?;
+    let path = path.to_path_buf();
+    // Fail early if the helper is not there at all.
+    let first = std::os::unix::net::UnixStream::connect(&path).with_context(|| format!("cannot register at {}", path.display()))?;
     let (tx, rx) = mpsc::unbounded_channel();
     std::thread::spawn(move || {
-        while let Ok(fd) = crate::fdpass::recv_fd(&reg) {
-            if tx.send(std::os::unix::net::UnixStream::from(fd)).is_err() {
-                break;
+        let mut reg = Some(first);
+        loop {
+            if let Some(sock) = reg.take().or_else(|| std::os::unix::net::UnixStream::connect(&path).ok()) {
+                while let Ok(fd) = crate::fdpass::recv_fd(&sock) {
+                    if tx.send(std::os::unix::net::UnixStream::from(fd)).is_err() {
+                        return;
+                    }
+                }
             }
+            if tx.is_closed() {
+                return;
+            }
+            std::thread::sleep(Duration::from_secs(2));
         }
-        // The helper closed the registration (or went away): `next` returns None from now on.
     });
     Ok(Source::Registered(rx))
 }
