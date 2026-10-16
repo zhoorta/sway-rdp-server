@@ -16,6 +16,9 @@ pub const VERSION: u16 = 1;
 /// Largest message accepted (a full 4096x2304 BGRA bitmap is 36 MiB).
 pub const MAX_MESSAGE: u32 = 48 * 1024 * 1024;
 
+/// Longest string in a helper message (account names, passwords, addresses).
+pub const MAX_STRING: u32 = 1024;
+
 #[derive(Debug, PartialEq)]
 pub enum ProtoError {
     /// The message ended before all of its fields were read.
@@ -25,6 +28,8 @@ pub enum ProtoError {
     UnknownTag(u8),
     /// A length above `MAX_MESSAGE`.
     TooLarge(u32),
+    /// A string that is not valid UTF-8.
+    BadString,
     Io(String),
 }
 
@@ -35,6 +40,7 @@ impl std::fmt::Display for ProtoError {
             ProtoError::Trailing => write!(f, "unexpected bytes after message"),
             ProtoError::UnknownTag(t) => write!(f, "unknown message tag {t}"),
             ProtoError::TooLarge(n) => write!(f, "message of {n} bytes is too large"),
+            ProtoError::BadString => write!(f, "string is not valid UTF-8"),
             ProtoError::Io(e) => write!(f, "{e}"),
         }
     }
@@ -115,6 +121,9 @@ impl Out {
         self.u32(v.len() as u32);
         self.0.extend_from_slice(v);
     }
+    fn str(&mut self, v: &str) {
+        self.bytes(v.as_bytes());
+    }
 }
 
 struct In<'a>(&'a [u8]);
@@ -149,6 +158,14 @@ impl<'a> In<'a> {
             return Err(ProtoError::TooLarge(n));
         }
         Ok(self.take(n as usize)?.to_vec())
+    }
+    /// A UTF-8 string of at most `MAX_STRING` bytes.
+    fn str(&mut self) -> Result<String, ProtoError> {
+        let n = self.u32()?;
+        if n > MAX_STRING {
+            return Err(ProtoError::TooLarge(n));
+        }
+        String::from_utf8(self.take(n as usize)?.to_vec()).map_err(|_| ProtoError::BadString)
     }
     fn finish(self) -> Result<(), ProtoError> {
         if self.0.is_empty() {
@@ -287,6 +304,93 @@ impl Up {
             4 => Up::Audio { pcm: i.bytes()? },
             5 => Up::Clipboard { data: i.bytes()? },
             255 => Up::Bye,
+            t => return Err(ProtoError::UnknownTag(t)),
+        };
+        i.finish()?;
+        Ok(msg)
+    }
+}
+
+// ---- daemon <-> root helper ----
+//
+// The network daemon runs without privileges and asks the helper for the two things only root can do: check a
+// password (any account) and start a session process as that account. One helper connection serves one client
+// connection: the helper remembers who authenticated on it and starts sessions only for that account, so the daemon
+// cannot ask for a session of an account whose password it did not present.
+
+/// From the daemon to the helper.
+#[derive(Debug, PartialEq)]
+pub enum HelperReq {
+    Authenticate { user: String, password: String, source: String },
+    /// Start the session of the account that authenticated on this connection. The answer carries the daemon's end of
+    /// the session socket as a file descriptor (see `fdpass`). Nothing else is asked for: what runs, with which
+    /// arguments, is the helper's own configuration, never the daemon's.
+    StartSession,
+    Bye,
+}
+
+/// From the helper to the daemon.
+#[derive(Debug, PartialEq)]
+pub enum HelperResp {
+    AuthOk,
+    AuthFail,
+    /// The session is running; a file descriptor follows (see `fdpass`).
+    Started,
+    Error { message: String },
+}
+
+impl HelperReq {
+    pub fn encode(&self) -> Vec<u8> {
+        let mut o = Out::default();
+        match self {
+            HelperReq::Authenticate { user, password, source } => {
+                o.u8(1);
+                o.str(user);
+                o.str(password);
+                o.str(source);
+            }
+            HelperReq::StartSession => o.u8(2),
+            HelperReq::Bye => o.u8(255),
+        }
+        o.0
+    }
+
+    pub fn decode(buf: &[u8]) -> Result<Self, ProtoError> {
+        let mut i = In(buf);
+        let msg = match i.u8()? {
+            1 => HelperReq::Authenticate { user: i.str()?, password: i.str()?, source: i.str()? },
+            2 => HelperReq::StartSession,
+            255 => HelperReq::Bye,
+            t => return Err(ProtoError::UnknownTag(t)),
+        };
+        i.finish()?;
+        Ok(msg)
+    }
+}
+
+impl HelperResp {
+    pub fn encode(&self) -> Vec<u8> {
+        let mut o = Out::default();
+        match self {
+            HelperResp::AuthOk => o.u8(1),
+            HelperResp::AuthFail => o.u8(2),
+            HelperResp::Started => o.u8(3),
+            HelperResp::Error { message } => {
+                o.u8(4);
+                // Never longer than a string may be.
+                o.str(&message.chars().take(200).collect::<String>());
+            }
+        }
+        o.0
+    }
+
+    pub fn decode(buf: &[u8]) -> Result<Self, ProtoError> {
+        let mut i = In(buf);
+        let msg = match i.u8()? {
+            1 => HelperResp::AuthOk,
+            2 => HelperResp::AuthFail,
+            3 => HelperResp::Started,
+            4 => HelperResp::Error { message: i.str()? },
             t => return Err(ProtoError::UnknownTag(t)),
         };
         i.finish()?;
@@ -444,6 +548,37 @@ mod tests {
                 assert!(Up::decode(&b[..cut]).is_err(), "cut {cut} of {m:?}");
             }
         }
+    }
+
+    #[test]
+    fn helper_messages_round_trip_and_refuse_bad_input() {
+        let reqs = [
+            HelperReq::Authenticate { user: "alice".into(), password: "pä ss".into(), source: "10.0.0.1".into() },
+            HelperReq::StartSession,
+            HelperReq::Bye,
+        ];
+        for r in reqs {
+            assert_eq!(HelperReq::decode(&r.encode()).unwrap(), r);
+            let b = r.encode();
+            for cut in 0..b.len() {
+                assert!(HelperReq::decode(&b[..cut]).is_err());
+            }
+        }
+        for r in [HelperResp::AuthOk, HelperResp::AuthFail, HelperResp::Started, HelperResp::Error { message: "no".into() }] {
+            assert_eq!(HelperResp::decode(&r.encode()).unwrap(), r);
+        }
+        // a string longer than allowed
+        let mut b = vec![1u8];
+        b.extend_from_slice(&(MAX_STRING + 1).to_le_bytes());
+        assert_eq!(HelperReq::decode(&b), Err(ProtoError::TooLarge(MAX_STRING + 1)));
+        // not UTF-8
+        let mut b = vec![1u8];
+        b.extend_from_slice(&1u32.to_le_bytes());
+        b.push(0xff);
+        assert_eq!(HelperReq::decode(&b), Err(ProtoError::BadString));
+        // a long error message is cut, not refused
+        let long = HelperResp::Error { message: "x".repeat(5000) };
+        assert!(matches!(HelperResp::decode(&long.encode()), Ok(HelperResp::Error { .. })));
     }
 
     #[test]

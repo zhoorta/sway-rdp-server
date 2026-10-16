@@ -1,6 +1,6 @@
 # sway-rdp: multi-user design (draft, 2026-10-16)
 
-Status: milestones 1 to 3 are built and tested in a VM (see section 8); the rest is design. It describes where `sway-rdp-server` (one user, one client at a time,
+Status: milestones 1 to 4 are built and tested in a VM (see section 8); the rest is design. It describes where `sway-rdp-server` (one user, one client at a time,
 all sessions on one shared sway) goes to become an out-of-the-box multi-user remote desktop for Debian.
 Written from reading the current code (`main.rs`, `session.rs`, `auth.rs`, `input.rs`, `capture.rs`) and the
 vendored IronRDP patches. Statements about systemd, logind and PAM behaviour are from experience and have to be
@@ -134,7 +134,20 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
   removes; sound is off in this mode (still in the daemon); the same account connecting twice gets two swaies
   (milestone 5 makes it one); the binary has to be readable by the accounts (installed to /usr/local/bin); a plain
   `sway` config is used (no DMS autostart, which needs the account's systemd user session).
-- The worker is spawned by the daemon here; in the final design the root helper starts it as the user (milestone 4).
+- 4 done: `sway-rdp-server --helper` (root) and `sway-rdp-server --auth helper` (the daemon, which now refuses to run
+  as root). The helper listens on a Unix socket (`/run/sway-rdp/helper.sock`, owned by the daemon's account, mode 0600,
+  `SO_PEERCRED` checked) and answers two requests: `Authenticate` (PAM, any ordinary account, failures counted per
+  account and per source address) and `StartSession`, which starts the session process as the account that
+  authenticated *on that same connection* and passes the daemon its end of the socket (SCM_RIGHTS). The daemon sends
+  no program, path or arguments: those are the helper's own configuration. Tested in the VM: daemon as the system
+  account `sway-rdp`, helper as root, two accounts logging in with sessions as their own uids; the daemon account
+  cannot read `/home/alice`; another account cannot connect to the helper socket; a request for a session before
+  or after failed logins is refused; root and wrong passwords are refused; nothing is left after disconnect.
+  Gaps: the helper is the same binary as the daemon (a separate small binary or crate would shrink what root
+  runs and audit); `pam_open_session`/`pam_systemd` is not used yet, so the account still needs
+  `loginctl enable-linger`; the daemon's `--quality` must equal the helper's; no systemd units or hardening options
+  yet (milestone 6); the password still passes through the daemon (plain TLS login), see section 7.
+- The worker is spawned by the daemon in the single-account and `--per-user` forms, by the helper in the helper form.
 
 ## 9. Open questions
 

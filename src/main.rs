@@ -8,10 +8,14 @@ mod capture;
 mod clipboard;
 mod egfx;
 mod encode;
+mod fdpass;
+mod helper;
+mod helperclient;
 mod input;
 mod link;
 mod proto;
 mod session;
+mod spawn;
 mod worker;
 
 use std::num::{NonZeroU16, NonZeroUsize};
@@ -134,12 +138,15 @@ struct Slot {
     applying: AtomicBool,
     /// The account that logged in (PAM logins only).
     user: Arc<Mutex<Option<auth::UserInfo>>>,
+    /// The connection to the root helper, when logins and sessions go through it.
+    helper: Option<Arc<helperclient::HelperConn>>,
 }
 
 impl Slot {
-    fn new(user: Arc<Mutex<Option<auth::UserInfo>>>) -> Self {
+    fn new(user: Arc<Mutex<Option<auth::UserInfo>>>, helper: Option<Arc<helperclient::HelperConn>>) -> Self {
         Self {
             user,
+            helper,
             link: Mutex::new(None),
             klid: AtomicU32::new(0),
             scale: AtomicU32::new(100),
@@ -233,6 +240,30 @@ impl RdpServerDisplay for Handler {
         }
         let klid = self.slot.klid.load(Ordering::Relaxed);
         info!(?client_size, klid = format!("{klid:#06x}"), "starting a session process");
+        if let Some(helper) = self.slot.helper.clone() {
+            // The root helper starts the session as the account that logged in and hands us its socket.
+            let started = tokio::task::spawn_blocking(move || helper.start_session()).await;
+            let result = match started {
+                Ok(Ok(stream)) => Link::from_helper(stream, (client_size.width, client_size.height), klid).await,
+                Ok(Err(e)) => Err(e),
+                Err(e) => Err(e.into()),
+            };
+            return match result {
+                Ok(link) => {
+                    if let Some((st, _)) = &self.egfx {
+                        let to = link.clone();
+                        st.set_credit_sink(Box::new(move |frames| to.send(Down::Credit { frames })));
+                    }
+                    let (width, height) = link.size();
+                    *self.slot.link.lock().unwrap() = Some(link);
+                    DesktopSize { width, height }
+                }
+                Err(e) => {
+                    error!("cannot create session: {e:#}");
+                    client_size
+                }
+            };
+        }
         let user = if self.cfg.per_user { self.slot.user.lock().unwrap().clone() } else { None };
         if self.cfg.per_user && user.is_none() {
             error!("no account for this connection");
@@ -376,6 +407,10 @@ async fn main() -> anyhow::Result<()> {
     // One sway per logged-in account, started as that account (needs --auth pam, and root for other accounts).
     let mut per_user = false;
     let mut allow_users: Option<Vec<String>> = None;
+    // The root helper (`--helper`), or the daemon using one (`--auth helper`).
+    let mut run_helper = false;
+    let mut helper_socket = PathBuf::from("/run/sway-rdp/helper.sock");
+    let mut daemon_user = "sway-rdp".to_string();
     while let Some(a) = args.next() {
         match a.as_str() {
             "--bind" => bind = args.next().context("--bind needs a value")?,
@@ -389,6 +424,9 @@ async fn main() -> anyhow::Result<()> {
             "--no-egfx" => no_egfx = true,
             "--session-worker" => worker = true,
             "--own-sway" => own_sway = true,
+            "--helper" => run_helper = true,
+            "--helper-socket" => helper_socket = PathBuf::from(args.next().context("--helper-socket needs a path")?),
+            "--daemon-user" => daemon_user = args.next().context("--daemon-user needs an account name")?,
             "--per-user" => per_user = true,
             "--allow-users" => allow_users = Some(args.next().context("--allow-users needs a comma separated list")?.split(',').map(str::to_owned).collect()),
             // A new connection ends the open one. It does so before the new client has logged in, so use
@@ -424,11 +462,17 @@ async fn main() -> anyhow::Result<()> {
     if let Some(h) = &hook {
         worker_args.extend(["--session-hook".to_string(), h.display().to_string()]);
     }
-    anyhow::ensure!(matches!(auth_mode.as_str(), "file" | "pam"), "--auth must be file or pam");
+    if run_helper {
+        let exe = std::env::current_exe().context("path of this program")?;
+        return helper::run(helper::Config { socket: helper_socket, daemon_user, allow_users, exe, worker_args, workspace });
+    }
+    anyhow::ensure!(matches!(auth_mode.as_str(), "file" | "pam" | "helper"), "--auth must be file, pam or helper");
     anyhow::ensure!(!per_user || auth_mode == "pam", "--per-user needs --auth pam (the account comes from the login)");
+    let via_helper = auth_mode == "helper";
+    anyhow::ensure!(!via_helper || unsafe { libc::geteuid() } != 0, "--auth helper: the network daemon refuses to run as root (start sway-rdp-server --helper as root and this as an ordinary service account)");
     let pam = auth_mode == "pam";
-    let tls_only = tls_only || pam;
-    let (username, password) = if pam {
+    let tls_only = tls_only || pam || via_helper;
+    let (username, password) = if pam || via_helper {
         (String::new(), String::new())
     } else {
         let f = creds_file.context("--credentials FILE is required with --auth file (first line user:password)")?;
@@ -449,9 +493,10 @@ async fn main() -> anyhow::Result<()> {
         tls_only,
         pam: if pam { Some(auth::PamPolicy::new("sway-rdp-server", allow_users)?) } else { None },
         credentials: (username, password),
+        helper_socket: via_helper.then_some(helper_socket),
         egfx: (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 }),
         clipboard,
-        audio: audio && !per_user,
+        audio: audio && !per_user && !via_helper,
     });
     if let Some(p) = &common.pam {
         info!(user = p.running_user(), root = p.is_root(), per_user, "login: PAM service sway-rdp-server, plain TLS login (no NLA)");
@@ -459,8 +504,8 @@ async fn main() -> anyhow::Result<()> {
             warn!("running as root: any ordinary account can log in and the whole daemon, including the network side, has root rights. Development only (see docs/MULTIUSER-DESIGN.md).");
         }
     }
-    if per_user && audio {
-        warn!("--per-user: sound is off (it still runs in the daemon, not in the account's own session)");
+    if (per_user || via_helper) && audio {
+        warn!("per-user sessions: sound is off (it still runs in the daemon, not in the account's own session)");
     }
     if replace == Some(true) {
         warn!("--replace is ignored: every connection now gets its own session");
@@ -507,6 +552,8 @@ struct Common {
     pub_key: Vec<u8>,
     tls_only: bool,
     pam: Option<Arc<auth::PamPolicy>>,
+    /// Logins and sessions come from the root helper at this socket.
+    helper_socket: Option<PathBuf>,
     credentials: (String, String),
     /// None = no graphics pipeline, bitmaps only.
     egfx: Option<encode::Tuning>,
@@ -535,7 +582,20 @@ impl Drop for AudioLease {
 async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common: Arc<Common>) {
     let started = std::time::Instant::now();
     let login = Arc::new(Mutex::new(None));
-    let slot = Arc::new(Slot::new(login.clone()));
+    let helper = match &common.helper_socket {
+        Some(path) => {
+            let path = path.clone();
+            match tokio::task::spawn_blocking(move || helperclient::HelperConn::connect(&path)).await {
+                Ok(Ok(conn)) => Some(Arc::new(conn)),
+                other => {
+                    error!(%peer, "cannot reach the helper: {:?}", other.map(|r| r.err()));
+                    return;
+                }
+            }
+        }
+        None => None,
+    };
+    let slot = Arc::new(Slot::new(login.clone(), helper.clone()));
     let egfx_state = Arc::new(egfx::EgfxState::default());
     let handler = Handler {
         slot: slot.clone(),
@@ -561,9 +621,13 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
         .with_sound_factory(audio_lease.is_some().then(|| Box::new(audio::Factory::new()) as Box<dyn ironrdp_server::SoundServerFactory>))
         .with_honor_client_desktop_size(true)
         .with_replace_on_new_connection(false)
-        .with_credential_validator(common.pam.clone().map(|p| Arc::new(auth::PamValidator::new(p, login.clone())) as Arc<dyn ironrdp_server::CredentialValidator>))
+        .with_credential_validator(match (&common.pam, &helper) {
+            (Some(p), _) => Some(Arc::new(auth::PamValidator::new(p.clone(), login.clone(), peer.ip().to_string())) as Arc<dyn ironrdp_server::CredentialValidator>),
+            (None, Some(h)) => Some(Arc::new(helperclient::HelperValidator::new(h.clone(), peer.ip().to_string())) as Arc<dyn ironrdp_server::CredentialValidator>),
+            (None, None) => None,
+        })
         .build();
-    if common.pam.is_none() {
+    if common.pam.is_none() && helper.is_none() {
         let (username, password) = common.credentials.clone();
         server.set_credentials(Some(Credentials { username, password, domain: None }));
     }

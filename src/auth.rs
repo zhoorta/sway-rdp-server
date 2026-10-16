@@ -138,7 +138,9 @@ pub struct PamPolicy {
 }
 
 const FAIL_DELAY: Duration = Duration::from_secs(2);
-const MAX_FAILURES: u32 = 5;
+/// Failures in a row for one account, and for one source address (higher: a office may share one address).
+const MAX_FAILURES_USER: u32 = 5;
+const MAX_FAILURES_SOURCE: u32 = 20;
 const LOCKOUT: Duration = Duration::from_secs(60);
 /// Accounts tracked at once; unknown names are tracked too, so this bounds the memory an attacker can use.
 const MAX_TRACKED: usize = 4096;
@@ -176,7 +178,7 @@ impl PamPolicy {
 
     /// Counts this attempt as a failure right away (it is cleared again on success), so an attempt that is cancelled
     /// half way, for example because the client reconnects at once, still counts. Returns false while locked out.
-    fn begin_attempt(&self, name: &str) -> bool {
+    fn begin_attempt(&self, name: &str, max_failures: u32) -> bool {
         let mut guards = self.guards.lock().unwrap();
         if guards.len() >= MAX_TRACKED {
             let now = Instant::now();
@@ -191,60 +193,67 @@ impl PamPolicy {
             g.failures = 0;
         }
         g.failures += 1;
-        if g.failures > MAX_FAILURES {
+        if g.failures > max_failures {
             g.locked_until = Some(Instant::now() + LOCKOUT);
-            warn!(user = name, "too many failed logins: refusing this account for {}s", LOCKOUT.as_secs());
+            warn!(key = name, "too many failed logins: refusing this one for {}s", LOCKOUT.as_secs());
             return false;
         }
         true
     }
 
-    fn succeeded(&self, name: &str) {
-        self.guards.lock().unwrap().remove(name);
+    fn succeeded(&self, key: &str) {
+        self.guards.lock().unwrap().remove(key);
+    }
+
+    /// Checks `password` for the account `name`, coming from `source` (an address, for the failure counters).
+    /// Blocking: PAM can take a while and a failed attempt is delayed on purpose. Unknown accounts and wrong
+    /// passwords get the same answer and the same delay.
+    pub fn authenticate(&self, name: &str, password: &str, source: &str) -> Option<UserInfo> {
+        let (user_key, source_key) = (format!("user:{name}"), format!("ip:{source}"));
+        if !self.begin_attempt(&user_key, MAX_FAILURES_USER) || !self.begin_attempt(&source_key, MAX_FAILURES_SOURCE) {
+            return None;
+        }
+        let candidate = if password.is_empty() { None } else { self.candidate(name) };
+        let accepted = candidate.filter(|_| pam_check(&self.service, name, password));
+        match &accepted {
+            Some(info) => {
+                self.succeeded(&user_key);
+                self.succeeded(&source_key);
+                info!(user = %name, uid = info.uid, %source, "login accepted (PAM)");
+            }
+            None => {
+                warn!(user = %name, %source, "login rejected (PAM)");
+                std::thread::sleep(FAIL_DELAY);
+            }
+        }
+        accepted
     }
 }
 
-/// The validator of one connection: the policy is shared, and `outcome` receives the account that logged in.
+/// The validator of one connection when PAM runs in this process: `outcome` receives the account that logged in.
 pub struct PamValidator {
     policy: Arc<PamPolicy>,
     outcome: Arc<Mutex<Option<UserInfo>>>,
+    source: String,
 }
 
 impl PamValidator {
-    pub fn new(policy: Arc<PamPolicy>, outcome: Arc<Mutex<Option<UserInfo>>>) -> Self {
-        Self { policy, outcome }
+    pub fn new(policy: Arc<PamPolicy>, outcome: Arc<Mutex<Option<UserInfo>>>, source: String) -> Self {
+        Self { policy, outcome, source }
     }
 }
 
 #[async_trait::async_trait]
 impl CredentialValidator for PamValidator {
     async fn validate(&self, credentials: &Credentials) -> Result<CredentialDecision, CredentialValidationError> {
-        let name = credentials.username.clone();
-        if !self.policy.begin_attempt(&name) {
-            return Ok(CredentialDecision::Reject);
-        }
-        // Same answer and same delay for an unknown account and a wrong password; the domain part is ignored.
-        let candidate = if credentials.password.is_empty() { None } else { self.policy.candidate(&name) };
-        let accepted = match candidate {
+        let (policy, name, password, source) = (self.policy.clone(), credentials.username.clone(), credentials.password.clone(), self.source.clone());
+        let accepted = tokio::task::spawn_blocking(move || policy.authenticate(&name, &password, &source)).await.unwrap_or(None);
+        Ok(match accepted {
             Some(info) => {
-                let (service, user, password) = (self.policy.service.clone(), name.clone(), credentials.password.clone());
-                let ok = tokio::task::spawn_blocking(move || pam_check(&service, &user, &password)).await.unwrap_or(false);
-                ok.then_some(info)
-            }
-            None => None,
-        };
-        match accepted {
-            Some(info) => {
-                self.policy.succeeded(&name);
-                info!(user = %name, uid = info.uid, "login accepted (PAM)");
                 *self.outcome.lock().unwrap() = Some(info);
-                Ok(CredentialDecision::Accept)
+                CredentialDecision::Accept
             }
-            None => {
-                warn!(user = %name, "login rejected (PAM)");
-                tokio::time::sleep(FAIL_DELAY).await;
-                Ok(CredentialDecision::Reject)
-            }
-        }
+            None => CredentialDecision::Reject,
+        })
     }
 }

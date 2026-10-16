@@ -1,10 +1,8 @@
 //! The network daemon's side of the stream protocol: starts a session process for a connection, sends it what the
 //! client does (input, resizes, credits) and turns what it sends back into events for the RDP side.
 
-use std::os::fd::AsRawFd;
-use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::Child;
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -67,57 +65,18 @@ impl Link {
         // On a shared sway the first session keeps the configured name and later ones get a number; with a sway
         // of its own there is nothing to keep apart.
         let workspace = if own_sway || slot.0 == 1 { workspace.to_owned() } else { format!("{workspace} {}", slot.0) };
-        let switch = user.filter(|u| u.uid != unsafe { libc::getuid() });
-        if switch.is_some() && unsafe { libc::getuid() } != 0 {
-            bail!("starting a session as another account needs the daemon to run as root");
-        }
-        if own_sway {
-            if let Some(u) = switch {
-                let dir = format!("/run/user/{}", u.uid);
-                if !Path::new(&dir).is_dir() {
-                    bail!("{dir} does not exist: the account needs a runtime directory (loginctl enable-linger {})", u.name);
-                }
-            }
-        }
-        let (parent, child_end) = std::os::unix::net::UnixStream::pair().context("socket pair")?;
-        let child_fd = child_end.as_raw_fd();
-        let mut cmd = Command::new(exe);
-        cmd.arg("--session-worker").args(args).args(["--workspace", &workspace]).stdin(Stdio::null());
-        if own_sway {
-            cmd.arg("--own-sway");
-        }
-        let ids = switch.map(|u| (u.uid, u.gid, u.groups.clone()));
-        if let Some(u) = switch {
-            cmd.env_clear()
-                .env("PATH", "/usr/local/bin:/usr/bin:/bin")
-                .env("HOME", &u.home)
-                .env("USER", &u.name)
-                .env("LOGNAME", &u.name)
-                .env("XDG_RUNTIME_DIR", format!("/run/user/{}", u.uid))
-                .env("LANG", "C.UTF-8")
-                .current_dir(&u.home);
-            if let Ok(level) = std::env::var("SWAY_RDP_LOG") {
-                cmd.env("SWAY_RDP_LOG", level);
-            }
-        }
-        // SAFETY: only async-signal-safe calls (setgroups, setgid, setuid, dup2, fcntl) between fork and exec.
-        unsafe {
-            cmd.pre_exec(move || {
-                if let Some((uid, gid, groups)) = &ids {
-                    if libc::setgroups(groups.len(), groups.as_ptr()) != 0 || libc::setgid(*gid) != 0 || libc::setuid(*uid) != 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
-                }
-                let ok = if child_fd == 3 { libc::fcntl(3, libc::F_SETFD, 0) >= 0 } else { libc::dup2(child_fd, 3) >= 0 };
-                if ok {
-                    Ok(())
-                } else {
-                    Err(std::io::Error::last_os_error())
-                }
-            });
-        }
-        let child = cmd.spawn().with_context(|| format!("cannot start {}", exe.display()))?;
-        drop(child_end);
+        let (child, parent) = crate::spawn::spawn_worker(exe, args, &workspace, user, own_sway)?;
+        Self::from_stream(parent, Some(child), slot, size, klid).await
+    }
+
+    /// Uses a session process that the root helper started: `stream` is the daemon's end of its socket.
+    pub async fn from_helper(stream: std::os::unix::net::UnixStream, size: (u16, u16), klid: u32) -> Result<Arc<Link>> {
+        Self::from_stream(stream, None, Slot::take(), size, klid).await
+    }
+
+    /// Takes over a session process that is already running: sends it the hello and waits until it reports its size.
+    /// `child` is None when something else (the root helper) owns the process.
+    async fn from_stream(parent: std::os::unix::net::UnixStream, child: Option<Child>, slot: Slot, size: (u16, u16), klid: u32) -> Result<Arc<Link>> {
         parent.set_nonblocking(true)?;
         let (mut rd, mut wr) = tokio::net::UnixStream::from_std(parent)?.into_split();
 
@@ -128,7 +87,7 @@ impl Link {
             .context("the session did not start in 30 s")??
             .context("the session process ended before it was ready")?;
         let Up::Ready { width, height } = Up::decode(&first)? else { bail!("first message of the session is not Ready") };
-        info!(width, height, pid = child.id(), "session process ready");
+        info!(width, height, pid = child.as_ref().map(Child::id), "session process ready");
 
         let (tx, mut tx_rx) = mpsc::unbounded_channel::<Down>();
         tokio::spawn(async move {
@@ -145,7 +104,7 @@ impl Link {
             events: tokio::sync::Mutex::new(ev_rx),
             size: Mutex::new((width, height)),
             resized: tokio::sync::Notify::new(),
-            child: Mutex::new(Some(child)),
+            child: Mutex::new(child),
             _slot: slot,
         });
         let reader = link.clone();
@@ -190,23 +149,35 @@ impl Link {
         *self.size.lock().unwrap()
     }
 
-    /// Tells the session to end and waits for it to clean up (ten seconds at most).
+    /// Tells the session to end and waits for it to clean up (ten seconds at most). Without a child process of our
+    /// own (the helper owns it), the end of the stream is the sign that it is gone.
     pub async fn shutdown(self: Arc<Self>) {
         self.send(Down::Bye);
         let child = self.child.lock().unwrap().take();
-        if let Some(mut child) = child {
-            let _ = tokio::task::spawn_blocking(move || {
-                for _ in 0..200 {
-                    if matches!(child.try_wait(), Ok(Some(_))) {
-                        return;
+        match child {
+            Some(mut child) => {
+                let _ = tokio::task::spawn_blocking(move || {
+                    for _ in 0..200 {
+                        if matches!(child.try_wait(), Ok(Some(_))) {
+                            return;
+                        }
+                        std::thread::sleep(Duration::from_millis(50));
                     }
-                    std::thread::sleep(Duration::from_millis(50));
+                    warn!("session process did not end in time; killing it");
+                    let _ = child.kill();
+                    let _ = child.wait();
+                })
+                .await;
+            }
+            None => {
+                let mut events = self.events.lock().await;
+                let waiting = async {
+                    while !matches!(events.recv().await, Some(Event::Closed) | None) {}
+                };
+                if tokio::time::timeout(Duration::from_secs(10), waiting).await.is_err() {
+                    warn!("session process did not close its socket in time");
                 }
-                warn!("session process did not end in time; killing it");
-                let _ = child.kill();
-                let _ = child.wait();
-            })
-            .await;
+            }
         }
     }
 }
