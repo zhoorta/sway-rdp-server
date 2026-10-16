@@ -7,6 +7,7 @@ mod auth;
 mod capture;
 mod clipboard;
 mod egfx;
+mod encode;
 mod input;
 mod proto;
 mod session;
@@ -36,6 +37,7 @@ struct Updates {
 struct EgfxLink {
     st: Arc<egfx::EgfxState>,
     out: egfx::Out,
+    enc: encode::H264,
     /// Set once the client turned out not to do AVC420: stay on bitmaps.
     unsupported: bool,
 }
@@ -99,27 +101,31 @@ impl RdpServerDisplayUpdates for Updates {
                     _ = self.slot.resize_notify.notified() => continue,
                 };
                 let link = self.egfx.as_mut().unwrap();
-                match link.out.send(&frame, r)? {
-                    egfx::Sent::Done => continue,
-                    egfx::Sent::Backpressure => {
+                match link.out.prepare()? {
+                    egfx::Prepare::Ready => {}
+                    egfx::Prepare::Backpressure => {
                         // Nothing was consumed by the encoder: put the area back and wait a moment.
                         self.shared.mark_dirty(r);
                         tokio::time::sleep(std::time::Duration::from_millis(8)).await;
                         continue;
                     }
-                    egfx::Sent::Skipped => {
-                        // The encoder dropped the frame: its area was never sent, so send it again.
-                        self.shared.mark_dirty(r);
-                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                        continue;
-                    }
-                    egfx::Sent::Unsupported => {
+                    egfx::Prepare::Unsupported => {
                         warn!("client has no AVC420; using bitmap updates");
                         link.unsupported = true;
                         self.shared.mark_dirty(r);
                         continue;
                     }
                 }
+                match link.enc.encode(&frame, usize::from(self.shared.width), usize::from(self.shared.height))? {
+                    Some(data) => link.out.send_encoded(&data, r, link.enc.max_qp())?,
+                    None => {
+                        // The encoder dropped the frame: its area was never sent, so send it again.
+                        link.out.flush()?;
+                        self.shared.mark_dirty(r);
+                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                    }
+                }
+                continue;
             }
 
             let (frame, r) = tokio::select! {
@@ -204,7 +210,7 @@ struct Config {
 struct Handler {
     slot: Arc<Slot>,
     cfg: Arc<Config>,
-    egfx: Option<(Arc<egfx::EgfxState>, egfx::Tuning)>,
+    egfx: Option<(Arc<egfx::EgfxState>, encode::Tuning)>,
 }
 
 impl Handler {
@@ -274,7 +280,8 @@ impl RdpServerDisplay for Handler {
         let egfx = match &self.egfx {
             Some((st, tuning)) => Some(EgfxLink {
                 st: st.clone(),
-                out: egfx::Out::new(st.clone(), shared.width, shared.height, *tuning)?,
+                out: egfx::Out::new(st.clone(), shared.width, shared.height),
+                enc: encode::H264::new(shared.width, shared.height, *tuning)?,
                 unsupported: false,
             }),
             None => None,
@@ -430,7 +437,7 @@ async fn main() -> anyhow::Result<()> {
         tls_only,
         pam_validator: if pam { Some(Arc::new(auth::PamValidator::new("sway-rdp-server")?)) } else { None },
         credentials: (username, password),
-        egfx: (!no_egfx).then_some(egfx::Tuning { bitrate, max_qp, fps: 30 }),
+        egfx: (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 }),
         clipboard,
         audio,
     });
@@ -484,7 +491,7 @@ struct Common {
     pam_validator: Option<Arc<auth::PamValidator>>,
     credentials: (String, String),
     /// None = no graphics pipeline, bitmaps only.
-    egfx: Option<egfx::Tuning>,
+    egfx: Option<encode::Tuning>,
     clipboard: bool,
     audio: bool,
 }
