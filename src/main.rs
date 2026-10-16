@@ -361,7 +361,9 @@ impl RdpServerInputHandler for Handler {
             // 120 units per wheel notch.
             MouseEvent::VerticalScroll { value } => self.send(Cmd::Wheel { vertical: f64::from(value) / 120.0, horizontal: 0.0 }),
             MouseEvent::Scroll { x, y } => {
-                self.send(Cmd::Wheel { vertical: f64::from(y) / 120.0, horizontal: f64::from(x) / 120.0 })
+                // Some clients (FreeRDP SDL) send 16.16 fixed-point amounts here; plain wheel units are 120 per notch.
+                let unit = |v: i32| if v.unsigned_abs() > 32768 { f64::from(v) / 65536.0 / 40.0 } else { f64::from(v) / 120.0 };
+                self.send(Cmd::Wheel { vertical: unit(y), horizontal: unit(x) })
             }
             MouseEvent::RelMove { .. } => tracing::debug!("relative mouse move not handled"),
         }
