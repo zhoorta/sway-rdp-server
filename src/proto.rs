@@ -327,9 +327,56 @@ pub fn read_frame<R: Read>(r: &mut R) -> Result<Option<Vec<u8>>, ProtoError> {
     Ok(Some(body))
 }
 
+/// `write_frame` for tokio streams.
+pub async fn write_frame_async<W: tokio::io::AsyncWrite + Unpin>(w: &mut W, body: &[u8]) -> Result<(), ProtoError> {
+    use tokio::io::AsyncWriteExt;
+    let len = u32::try_from(body.len()).map_err(|_| ProtoError::TooLarge(u32::MAX))?;
+    if len > MAX_MESSAGE {
+        return Err(ProtoError::TooLarge(len));
+    }
+    w.write_all(&len.to_le_bytes()).await?;
+    w.write_all(body).await?;
+    w.flush().await?;
+    Ok(())
+}
+
+/// `read_frame` for tokio streams. Not cancel safe: read it in a task of its own, never inside `select!`.
+pub async fn read_frame_async<R: tokio::io::AsyncRead + Unpin>(r: &mut R) -> Result<Option<Vec<u8>>, ProtoError> {
+    use tokio::io::AsyncReadExt;
+    let mut len = [0u8; 4];
+    if r.read(&mut len[..1]).await? == 0 {
+        return Ok(None);
+    }
+    r.read_exact(&mut len[1..]).await?;
+    let len = u32::from_le_bytes(len);
+    if len > MAX_MESSAGE {
+        return Err(ProtoError::TooLarge(len));
+    }
+    if len == 0 {
+        return Err(ProtoError::Truncated);
+    }
+    let mut body = vec![0u8; len as usize];
+    r.read_exact(&mut body).await?;
+    Ok(Some(body))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn async_framing_matches_sync_framing() {
+        let (mut a, mut b) = tokio::io::duplex(1024);
+        let msg = Up::Frame { x: 1, y: 2, w: 3, h: 4, kind: FrameKind::H264, data: vec![9; 5000] };
+        let body = msg.encode();
+        let writer = tokio::spawn(async move {
+            write_frame_async(&mut a, &body).await.unwrap();
+        });
+        let got = read_frame_async(&mut b).await.unwrap().unwrap();
+        writer.await.unwrap();
+        assert_eq!(Up::decode(&got).unwrap(), msg);
+        assert_eq!(read_frame_async(&mut b).await.unwrap(), None);
+    }
 
     fn down_samples() -> Vec<Down> {
         vec![

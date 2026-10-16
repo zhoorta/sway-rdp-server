@@ -27,7 +27,7 @@ wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 wayland-protocols-misc = { version = "0.3", features = ["client"] }
 xkbcommon = "0.9"
 async-trait = "0.1"
-tokio = { version = "1", features = ["macros", "rt", "sync", "time", "net"] }
+tokio = { version = "1", features = ["macros", "rt", "sync", "time", "net", "io-util", "signal"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

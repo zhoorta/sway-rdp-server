@@ -30,7 +30,6 @@ pub struct H264 {
     u: Vec<u8>,
     v: Vec<u8>,
     sps_pps: Option<Vec<u8>>,
-    max_qp: u8,
 }
 
 impl H264 {
@@ -56,13 +55,7 @@ impl H264 {
             u: vec![128u8; (sw / 2) * (sh / 2)],
             v: vec![128u8; (sw / 2) * (sh / 2)],
             sps_pps: None,
-            max_qp: t.max_qp.clamp(1, 51),
         })
-    }
-
-    /// Highest quantiser the encoder was set up with.
-    pub fn max_qp(&self) -> u8 {
-        self.max_qp
     }
 
     /// Encode a tight BGRA frame of `w` x `h` (the surface is `sw` x `sh`, the extra rows stay black).

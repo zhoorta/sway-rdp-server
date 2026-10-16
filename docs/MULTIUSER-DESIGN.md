@@ -1,6 +1,6 @@
 # sway-rdp: multi-user design (draft, 2026-10-16)
 
-Status: design only, nothing here is built. It describes where `sway-rdp-server` (one user, one client at a time,
+Status: milestones 1 and 2 are built and tested in a VM (see section 8); the rest is design. It describes where `sway-rdp-server` (one user, one client at a time,
 all sessions on one shared sway) goes to become an out-of-the-box multi-user remote desktop for Debian.
 Written from reading the current code (`main.rs`, `session.rs`, `auth.rs`, `input.rs`, `capture.rs`) and the
 vendored IronRDP patches. Statements about systemd, logind and PAM behaviour are from experience and have to be
@@ -113,6 +113,17 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
 6. **Package and wizard.** `.deb` for `sway-rdp` with the units, PAM file and sway template; the installer wizard
    as an optional post-install step.
 7. **Review.** Threat-model walk-through with someone else before any non-VPN exposure is documented.
+
+### Where it stands (2026-10-16)
+
+- 1 done: one `RdpServer` per connection; tested with up to three FreeRDP clients.
+- 2 done, with two deviations from section 3: the session process (`--session-worker`, started by the daemon with a
+  socket pair as fd 3) runs as the same user and owns output, capture, encoder and input; **audio and clipboard stay in
+  the daemon** for now (they need the user's own PipeWire and Wayland socket, which is milestone 3). The daemon forwards
+  input and resize requests and sends credits; frames are encoded in the session. Killing the daemon (even with
+  SIGKILL) or sending SIGTERM to the session makes the session remove its output and end. Not tested: window resize
+  under load, the Windows App on macOS after the split, bitmap fallback.
+- The worker is spawned by the daemon here; in the final design the root helper starts it as the user (milestone 4).
 
 ## 9. Open questions
 
