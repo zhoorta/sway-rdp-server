@@ -4,6 +4,7 @@
 
 use std::os::fd::FromRawFd;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{bail, Context as _, Result};
 use tokio::sync::mpsc;
@@ -24,6 +25,63 @@ pub struct Config {
     pub tuning: Option<Tuning>,
     /// Start a headless sway of this session's own (see `OwnSway`).
     pub own_sway: bool,
+    /// Keep the session across clients: register with the root helper at this socket and take the client sockets it
+    /// sends. None: one client, on the socket inherited as fd 3, and the session ends with it.
+    pub register: Option<std::path::PathBuf>,
+    /// A persistent session without a client ends after this long (zero: never).
+    pub idle_timeout: std::time::Duration,
+    /// A persistent session ends when its client leaves.
+    pub end_on_disconnect: bool,
+}
+
+/// Where clients come from.
+enum Source {
+    /// The daemon's socket pair, once.
+    Single(Option<std::os::unix::net::UnixStream>),
+    /// Sockets sent by the helper, one per client; `None` from `next` means the helper is gone.
+    Registered(mpsc::UnboundedReceiver<std::os::unix::net::UnixStream>),
+}
+
+impl Source {
+    async fn next(&mut self) -> Option<std::os::unix::net::UnixStream> {
+        match self {
+            Source::Single(s) => match s.take() {
+                Some(stream) => Some(stream),
+                None => std::future::pending().await,
+            },
+            Source::Registered(rx) => rx.recv().await,
+        }
+    }
+
+    fn persistent(&self) -> bool {
+        matches!(self, Source::Registered(_))
+    }
+}
+
+/// Connects to the helper's registration socket (the helper learns our account from the kernel) and turns every
+/// descriptor it sends into a client socket.
+fn register(path: &std::path::Path) -> Result<Source> {
+    let reg = std::os::unix::net::UnixStream::connect(path).with_context(|| format!("cannot register at {}", path.display()))?;
+    let (tx, rx) = mpsc::unbounded_channel();
+    std::thread::spawn(move || {
+        while let Ok(fd) = crate::fdpass::recv_fd(&reg) {
+            if tx.send(std::os::unix::net::UnixStream::from(fd)).is_err() {
+                break;
+            }
+        }
+        // The helper closed the registration (or went away): `next` returns None from now on.
+    });
+    Ok(Source::Registered(rx))
+}
+
+/// How a client's turn ended.
+enum Outcome {
+    /// The client left; the session goes on.
+    Gone,
+    /// Another client arrived: this is its socket.
+    Replaced(std::os::unix::net::UnixStream),
+    /// The session has to end (signal, sway gone, error).
+    Stop,
 }
 
 struct Worker {
@@ -38,20 +96,94 @@ struct Worker {
 }
 
 pub async fn run(cfg: Config) -> Result<()> {
-    // The daemon passes its end of a socket pair as fd 3.
-    let std_stream = unsafe { std::os::unix::net::UnixStream::from_raw_fd(3) };
-    std_stream.set_nonblocking(true).context("socket")?;
-    let (mut rd, mut wr) = tokio::net::UnixStream::from_std(std_stream)?.into_split();
+    // A stop request (systemd stopping the service, Ctrl-C) must still remove the output and stop the hook.
+    let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    let mut int = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
 
-    let hello = proto::read_frame_async(&mut rd).await?.context("daemon closed before hello")?;
-    let Down::Hello { version, width, height, klid, .. } = Down::decode(&hello)? else { bail!("first message is not a hello") };
-    if version != proto::VERSION {
-        bail!("daemon speaks protocol {version}, this is {}", proto::VERSION);
+    let mut source = match &cfg.register {
+        // The helper starts us and then sends clients; register before the (slow) sway start so that it can.
+        Some(path) => register(path)?,
+        // The daemon passes its end of a socket pair as fd 3.
+        None => Source::Single(Some(unsafe { std::os::unix::net::UnixStream::from_raw_fd(3) })),
+    };
+    // Declared before the session so that it is dropped after it: the session's cleanup still needs the sway.
+    let mut sway = if cfg.own_sway { Some(OwnSway::start().await?) } else { None };
+
+    let mut session: Option<Session> = None;
+    let mut pending: Option<std::os::unix::net::UnixStream> = None;
+    loop {
+        let conn = match pending.take() {
+            Some(c) => c,
+            None => {
+                // Waiting for a client.
+                let idle_for = (session.is_some() && !cfg.idle_timeout.is_zero()).then_some(cfg.idle_timeout);
+                let idle = async {
+                    match idle_for {
+                        Some(d) => tokio::time::sleep(d).await,
+                        None => std::future::pending().await,
+                    }
+                };
+                tokio::pin!(idle);
+                let mut tick = tokio::time::interval(Duration::from_secs(2));
+                let next = loop {
+                    tokio::select! {
+                        c = source.next() => break c,
+                        _ = &mut idle => {
+                            info!("no client for {:?}: ending the session", cfg.idle_timeout);
+                            break None;
+                        }
+                        _ = tick.tick() => if sway.as_mut().is_some_and(OwnSway::exited) {
+                            info!("sway has ended: ending the session");
+                            break None;
+                        },
+                        _ = term.recv() => break None,
+                        _ = int.recv() => break None,
+                    }
+                };
+                match next {
+                    Some(c) => c,
+                    None => break,
+                }
+            }
+        };
+        let (back, outcome) = serve_client(conn, session.take(), &cfg, &mut source, &mut sway, &mut term, &mut int).await;
+        session = back;
+        match outcome {
+            Outcome::Gone if source.persistent() && !cfg.end_on_disconnect => info!("client left; the session stays"),
+            Outcome::Gone => break,
+            Outcome::Replaced(next) => {
+                info!("a new client replaces the old one");
+                pending = Some(next);
+            }
+            Outcome::Stop => break,
+        }
     }
+    info!("session worker ending");
+    // Dropping the session removes the output and stops the hook.
+    drop(session);
+    Ok(())
+}
 
+/// Serves one client until it leaves, is replaced or the session has to end. Returns the session (if it exists).
+async fn serve_client(
+    conn: std::os::unix::net::UnixStream,
+    session: Option<Session>,
+    cfg: &Config,
+    source: &mut Source,
+    sway: &mut Option<OwnSway>,
+    term: &mut tokio::signal::unix::Signal,
+    int: &mut tokio::signal::unix::Signal,
+) -> (Option<Session>, Outcome) {
+    let (mut rd, mut wr) = match conn.set_nonblocking(true).and_then(|()| tokio::net::UnixStream::from_std(conn)) {
+        Ok(s) => s.into_split(),
+        Err(e) => {
+            warn!("bad client socket: {e}");
+            return (session, Outcome::Gone);
+        }
+    };
     // Writer and reader tasks: the main loop must never read a half message inside `select!`.
     let (up_tx, mut up_rx) = mpsc::unbounded_channel::<Up>();
-    tokio::spawn(async move {
+    let writer = tokio::spawn(async move {
         while let Some(msg) = up_rx.recv().await {
             if proto::write_frame_async(&mut wr, &msg.encode()).await.is_err() {
                 break;
@@ -59,7 +191,7 @@ pub async fn run(cfg: Config) -> Result<()> {
         }
     });
     let (down_tx, mut down_rx) = mpsc::unbounded_channel::<Down>();
-    tokio::spawn(async move {
+    let reader = tokio::spawn(async move {
         loop {
             let msg = match proto::read_frame_async(&mut rd).await {
                 Ok(Some(body)) => Down::decode(&body),
@@ -81,46 +213,104 @@ pub async fn run(cfg: Config) -> Result<()> {
             }
         }
     });
+    let finish = |writer: tokio::task::JoinHandle<()>, reader: tokio::task::JoinHandle<()>| {
+        // Dropping the halves closes the socket: the daemon sees the end of the stream.
+        writer.abort();
+        reader.abort();
+    };
 
-    // Declared before the session so that it is dropped after it: the session's cleanup still needs the sway.
-    let _sway = if cfg.own_sway { Some(OwnSway::start().await?) } else { None };
+    let hello = match down_rx.recv().await {
+        Some(Down::Hello { version, width, height, klid, .. }) if version == proto::VERSION => (width, height, klid),
+        other => {
+            warn!("first message of a client is not a usable hello: {other:?}");
+            finish(writer, reader);
+            return (session, Outcome::Gone);
+        }
+    };
+    let (width, height, klid) = hello;
 
-    let layout = if klid == 0 { cfg.opts.default_layout.clone() } else { session::xkb_layout_for_klid(klid).to_owned() };
-    info!(width, height, klid = format!("{klid:#06x}"), %layout, "creating session");
-    let opts = cfg.opts;
-    let session = tokio::task::spawn_blocking(move || Session::create((width, height), &layout, &opts))
-        .await
-        .context("session task")??;
+    // First client: make the session. Later clients: it exists; give it the new client's size.
+    let session = match session {
+        None => {
+            let layout = if klid == 0 { cfg.opts.default_layout.clone() } else { session::xkb_layout_for_klid(klid).to_owned() };
+            info!(width, height, klid = format!("{klid:#06x}"), %layout, "creating session");
+            let opts = cfg.opts.clone();
+            match tokio::task::spawn_blocking(move || Session::create((width, height), &layout, &opts)).await {
+                Ok(Ok(s)) => s,
+                Ok(Err(e)) => {
+                    error!("cannot create the session: {e:#}");
+                    finish(writer, reader);
+                    return (None, Outcome::Stop);
+                }
+                Err(e) => {
+                    error!("session task failed: {e}");
+                    finish(writer, reader);
+                    return (None, Outcome::Stop);
+                }
+            }
+        }
+        Some(mut s) => {
+            info!(width, height, "a client reconnects to the session");
+            if session::clamp_size(width, height) != (s.shared.width, s.shared.height) {
+                let (s2, result) = tokio::task::spawn_blocking(move || {
+                    let r = s.resize((width, height));
+                    (s, r)
+                })
+                .await
+                .expect("resize task");
+                if let Err(e) = result {
+                    error!("resize for the new client failed: {e:#}");
+                }
+                s = s2;
+            }
+            s
+        }
+    };
     let (w, h) = (session.shared.width, session.shared.height);
+    session.shared.force_full();
     let mut me = Worker { session: Some(session), enc: None, tuning: cfg.tuning, credits: 0, bitmaps: cfg.tuning.is_none(), up: up_tx };
     let _ = me.up.send(Up::Ready { width: w, height: h });
 
-    // A stop request (systemd stopping the service, Ctrl-C) must still remove the output and stop the hook.
-    let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
-    let mut int = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())?;
-    loop {
+    let mut tick = tokio::time::interval(Duration::from_secs(2));
+    // The helper has gone away: no new clients can come, this one carries on.
+    let mut helper_gone = false;
+    let outcome = loop {
         let shared = me.session.as_ref().expect("session").shared.clone();
         tokio::select! {
-            _ = term.recv() => break,
-            _ = int.recv() => break,
+            _ = term.recv() => break Outcome::Stop,
+            _ = int.recv() => break Outcome::Stop,
+            _ = tick.tick() => if sway.as_mut().is_some_and(OwnSway::exited) {
+                info!("sway has ended");
+                break Outcome::Stop;
+            },
+            replacement = source.next(), if source.persistent() && !helper_gone => match replacement {
+                Some(next) => break Outcome::Replaced(next),
+                None => helper_gone = true,
+            },
             msg = down_rx.recv() => match msg {
-                None | Some(Down::Bye) => break,
+                None | Some(Down::Bye) => {
+                    let _ = me.up.send(Up::Bye);
+                    break Outcome::Gone;
+                }
                 Some(m) => me.handle(m).await,
             },
             // Only take a frame when there is room for it: changes keep merging into the dirty rectangle meanwhile.
             (frame, rect) = shared.next(), if me.credits > 0 => {
                 if let Err(e) = me.send_frame(&frame, rect).await {
                     error!("sending a frame failed: {e:#}");
-                    break;
+                    break Outcome::Gone;
                 }
             }
         }
+    };
+    // Let the goodbye out before the socket closes.
+    if matches!(outcome, Outcome::Gone | Outcome::Stop) {
+        tokio::time::sleep(Duration::from_millis(50)).await;
     }
-    let _ = me.up.send(Up::Bye);
-    info!("session worker ending");
-    // Dropping the session removes the output and stops the hook.
+    let session = me.session.take();
     drop(me);
-    Ok(())
+    finish(writer, reader);
+    (session, outcome)
 }
 
 impl Worker {
@@ -218,6 +408,11 @@ struct OwnSway {
 }
 
 impl OwnSway {
+    /// True when sway has ended (the account logged out of it, or it crashed).
+    fn exited(&mut self) -> bool {
+        !matches!(self.child.try_wait(), Ok(None))
+    }
+
     async fn start() -> Result<Self> {
         use std::os::unix::process::CommandExt;
         let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);

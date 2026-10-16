@@ -16,7 +16,10 @@ use crate::auth::UserInfo;
 /// `user`: the account the session belongs to. When it is not the account running this process, this process has to
 /// be root: the session then starts as that account (groups, gid, uid, a clean environment). `own_sway`: the session
 /// starts its own headless sway instead of using the one it was started in.
-pub fn spawn_worker(exe: &Path, args: &[String], workspace: &str, user: Option<&UserInfo>, own_sway: bool) -> Result<(Child, UnixStream)> {
+///
+/// `register`: None for a session of one client, which gets one end of a socket pair as fd 3 (returned); Some(path) for a
+/// persistent session, which registers at the helper's socket there and gets its clients from it (nothing returned).
+pub fn spawn_worker(exe: &Path, args: &[String], workspace: &str, user: Option<&UserInfo>, own_sway: bool, register: Option<&Path>) -> Result<(Child, Option<UnixStream>)> {
     let switch = user.filter(|u| u.uid != unsafe { libc::getuid() });
     if switch.is_some() && unsafe { libc::getuid() } != 0 {
         bail!("starting a session as another account needs the daemon to run as root");
@@ -29,10 +32,19 @@ pub fn spawn_worker(exe: &Path, args: &[String], workspace: &str, user: Option<&
             }
         }
     }
-    let (parent, child_end) = std::os::unix::net::UnixStream::pair().context("socket pair")?;
-    let child_fd = child_end.as_raw_fd();
+    let (parent, child_end) = match register {
+        None => {
+            let (p, c) = UnixStream::pair().context("socket pair")?;
+            (Some(p), Some(c))
+        }
+        Some(_) => (None, None),
+    };
+    let child_fd = child_end.as_ref().map(AsRawFd::as_raw_fd);
     let mut cmd = Command::new(exe);
     cmd.arg("--session-worker").args(args).args(["--workspace", &workspace]).stdin(Stdio::null());
+    if let Some(path) = register {
+        cmd.arg("--register").arg(path);
+    }
     if own_sway {
         cmd.arg("--own-sway");
     }
@@ -58,7 +70,11 @@ pub fn spawn_worker(exe: &Path, args: &[String], workspace: &str, user: Option<&
                     return Err(std::io::Error::last_os_error());
                 }
             }
-            let ok = if child_fd == 3 { libc::fcntl(3, libc::F_SETFD, 0) >= 0 } else { libc::dup2(child_fd, 3) >= 0 };
+            let ok = match child_fd {
+                None => true,
+                Some(3) => libc::fcntl(3, libc::F_SETFD, 0) >= 0,
+                Some(fd) => libc::dup2(fd, 3) >= 0,
+            };
             if ok {
                 Ok(())
             } else {

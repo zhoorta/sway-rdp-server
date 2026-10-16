@@ -1,6 +1,6 @@
 # sway-rdp: multi-user design (draft, 2026-10-16)
 
-Status: milestones 1 to 4 are built and tested in a VM (see section 8); the rest is design. It describes where `sway-rdp-server` (one user, one client at a time,
+Status: milestones 1 to 5 are built and tested in a VM (see section 8); the rest is design. It describes where `sway-rdp-server` (one user, one client at a time,
 all sessions on one shared sway) goes to become an out-of-the-box multi-user remote desktop for Debian.
 Written from reading the current code (`main.rs`, `session.rs`, `auth.rs`, `input.rs`, `capture.rs`) and the
 vendored IronRDP patches. Statements about systemd, logind and PAM behaviour are from experience and have to be
@@ -147,6 +147,22 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
   runs and audit); `pam_open_session`/`pam_systemd` is not used yet, so the account still needs
   `loginctl enable-linger`; the daemon's `--quality` must equal the helper's; no systemd units or hardening options
   yet (milestone 6); the password still passes through the daemon (plain TLS login), see section 7.
+- 5 done: sessions outlive connections. In helper mode the session process is persistent (`--register`): right after
+  it starts it connects to the helper's second socket, `/run/sway-rdp/sessions.sock` (any local account may open it;
+  the kernel tells the helper which account is on the other end, so a session registers only as itself). Each client
+  gets a fresh socket pair: one end goes to the session over its registration (SCM_RIGHTS), the other to the daemon.
+  Design choice: the helper never connects to a path inside an account's directory (a planted symlink would point
+  root at something else), the session connects to the helper instead. A reconnect finds the running session (same
+  worker, same sway, same windows) and sets its output to the new client's size; a new client of the same account
+  replaces the old one, and since the helper only hands out a socket after a successful login, that is
+  replace-after-auth. The session ends after `--idle-timeout` seconds without a client (default 8 h, 0 = never), with
+  `--end-on-disconnect` when the client leaves, or when its sway exits (logout). Tested in the VM with an idle timeout
+  of 25 s: same worker and sway across disconnect and reconnect (a marker window survived and the output became
+  1100x720), a second client replaced the first, the session was removed after 25 s idle, `swaymsg exit` ended the
+  worker and cleared the registration, and the next login got a new session. Gaps: no per-account limit on
+  sessions or resources yet (logind slice limits belong to milestone 6), no way for a user to log out of the
+  RDP session other than quitting sway, keys held down when a client is replaced stay pressed, and the idle timer
+  does not look at activity inside the session.
 - The worker is spawned by the daemon in the single-account and `--per-user` forms, by the helper in the helper form.
 
 ## 9. Open questions

@@ -65,8 +65,8 @@ impl Link {
         // On a shared sway the first session keeps the configured name and later ones get a number; with a sway
         // of its own there is nothing to keep apart.
         let workspace = if own_sway || slot.0 == 1 { workspace.to_owned() } else { format!("{workspace} {}", slot.0) };
-        let (child, parent) = crate::spawn::spawn_worker(exe, args, &workspace, user, own_sway)?;
-        Self::from_stream(parent, Some(child), slot, size, klid).await
+        let (child, parent) = crate::spawn::spawn_worker(exe, args, &workspace, user, own_sway, None)?;
+        Self::from_stream(parent.context("no socket for the session")?, Some(child), slot, size, klid).await
     }
 
     /// Uses a session process that the root helper started: `stream` is the daemon's end of its socket.

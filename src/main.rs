@@ -411,6 +411,11 @@ async fn main() -> anyhow::Result<()> {
     let mut run_helper = false;
     let mut helper_socket = PathBuf::from("/run/sway-rdp/helper.sock");
     let mut daemon_user = "sway-rdp".to_string();
+    // How long a session without a client lives (seconds, 0 = for ever), and whether it ends when the client leaves.
+    let mut idle_timeout = 8 * 3600u64;
+    let mut end_on_disconnect = false;
+    // Internal: where a persistent session registers (set by the helper).
+    let mut register: Option<PathBuf> = None;
     while let Some(a) = args.next() {
         match a.as_str() {
             "--bind" => bind = args.next().context("--bind needs a value")?,
@@ -425,6 +430,9 @@ async fn main() -> anyhow::Result<()> {
             "--session-worker" => worker = true,
             "--own-sway" => own_sway = true,
             "--helper" => run_helper = true,
+            "--idle-timeout" => idle_timeout = args.next().context("--idle-timeout needs seconds")?.parse()?,
+            "--end-on-disconnect" => end_on_disconnect = true,
+            "--register" => register = args.next().map(PathBuf::from),
             "--helper-socket" => helper_socket = PathBuf::from(args.next().context("--helper-socket needs a path")?),
             "--daemon-user" => daemon_user = args.next().context("--daemon-user needs an account name")?,
             "--per-user" => per_user = true,
@@ -448,7 +456,7 @@ async fn main() -> anyhow::Result<()> {
     if worker {
         let tuning = (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 });
         let opts = session::Options { default_layout: layout, spawn_terminal, workspace, hook };
-        return worker::run(worker::Config { opts, tuning, own_sway }).await;
+        return worker::run(worker::Config { opts, tuning, own_sway, register, idle_timeout: std::time::Duration::from_secs(idle_timeout), end_on_disconnect }).await;
     }
     // What the session processes are started with.
     let mut worker_args = vec!["--kb-layout".to_string(), layout.clone(), "--workspace".into(), workspace.clone()];
@@ -458,6 +466,10 @@ async fn main() -> anyhow::Result<()> {
     }
     if no_egfx {
         worker_args.push("--no-egfx".into());
+    }
+    worker_args.extend(["--idle-timeout".to_string(), idle_timeout.to_string()]);
+    if end_on_disconnect {
+        worker_args.push("--end-on-disconnect".into());
     }
     if let Some(h) = &hook {
         worker_args.extend(["--session-hook".to_string(), h.display().to_string()]);
