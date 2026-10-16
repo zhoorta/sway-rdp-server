@@ -17,9 +17,8 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Context as _;
 use ironrdp_server::{
-    BitmapUpdate, ConnectionHandler, Credentials, DesktopSize, DisplayUpdate, KeyboardEvent, MouseEvent,
-    PixelFormat, PostConnectionAction, RdpServer, RdpServerDisplay, RdpServerDisplayUpdates,
-    RdpServerInputHandler, TlsIdentityCtx,
+    BitmapUpdate, Credentials, DesktopSize, DisplayUpdate, KeyboardEvent, MouseEvent, PixelFormat, RdpServer,
+    RdpServerDisplay, RdpServerDisplayUpdates, RdpServerInputHandler, TlsIdentityCtx,
 };
 use tracing::{error, info, warn};
 
@@ -131,7 +130,7 @@ impl RdpServerDisplayUpdates for Updates {
     }
 }
 
-/// The session of the connection that is currently open (the server handles one client at a time).
+/// The session of one connection. Every connection has its own `Slot`.
 struct Slot {
     session: Mutex<Option<Session>>,
     klid: AtomicU32,
@@ -216,21 +215,6 @@ impl Handler {
 
     fn shared(&self) -> Option<Arc<Shared>> {
         self.slot.session.lock().unwrap().as_ref().map(|s| s.shared.clone())
-    }
-}
-
-/// Ends the session when the client leaves.
-struct Conn {
-    slot: Arc<Slot>,
-}
-
-impl ConnectionHandler for Conn {
-    fn on_disconnected(&mut self, peer: std::net::SocketAddr, duration: std::time::Duration, error: Option<&anyhow::Error>) -> PostConnectionAction {
-        info!(%peer, ?duration, error = ?error.map(|e| e.to_string()), "client disconnected");
-        self.slot.session.lock().unwrap().take();
-        self.slot.wanted.lock().unwrap().take();
-        self.slot.resize_to.lock().unwrap().take();
-        PostConnectionAction::Continue
     }
 }
 
@@ -381,7 +365,7 @@ async fn main() -> anyhow::Result<()> {
     let (mut layout, mut spawn_terminal) = ("us".to_string(), true);
     let (mut workspace, mut hook) = ("Remote".to_string(), None::<PathBuf>);
     let (mut no_egfx, mut bitrate, mut max_qp) = (false, 40_000_000u32, 20u8);
-    // None = decide from the bind address: replacing is only safe where reaching the port already means trust.
+    // Kept for old command lines: every connection has its own session now, so nothing is replaced.
     let mut replace: Option<bool> = None;
     // Experiment: plain TLS login (the password travels inside TLS, no CredSSP/NLA). Off by default.
     let mut tls_only = false;
@@ -393,6 +377,7 @@ async fn main() -> anyhow::Result<()> {
     // (see docs/NOTES.md), while FreeRDP is fine.
     let mut clipboard = false;
     let mut audio = true;
+    let mut max_sessions = 8usize;
     while let Some(a) = args.next() {
         match a.as_str() {
             "--bind" => bind = args.next().context("--bind needs a value")?,
@@ -414,6 +399,7 @@ async fn main() -> anyhow::Result<()> {
             "--credentials" => creds_file = args.next().map(PathBuf::from),
             "--clipboard" => clipboard = true,
             "--no-audio" => audio = false,
+            "--max-sessions" => max_sessions = args.next().context("--max-sessions needs a number")?.parse()?,
             "--bitrate" => bitrate = args.next().context("--bitrate needs a value")?.parse()?,
             "--quality" => max_qp = args.next().context("--quality needs a value (max QP, lower = better)")?.parse()?,
             other => anyhow::bail!("unknown argument {other}"),
@@ -432,40 +418,143 @@ async fn main() -> anyhow::Result<()> {
         anyhow::ensure!(!u.is_empty() && p.len() >= 8, "credentials: empty user or password shorter than 8 characters");
         (u.to_string(), p.to_string())
     };
-    let loopback = bind.parse::<std::net::SocketAddr>().map(|a| a.ip().is_loopback()).unwrap_or(false);
-    let replace = replace.unwrap_or(loopback);
     let (cert, key) = cert.zip(key).context("--cert and --key are required (TLS is always on)")?;
     let identity = TlsIdentityCtx::init_from_paths(&cert, &key).context("TLS identity")?;
     let acceptor = identity.make_acceptor().context("TLS acceptor")?;
 
+    let common = Arc::new(Common {
+        cfg: Arc::new(Config { opts: session::Options { default_layout: layout, spawn_terminal, workspace, hook } }),
+        acceptor,
+        pub_key: identity.pub_key,
+        tls_only,
+        pam_validator: if pam { Some(Arc::new(auth::PamValidator::new("sway-rdp-server")?)) } else { None },
+        credentials: (username, password),
+        egfx: (!no_egfx).then_some(egfx::Tuning { bitrate, max_qp, fps: 30 }),
+        clipboard,
+        audio,
+    });
+    if let Some(v) = &common.pam_validator {
+        info!(user = v.user(), "login: PAM service sway-rdp-server, plain TLS login (no NLA)");
+    }
+    if replace == Some(true) {
+        warn!("--replace is ignored: every connection now gets its own session");
+    }
+
+    let addr = bind.parse::<std::net::SocketAddr>().context("bad --bind address")?;
+    let listener = tokio::net::TcpListener::bind(addr).await.with_context(|| format!("cannot listen on {addr}"))?;
+    let permits = Arc::new(tokio::sync::Semaphore::new(max_sessions));
+    info!(%bind, max_sessions, "sway-rdp-server listening");
+
+    // One RDP server per connection, all on this thread: connections are independent and each owns a session.
+    let local = tokio::task::LocalSet::new();
+    local
+        .run_until(async move {
+            loop {
+                let (stream, peer) = match listener.accept().await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        warn!("accept failed: {e}");
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        continue;
+                    }
+                };
+                // Counts connections, not only logged-in ones: an unauthenticated flood can use up the permits.
+                let Ok(permit) = permits.clone().try_acquire_owned() else {
+                    warn!(%peer, "too many connections, refused");
+                    continue;
+                };
+                let common = common.clone();
+                tokio::task::spawn_local(async move {
+                    serve(stream, peer, common).await;
+                    drop(permit);
+                });
+            }
+        })
+        .await;
+    Ok(())
+}
+
+/// What every connection shares (read only).
+struct Common {
+    cfg: Arc<Config>,
+    acceptor: ironrdp_server::tokio_rustls::TlsAcceptor,
+    pub_key: Vec<u8>,
+    tls_only: bool,
+    pam_validator: Option<Arc<auth::PamValidator>>,
+    credentials: (String, String),
+    /// None = no graphics pipeline, bitmaps only.
+    egfx: Option<egfx::Tuning>,
+    clipboard: bool,
+    audio: bool,
+}
+
+/// Only one connection at a time can have sound: the virtual speaker is shared by the whole machine.
+static AUDIO_BUSY: AtomicBool = AtomicBool::new(false);
+
+struct AudioLease;
+
+impl AudioLease {
+    fn take() -> Option<Self> {
+        (!AUDIO_BUSY.swap(true, Ordering::AcqRel)).then_some(Self)
+    }
+}
+
+impl Drop for AudioLease {
+    fn drop(&mut self) {
+        AUDIO_BUSY.store(false, Ordering::Release);
+    }
+}
+
+/// Runs one client from accept to disconnect, then removes its session.
+async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common: Arc<Common>) {
+    let started = std::time::Instant::now();
     let slot = Arc::new(Slot::new());
     let egfx_state = Arc::new(egfx::EgfxState::default());
     let handler = Handler {
         slot: slot.clone(),
-        cfg: Arc::new(Config { opts: session::Options { default_layout: layout, spawn_terminal, workspace, hook } }),
-        egfx: (!no_egfx).then(|| (egfx_state.clone(), egfx::Tuning { bitrate, max_qp, fps: 30 })),
+        cfg: common.cfg.clone(),
+        egfx: common.egfx.map(|tuning| (egfx_state.clone(), tuning)),
     };
-    let pam_validator = if pam { Some(Arc::new(auth::PamValidator::new("sway-rdp-server")?)) } else { None };
-    let builder = RdpServer::builder().with_addr(bind.parse::<std::net::SocketAddr>().context("bad --bind address")?);
-    let builder = if tls_only { builder.with_tls(acceptor) } else { builder.with_hybrid(acceptor, identity.pub_key) };
+    let audio_lease = if common.audio { AudioLease::take() } else { None };
+    if common.audio && audio_lease.is_none() {
+        info!(%peer, "another session has the sound; this one is silent");
+    }
+
+    let builder = RdpServer::builder().with_addr(peer);
+    let builder = if common.tls_only {
+        builder.with_tls(common.acceptor.clone())
+    } else {
+        builder.with_hybrid(common.acceptor.clone(), common.pub_key.clone())
+    };
     let mut server = builder
         .with_input_handler(handler.clone())
         .with_display_handler(handler)
-        .with_gfx_factory((!no_egfx).then(|| {
-            Box::new(egfx::Factory::new(egfx_state.clone())) as Box<dyn ironrdp_server::GfxServerFactory>
-        }))
-        .with_cliprdr_factory(clipboard.then(|| Box::new(clipboard::Factory::new()) as Box<dyn ironrdp_server::CliprdrServerFactory>))
-        .with_sound_factory(audio.then(|| Box::new(audio::Factory::new()) as Box<dyn ironrdp_server::SoundServerFactory>))
+        .with_gfx_factory(common.egfx.map(|_| Box::new(egfx::Factory::new(egfx_state.clone())) as Box<dyn ironrdp_server::GfxServerFactory>))
+        .with_cliprdr_factory(common.clipboard.then(|| Box::new(clipboard::Factory::new()) as Box<dyn ironrdp_server::CliprdrServerFactory>))
+        .with_sound_factory(audio_lease.is_some().then(|| Box::new(audio::Factory::new()) as Box<dyn ironrdp_server::SoundServerFactory>))
         .with_honor_client_desktop_size(true)
-        .with_replace_on_new_connection(replace)
-        .with_credential_validator(pam_validator.clone().map(|v| v as std::sync::Arc<dyn ironrdp_server::CredentialValidator>))
-        .with_connection_handler(Some(Box::new(Conn { slot })))
+        .with_replace_on_new_connection(false)
+        .with_credential_validator(common.pam_validator.clone().map(|v| v as Arc<dyn ironrdp_server::CredentialValidator>))
         .build();
-    if let Some(v) = &pam_validator {
-        info!(user = v.user(), "login: PAM service sway-rdp-server, plain TLS login (no NLA)");
-    } else {
+    if common.pam_validator.is_none() {
+        let (username, password) = common.credentials.clone();
         server.set_credentials(Some(Credentials { username, password, domain: None }));
     }
-    info!(%bind, "sway-rdp-server listening");
-    server.run().await.context("server stopped")
+
+    info!(%peer, "client connected");
+    let result = server.run_connection(stream).await;
+    match &result {
+        Ok(()) => info!(%peer, duration = ?started.elapsed(), "client disconnected"),
+        Err(e) => info!(%peer, duration = ?started.elapsed(), error = %format!("{e:#}"), "client disconnected"),
+    }
+    drop(server);
+
+    // Removing the session runs swaymsg and waits for the hook: not on the async thread.
+    let _ = tokio::task::spawn_blocking(move || {
+        slot.wanted.lock().unwrap().take();
+        slot.resize_to.lock().unwrap().take();
+        slot.session.lock().unwrap().take();
+    })
+    .await;
+    drop(audio_lease);
 }

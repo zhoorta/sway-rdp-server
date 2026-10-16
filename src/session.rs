@@ -3,9 +3,10 @@
 
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::collections::BTreeSet;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Context as _, Result};
 use tracing::{error, info, warn};
@@ -15,6 +16,24 @@ use crate::input;
 
 /// Counts sessions so a hook can derive a unique port or name from `SWAY_RDP_INDEX` (0..99, then it wraps).
 static NEXT_INDEX: AtomicU32 = AtomicU32::new(0);
+
+/// Sessions are created one at a time: setting one up moves focus between outputs, which must not interleave.
+static CREATE_LOCK: Mutex<()> = Mutex::new(());
+
+/// Numbers of the sessions that exist (1, 2, ...). The lowest free one names the session's workspace, so two
+/// concurrent sessions never share (and steal) a workspace.
+static USED_SLOTS: Mutex<BTreeSet<u32>> = Mutex::new(BTreeSet::new());
+
+fn take_slot() -> u32 {
+    let mut used = USED_SLOTS.lock().unwrap();
+    let n = (1..).find(|n| !used.contains(n)).expect("slot numbers are not exhausted");
+    used.insert(n);
+    n
+}
+
+fn release_slot(n: u32) {
+    USED_SLOTS.lock().unwrap().remove(&n);
+}
 
 /// What a new session is made of; set once from the command line.
 pub struct Options {
@@ -32,6 +51,7 @@ pub struct Options {
 pub struct Session {
     pub output: String,
     workspace: String,
+    slot: u32,
     /// The session hook, if any (runs in its own process group).
     hook: Option<Child>,
     pub shared: Arc<Shared>,
@@ -164,6 +184,7 @@ pub fn xkb_layout_for_klid(klid: u32) -> &'static str {
 impl Session {
     pub fn create(size: (u16, u16), layout: &str, opts: &Options) -> Result<Self> {
         let (w, h) = clamp_size(size.0, size.1);
+        let _creating = CREATE_LOCK.lock().unwrap();
         let before = output_names()?;
         swaymsg(&["create_output"])?;
         let output = output_names()?
@@ -172,17 +193,20 @@ impl Session {
             .context("sway created no new output")?;
         // Everything after this point has to remove the output again on failure.
         let index = NEXT_INDEX.fetch_add(1, Ordering::Relaxed) % 100;
-        match Self::attach(&output, index, (w, h), layout, opts) {
+        let slot = take_slot();
+        // The first session keeps the configured name; later ones get a number.
+        let workspace = if slot == 1 { opts.workspace.clone() } else { format!("{} {slot}", opts.workspace) };
+        match Self::attach(&output, index, slot, &workspace, (w, h), layout, opts) {
             Ok(s) => Ok(s),
             Err(e) => {
+                release_slot(slot);
                 let _ = swaymsg(&["output", &output, "unplug"]);
                 Err(e)
             }
         }
     }
 
-    fn attach(output: &str, index: u32, (w, h): (u16, u16), layout: &str, opts: &Options) -> Result<Self> {
-        let workspace = opts.workspace.as_str();
+    fn attach(output: &str, index: u32, slot: u32, workspace: &str, (w, h): (u16, u16), layout: &str, opts: &Options) -> Result<Self> {
         swaymsg(&["output", output, "mode", "--custom", &format!("{w}x{h}@60Hz"), "scale", "1"])?;
         // A workspace is created on the focused output, so focus the session output first.
         swaymsg(&["focus", "output", output])?;
@@ -198,7 +222,7 @@ impl Session {
         let input = input::spawn(Some(output.to_owned()), (shared.width.into(), shared.height.into()), layout.to_owned())
             .context("input setup")?;
         let hook = opts.hook.as_deref().and_then(|h| start_hook(h, output, workspace, index));
-        Ok(Self { output: output.to_owned(), workspace: workspace.to_owned(), hook, shared, input, stop })
+        Ok(Self { output: output.to_owned(), workspace: workspace.to_owned(), slot, hook, shared, input, stop })
     }
 
     /// Change the output size and capture it again at that size. The pointer extent follows.
@@ -243,6 +267,7 @@ impl Drop for Session {
         if let Err(e) = swaymsg(&["output", &self.output, "unplug"]) {
             warn!("cannot remove output {}: {e:#}", self.output);
         }
-        info!(output = %self.output, "session removed");
+        release_slot(self.slot);
+        info!(output = %self.output, workspace = %self.workspace, "session removed");
     }
 }
