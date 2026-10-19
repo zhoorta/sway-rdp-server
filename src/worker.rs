@@ -346,9 +346,15 @@ impl Worker {
     /// Send what moved lately again as a keyframe, now that the picture is still.
     fn start_settle(&mut self) {
         let (Some(rect), Some(enc)) = (self.settle.take(), self.enc.as_mut()) else { return };
+        // The area may be from before a resize: keep what still lies on the picture.
+        let shared = self.session.as_ref().expect("session").shared.clone();
+        let (x1, y1) = ((rect.x + rect.w).min(shared.width.into()), (rect.y + rect.h).min(shared.height.into()));
+        if rect.x >= x1 || rect.y >= y1 {
+            return;
+        }
         enc.force_keyframe();
         self.settling = true;
-        self.session.as_ref().expect("session").shared.mark_dirty(rect);
+        shared.mark_dirty(Rect { x: rect.x, y: rect.y, w: x1 - rect.x, h: y1 - rect.y });
     }
 
     async fn handle(&mut self, msg: Down) {
