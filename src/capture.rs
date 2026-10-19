@@ -12,7 +12,7 @@ use wayland_client::{Connection, Dispatch, EventQueue, Proxy, QueueHandle, WEnum
 use wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1};
 use wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,
@@ -21,7 +21,7 @@ pub struct Rect {
 }
 
 impl Rect {
-    fn union(self, o: Rect) -> Rect {
+    pub fn union(self, o: Rect) -> Rect {
         let x0 = self.x.min(o.x);
         let y0 = self.y.min(o.y);
         let x1 = (self.x + self.w).max(o.x + o.w);

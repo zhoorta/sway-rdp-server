@@ -58,6 +58,11 @@ impl H264 {
         })
     }
 
+    /// The next frame will be a keyframe: it carries the whole picture again, not only the difference to the last one.
+    pub fn force_keyframe(&mut self) {
+        self.encoder.force_intra_frame();
+    }
+
     /// Encode a tight BGRA frame of `w` x `h` (the surface is `sw` x `sh`, the extra rows stay black).
     /// Returns `None` when the encoder decided to skip the frame.
     pub fn encode(&mut self, bgra: &[u8], w: usize, h: usize) -> Result<Option<Vec<u8>>> {

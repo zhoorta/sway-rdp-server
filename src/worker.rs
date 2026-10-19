@@ -18,6 +18,8 @@ use crate::session::{self, Session};
 
 /// The daemon never grants more than this many at once (1000 when the client switched acknowledgements off).
 const MAX_CREDITS: u32 = 1000;
+/// How long the picture must stay still before the areas that moved are sent again as a keyframe.
+const SETTLE: Duration = Duration::from_millis(300);
 
 pub struct Config {
     pub opts: session::Options,
@@ -104,6 +106,15 @@ struct Worker {
     /// Send raw bitmaps instead of H.264.
     bitmaps: bool,
     up: mpsc::UnboundedSender<Up>,
+    /// Area changed since the last settle refresh. Between keyframes the encoder keeps improving the picture in
+    /// places the client was not told to redraw, so a region drawn roughly during motion would stay rough.
+    settle: Option<Rect>,
+    /// The next frame to go out is the settle refresh itself and does not start another one.
+    settling: bool,
+    last_frame: tokio::time::Instant,
+    /// The rectangle of the latest frame, and when it last differed from the one before (a window moving or resizing).
+    last_rect: Option<Rect>,
+    last_change: tokio::time::Instant,
 }
 
 pub async fn run(cfg: Config) -> Result<()> {
@@ -279,7 +290,7 @@ async fn serve_client(
     };
     let (w, h) = (session.shared.width, session.shared.height);
     session.shared.force_full();
-    let mut me = Worker { session: Some(session), enc: None, tuning: cfg.tuning, credits: 0, bitmaps: cfg.tuning.is_none(), up: up_tx };
+    let mut me = Worker { session: Some(session), enc: None, tuning: cfg.tuning, credits: 0, bitmaps: cfg.tuning.is_none(), up: up_tx, settle: None, settling: false, last_frame: tokio::time::Instant::now(), last_rect: None, last_change: tokio::time::Instant::now() };
     let _ = me.up.send(Up::Ready { width: w, height: h });
 
     let mut tick = tokio::time::interval(Duration::from_secs(2));
@@ -305,6 +316,7 @@ async fn serve_client(
                 }
                 Some(m) => me.handle(m).await,
             },
+            _ = tokio::time::sleep_until(me.settle_due()), if me.settle.is_some() && me.credits > 0 && !me.settling => me.start_settle(),
             // Only take a frame when there is room for it: changes keep merging into the dirty rectangle meanwhile.
             (frame, rect) = shared.next(), if me.credits > 0 => {
                 if let Err(e) = me.send_frame(&frame, rect).await {
@@ -325,6 +337,20 @@ async fn serve_client(
 }
 
 impl Worker {
+    /// When the settle refresh is due. A picture that stays the same, or whose changes stay inside the same rectangle
+    /// (a video playing where a window was dragged to), counts as settled once that rectangle stopped changing.
+    fn settle_due(&self) -> tokio::time::Instant {
+        (if self.settle == self.last_rect { self.last_frame } else { self.last_change }) + SETTLE
+    }
+
+    /// Send what moved lately again as a keyframe, now that the picture is still.
+    fn start_settle(&mut self) {
+        let (Some(rect), Some(enc)) = (self.settle.take(), self.enc.as_mut()) else { return };
+        enc.force_keyframe();
+        self.settling = true;
+        self.session.as_ref().expect("session").shared.mark_dirty(rect);
+    }
+
     async fn handle(&mut self, msg: Down) {
         let session = self.session.as_ref().expect("session");
         match msg {
@@ -400,6 +426,16 @@ impl Worker {
         match self.enc.as_mut().expect("encoder").encode(frame, w, h)? {
             Some(data) => {
                 self.credits -= 1;
+                if self.settling {
+                    self.settling = false;
+                } else {
+                    self.settle = Some(self.settle.map_or(r, |old| old.union(r)));
+                }
+                self.last_frame = tokio::time::Instant::now();
+                if self.last_rect != Some(r) {
+                    self.last_rect = Some(r);
+                    self.last_change = self.last_frame;
+                }
                 let _ = self.up.send(Up::Frame { x: r.x as u16, y: r.y as u16, w: r.w as u16, h: r.h as u16, kind: FrameKind::H264, data });
             }
             None => {
