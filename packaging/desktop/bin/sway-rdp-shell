@@ -129,11 +129,43 @@ if settings is not None and not os.path.exists(marker):
         break
     changed = True
     open(marker, "w").close()
+# The launcher: a grid of apps with one icon style (Papirus), without DMS's own utility entries (their icon is the DMS logo).
+marker = os.path.join(d, ".launcher-look")
+if settings is not None and not os.path.exists(marker):
+    if os.path.isdir("/usr/share/icons/Papirus-Dark"):
+        settings["iconThemeDark"] = "Papirus-Dark"
+        settings["iconThemeLight"] = "Papirus"
+    settings["spotlightSectionViewModes"] = {"apps": "grid"}
+    settings["appDrawerSectionViewModes"] = {"apps": "grid"}
+    builtin = settings.get("builtInPluginSettings") or {}
+    for name in ("dms_colorpicker", "dms_qr_generator", "dms_power", "dms_clipboard_search", "dms_sysmon", "dms_notepad", "dms_settings"):
+        builtin[name] = {"enabled": False}
+    settings["builtInPluginSettings"] = builtin
+    changed = True
+    open(marker, "w").close()
 if changed:
     with open(os.path.join(d, "settings.json"), "w") as f:
         json.dump(settings, f, indent=2)
 PY
 fi
+# Technical entries stay out of the launcher (an account that wants one back deletes its file in ~/.local/share/applications).
+apps_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+if [ ! -e "$dms_dir/.hidden-entries" ]; then
+    mkdir -p "$apps_dir"
+    for id in foot-server footclient qt6ct vim thunar-bulk-rename thunar-settings python3 org.quickshell com.danklinux.dms com.danklinux.dms.notepad dms-open; do
+        if [ -e "/usr/share/applications/$id.desktop" ] && [ ! -e "$apps_dir/$id.desktop" ]; then
+            printf '[Desktop Entry]\nType=Application\nName=%s\nNoDisplay=true\n' "$id" > "$apps_dir/$id.desktop"
+        fi
+    done
+    mkdir -p "$dms_dir" && : > "$dms_dir/.hidden-entries"
+fi
+# One font for GTK apps as well (DMS itself uses its own Inter).
+for gtk in gtk-3.0 gtk-4.0; do
+    ini="${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini"
+    if [ -e "$ini" ] && ! grep -q '^gtk-font-name' "$ini" && [ ! -e "$dms_dir/.gtk-font" ]; then
+        grep -q '\[Settings\]' "$ini" && sed -i '/\[Settings\]/a gtk-font-name=Inter 10' "$ini" && : > "$dms_dir/.gtk-font"
+    fi
+done
 # The control center header has an edit button (rearranging its tiles) that has no setting to hide it. The account runs DMS from
 # a copy of the shell made of links to the installed files, with that one button hidden. Without a match (another DMS version)
 # the installed shell is used as it is.
