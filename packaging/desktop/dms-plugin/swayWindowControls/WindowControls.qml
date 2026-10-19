@@ -57,16 +57,16 @@ PluginComponent {
 
     horizontalBarPill: Component {
         Row {
-            spacing: Theme.spacingXS + 2
+            spacing: Theme.spacingS
 
             Repeater {
                 model: root.buttons
 
                 Rectangle {
                     required property var modelData
-                    width: 10
-                    height: 10
-                    radius: 5
+                    width: 13
+                    height: 13
+                    radius: 7
                     anchors.verticalCenter: parent.verticalCenter
                     color: modelData.tone
                     opacity: area.containsMouse ? 1 : 0.7
@@ -75,7 +75,7 @@ PluginComponent {
                         anchors.centerIn: parent
                         visible: area.containsMouse
                         name: modelData.icon
-                        size: 10
+                        size: 12
                         color: Theme.surface
                     }
 
@@ -109,7 +109,7 @@ PluginComponent {
                     DankIcon {
                         anchors.verticalCenter: parent.verticalCenter
                         name: "expand_more"
-                        size: 14
+                        size: 16
                         color: arrowArea.containsMouse ? Theme.surfaceText : Theme.surfaceVariantText
                     }
                 }
