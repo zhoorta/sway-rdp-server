@@ -118,7 +118,7 @@ impl CliprdrBackend for Backend {
             *st.session_text.lock().unwrap() = Some(text);
             st.send(ClipboardMessage::SendInitiateCopy(vec![text_format()]));
         }));
-        // The session offers what is on its clipboard now, then every change.
+        // The session reports its clipboard changes from now on.
         link.send(Down::ClipboardOn);
     }
 

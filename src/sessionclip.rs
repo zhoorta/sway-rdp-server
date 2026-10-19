@@ -25,8 +25,9 @@ impl Clipboard {
         Self { watcher: None, up, last_set: Arc::new(Mutex::new(None)) }
     }
 
-    /// (Re)starts the watch. `wl-paste --watch` runs its command once at once and then on every change, so what is
-    /// on the clipboard now is offered to the client too.
+    /// (Re)starts the watch. `wl-paste --watch` runs its command once at once and then on every change; that first
+    /// run is skipped: what the session held before the client came is older than what the client holds, and
+    /// offering it at connect would replace the client's clipboard with it.
     pub fn watch(&mut self) {
         self.stop();
         let child = Command::new("wl-paste")
@@ -41,9 +42,13 @@ impl Clipboard {
                 self.watcher = Some(c);
                 let (up, last_set) = (self.up.clone(), self.last_set.clone());
                 std::thread::spawn(move || {
+                    let mut first = true;
                     for line in BufReader::new(out).lines() {
                         if line.is_err() {
                             break;
+                        }
+                        if std::mem::take(&mut first) {
+                            continue;
                         }
                         let Some(text) = wayland_text() else { continue };
                         if last_set.lock().unwrap().as_deref() == Some(text.as_str()) {

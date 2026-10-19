@@ -409,9 +409,8 @@ async fn main() -> anyhow::Result<()> {
     // over plain TLS login (see auth.rs for what that trades away).
     let mut auth_mode = "file".to_string();
     let mut creds_file: Option<PathBuf> = None;
-    // Off by default: the Windows App on macOS hangs the session when it has to hand over its clipboard
-    // (see docs/NOTES.md), while FreeRDP is fine.
-    let mut clipboard = false;
+    // On by default (text only); `--no-clipboard` turns it off. It needs wl-clipboard in the session.
+    let mut clipboard = true;
     let mut audio = true;
     let mut max_sessions = 64usize;
     // Internal: run as the session process of one connection (started by the daemon, with a socket as fd 3).
@@ -461,6 +460,7 @@ async fn main() -> anyhow::Result<()> {
             // First line "user:password" (split at the first colon). No built-in default credential.
             "--credentials" => creds_file = args.next().map(PathBuf::from),
             "--clipboard" => clipboard = true,
+            "--no-clipboard" => clipboard = false,
             "--no-audio" => audio = false,
             "--max-sessions" => max_sessions = args.next().context("--max-sessions needs a number")?.parse()?,
             "--bitrate" => bitrate = args.next().context("--bitrate needs a value")?.parse()?,

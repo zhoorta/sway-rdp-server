@@ -34,7 +34,7 @@ exists (run the binary inside your own sway).
   `libopenh264` (Debian: package `libopenh264-8`) loaded at run time; sway-rdp-server contains no encoder code.
 - Input: virtual keyboard and pointer (layout taken from the client's keyboard id), Command works as Ctrl on Macs.
 - Audio: RDPSND from a PipeWire/PulseAudio null sink (`sway-rdp-server`), PCM 44.1 kHz.
-- Clipboard: text only (up to 1 MiB), both ways, **off by default** (`--clipboard`, for the multi-user form in `SWAY_RDP_ARGS`). The session process does the `wl-copy`/`wl-paste` as the account; the daemon only relays text. Tried with FreeRDP and the macOS Windows App (2026-10-19). The server waits 5 s after connecting before it asks the client for its clipboard.
+- Clipboard: text only (up to 1 MiB), both ways, **on by default** (`--no-clipboard` turns it off; it needs `wl-clipboard`). The session process does the `wl-copy`/`wl-paste` as the account; the daemon only relays text. Tried with FreeRDP and the macOS Windows App (2026-10-19). The server waits 5 s after connecting before it asks the client for its clipboard.
 - Security: TLS always on. There is **no built-in credential**. Two ways to log in (one user, the one running the server):
   - `--auth file` (default): NLA with the `user:password` on the first line of `--credentials FILE` (password of at least 8
     characters). NLA protects the password even if you accept an unverified certificate.
@@ -58,7 +58,7 @@ Run it inside the sway session it should serve (it needs `SWAYSOCK` and `WAYLAND
 the first terminal, `--no-terminal` skips it), `libopenh264.so.8`, and `parec`/`pactl` for audio (`--no-audio` skips).
 
 Useful options: `--bind ADDR`, `--kb-layout xkb` (fallback layout), `--workspace NAME` (default `Remote`),
-`--session-hook PROGRAM`, `--bitrate`, `--quality`, `--no-egfx`, `--no-audio`, `--clipboard`, `--replace`/`--no-replace`.
+`--session-hook PROGRAM`, `--bitrate`, `--quality`, `--no-egfx`, `--no-audio`, `--no-clipboard`, `--replace`/`--no-replace`.
 
 **Exposure.** Binding to anything but loopback puts an RDP login on the network. Use a long random password, and prefer
 loopback plus an SSH tunnel or a VPN. A new connection replaces the open one; that is on by default only for loopback,
