@@ -3,7 +3,8 @@
 
   sway-rdp-windows maximize   toggle: fill the usable area (below the shell's bar), or go back to the old size
   sway-rdp-windows minimize   send the focused window to the scratchpad
-  sway-rdp-windows restore    bring the last minimized window back
+  sway-rdp-windows restore [ID]  bring a minimized window back (the last one without an ID)
+  sway-rdp-windows list       the minimized windows as JSON: [{"id", "title", "app"}]
   sway-rdp-windows fit        pull every window of this workspace back into the usable area
   sway-rdp-windows watch      run `fit` twice a second (started by the session's sway config)
 """
@@ -136,6 +137,15 @@ def maximize():
         pass
 
 
+def minimized():
+    """Windows sent to the scratchpad by `minimize`."""
+    out = []
+    for ws, n in walk(tree()):
+        if ws is not None and ws.get("name") == "__i3_scratch" and n["id"] in [f["id"] for f in ws.get("floating_nodes", [])]:
+            out.append({"id": n["id"], "title": n.get("name") or "", "app": n.get("app_id") or (n.get("window_properties") or {}).get("class") or ""})
+    return out
+
+
 def fit_all():
     focused_ws = next((w["name"] for w in workspaces() if w["focused"]), None)
     for ws, n in floating_windows():
@@ -160,7 +170,12 @@ def main():
     elif cmd == "minimize":
         command("move scratchpad")
     elif cmd == "restore":
-        command("scratchpad show")
+        if len(sys.argv) > 2 and sys.argv[2].isdigit():
+            command(f"[con_id={sys.argv[2]}] scratchpad show")
+        else:
+            command("scratchpad show")
+    elif cmd == "list":
+        print(json.dumps(minimized()))
     elif cmd == "fit":
         fit_all()
     elif cmd == "watch":
