@@ -1373,6 +1373,7 @@ impl RdpServer {
         reader: &mut Framed<R>,
         writer: &mut Framed<W>,
         result: AcceptorResult,
+        reactivation: bool,
     ) -> Result<RunState>
     where
         R: FramedRead,
@@ -1384,7 +1385,8 @@ impl RdpServer {
         // async server layer, rather than in the sans-I/O acceptor, because real validators
         // (PAM/LDAP/DB) are I/O-bound. On rejection, deny with a ServerSetErrorInfoPdu before
         // closing, matching the acceptor's exact-match denial path.
-        if let Some(validator) = self.credential_validator.clone() {
+        // A deactivation-reactivation (a resize) carries no credentials: the connection was validated when it began.
+        if let Some(validator) = self.credential_validator.clone().filter(|_| !reactivation) {
             if let Some(creds) = &result.credentials {
                 match validator.validate(creds).await {
                     Ok(CredentialDecision::Accept) => {
@@ -1767,6 +1769,7 @@ impl RdpServer {
     where
         S: AsyncRead + AsyncWrite + Sync + Send + Unpin,
     {
+        let mut reactivation = false;
         loop {
             let (new_framed, result) = ironrdp_acceptor::accept_finalize(framed, &mut acceptor)
                 .await
@@ -1774,7 +1777,7 @@ impl RdpServer {
 
             let (mut reader, mut writer) = split_tokio_framed(new_framed);
 
-            match self.client_accepted(&mut reader, &mut writer, result).await? {
+            match self.client_accepted(&mut reader, &mut writer, result, reactivation).await? {
                 RunState::Continue => {
                     unreachable!();
                 }
@@ -1789,6 +1792,7 @@ impl RdpServer {
                         desktop_size,
                     )?;
                     framed = unsplit_tokio_framed(reader, writer);
+                    reactivation = true;
                     continue;
                 }
                 RunState::Disconnect => {
