@@ -1,0 +1,12 @@
+{
+    "id": "swaySettings",
+    "name": "Settings",
+    "description": "A gear icon that opens the shell's settings (sway-rdp sessions)",
+    "version": "1.0.0",
+    "author": "sway-rdp",
+    "type": "widget",
+    "capabilities": ["settings"],
+    "component": "./Settings.qml",
+    "icon": "settings",
+    "permissions": []
+}

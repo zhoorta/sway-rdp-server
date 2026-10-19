@@ -29,7 +29,7 @@ plugins = load("plugin_settings.json")
 if plugins is None:
     plugins = {}
 added = False
-for name in ("swayWindowControls", "swayVolume"):
+for name in ("swayWindowControls", "swayVolume", "swaySettings"):
     if name not in plugins:
         plugins[name] = {"enabled": True}
         added = True
@@ -48,7 +48,7 @@ if settings is not None and "barConfigs" not in settings:
         "id": "default", "name": "Main Bar", "enabled": True, "position": 0, "screenPreferences": ["all"],
         "leftWidgets": ["launcherButton", "swayWindowControls", "workspaceSwitcher", "focusedWindow"],
         "centerWidgets": ["clock"],
-        "rightWidgets": ["systemTray", "swayVolume", "notificationButton", "powerMenuButton"],
+        "rightWidgets": ["systemTray", "swayVolume", "notificationButton", "swaySettings", "powerMenuButton"],
     }]
     changed = True
 # An account that already has a bar layout gets the buttons once, after the launcher button (the marker keeps a removal
@@ -114,6 +114,18 @@ if settings is not None and not os.path.exists(marker):
         if "swayVolume" not in [(w.get("id") if isinstance(w, dict) else w) for w in right]:
             at = next((i for i, w in enumerate(right) if (w.get("id") if isinstance(w, dict) else w) == "notificationButton"), len(right))
             right.insert(at, "swayVolume")
+        break
+    changed = True
+    open(marker, "w").close()
+# The settings are one click from the bar (the control center that used to lead to them is gone).
+marker = os.path.join(d, ".settings-button")
+if settings is not None and not os.path.exists(marker):
+    for bar in settings.get("barConfigs") or []:
+        right = bar.setdefault("rightWidgets", [])
+        ids = [(w.get("id") if isinstance(w, dict) else w) for w in right]
+        if "swaySettings" not in ids:
+            at = ids.index("powerMenuButton") if "powerMenuButton" in ids else len(right)
+            right.insert(at, "swaySettings")
         break
     changed = True
     open(marker, "w").close()
