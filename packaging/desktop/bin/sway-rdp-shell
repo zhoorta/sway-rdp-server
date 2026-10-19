@@ -5,9 +5,44 @@ export XDG_CURRENT_DESKTOP=sway XDG_SESSION_TYPE=wayland
 # First start of an account: DankMaterialShell without animations. Every animation frame is drawn in software and then
 # sent over the network; on a VM without a GPU they cost about three times the CPU of the rest of the session. The
 # account can turn them back on in the shell's settings (which then own the file).
-dms_settings="${XDG_CONFIG_HOME:-$HOME/.config}/DankMaterialShell/settings.json"
+dms_dir="${XDG_CONFIG_HOME:-$HOME/.config}/DankMaterialShell"
+dms_settings="$dms_dir/settings.json"
 if [ ! -e "$dms_settings" ]; then
-    mkdir -p "$(dirname "$dms_settings")" && printf '%s\n' '{"animationSpeed":0,"syncComponentAnimationSpeeds":true,"popoutAnimationSpeed":0,"modalAnimationSpeed":0,"notificationAnimationSpeed":0}' > "$dms_settings"
+    mkdir -p "$dms_dir" && printf '%s\n' '{"animationSpeed":0,"syncComponentAnimationSpeeds":true,"popoutAnimationSpeed":0,"modalAnimationSpeed":0,"notificationAnimationSpeed":0}' > "$dms_settings"
+fi
+# Window buttons (minimize, maximize, close): sway's title bars have none, so a DMS bar plugin provides them. An account that
+# already has its own bar layout keeps it and can add the widget "Window Controls" in the shell's settings.
+plugin=/usr/share/sway-rdp/dms-plugin/swayWindowControls
+if [ -d "$plugin" ] && command -v python3 >/dev/null 2>&1; then
+    mkdir -p "$dms_dir/plugins" && ln -sfn "$plugin" "$dms_dir/plugins/swayWindowControls"
+    python3 - "$dms_dir" <<'PY'
+import json, os, sys
+d = sys.argv[1]
+def load(name):
+    try:
+        with open(os.path.join(d, name)) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+plugins = load("plugin_settings.json")
+if plugins is None:
+    plugins = {}
+if "swayWindowControls" not in plugins:
+    plugins["swayWindowControls"] = {"enabled": True}
+    with open(os.path.join(d, "plugin_settings.json"), "w") as f:
+        json.dump(plugins, f, indent=2)
+settings = load("settings.json")
+if settings is not None and "barConfigs" not in settings:
+    settings["barConfigs"] = [{
+        "id": "default", "name": "Main Bar", "enabled": True, "position": 0, "screenPreferences": ["all"],
+        "leftWidgets": ["launcherButton", "workspaceSwitcher", "focusedWindow"],
+        "centerWidgets": ["music", "clock", "weather"],
+        "rightWidgets": ["systemTray", "clipboard", "cpuUsage", "memUsage", "notificationButton", "battery",
+                         "controlCenterButton", "swayWindowControls"],
+    }]
+    with open(os.path.join(d, "settings.json"), "w") as f:
+        json.dump(settings, f, indent=2)
+PY
 fi
 dbus-update-activation-environment --systemd --all 2>/dev/null
 if command -v dms >/dev/null 2>&1 && systemctl --user start sway-session.target 2>/dev/null; then

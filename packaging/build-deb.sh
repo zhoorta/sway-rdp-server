@@ -31,6 +31,7 @@ install -m 755 packaging/desktop/bin/* $D/usr/bin/
 install -m 644 packaging/desktop/etc-sway-rdp/sway.conf $D/etc/xdg/sway-rdp/sway.conf
 install -m 755 packaging/desktop/setup/*.sh $D/usr/share/sway-rdp/setup/
 install -m 644 packaging/desktop/setup/*.tsv $D/usr/share/sway-rdp/setup/
+mkdir -p $D/usr/share/sway-rdp/dms-plugin && cp -r packaging/desktop/dms-plugin/swayWindowControls $D/usr/share/sway-rdp/dms-plugin/ && chmod -R go-w,a+rX $D/usr/share/sway-rdp/dms-plugin
 install -m 644 packaging/desktop/systemd-user/sway-session.target $D/usr/lib/systemd/user/sway-session.target
 ln -s ../dms.service $D/usr/lib/systemd/user/sway-session.target.wants/dms.service
 cat LICENSE-MIT > $D/usr/share/doc/sway-rdp-desktop/copyright
