@@ -299,6 +299,14 @@ impl RdpServerDisplay for Handler {
             }
         });
         let size = link.size();
+        // After a resize the session starts again from zero credits (frames in flight died with the reactivation) and
+        // the channel stays up, so nothing grants new ones: without this a still picture never gets going again.
+        // A new connection gets its first credits when the channel reports ready.
+        if let Some((st, _)) = &self.egfx {
+            if st.is_ready() {
+                st.grant(egfx::MAX_CREDITS);
+            }
+        }
         let egfx = self.egfx.as_ref().map(|(st, _)| EgfxLink { st: st.clone(), out: egfx::Out::new(st.clone(), size.0, size.1) });
         let max_qp = self.egfx.as_ref().map_or(0, |(_, t)| t.max_qp.clamp(1, 51));
         Ok(Box::new(Updates { link, egfx, start: std::time::Instant::now(), size, mode: Mode::Undecided, max_qp }))

@@ -29,7 +29,7 @@ pub struct EgfxState {
 
 /// Frames the session may have in flight (sent, not acknowledged yet). Matches the pipeline's own default
 /// (`ironrdp_egfx` DEFAULT_MAX_FRAMES_IN_FLIGHT), which our handler does not change.
-const MAX_CREDITS: u16 = 3;
+pub const MAX_CREDITS: u16 = 3;
 /// The client's queue depth when it has switched acknowledgements off: it will never give a credit back.
 const ACKS_SUSPENDED: u32 = 0xFFFF_FFFF;
 
