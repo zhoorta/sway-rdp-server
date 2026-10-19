@@ -43,7 +43,7 @@ if settings is not None and "barConfigs" not in settings:
         "id": "default", "name": "Main Bar", "enabled": True, "position": 0, "screenPreferences": ["all"],
         "leftWidgets": ["launcherButton", "swayWindowControls", "workspaceSwitcher", "focusedWindow"],
         "centerWidgets": ["music", "clock", "weather"],
-        "rightWidgets": ["systemTray", "clipboard", "cpuUsage", "memUsage", "notificationButton", "battery",
+        "rightWidgets": ["systemTray", "cpuUsage", "memUsage", "notificationButton",
                          "controlCenterButton", "powerMenuButton"],
     }]
     changed = True
@@ -74,6 +74,21 @@ if settings is not None and not os.path.exists(marker):
         kept = [w for w in right if is_power(w)] or ["powerMenuButton"]
         bars[0]["rightWidgets"] = [w for w in right if not is_power(w)] + kept[:1]
         changed = True
+    open(marker, "w").close()
+# A remote desktop has no network, Bluetooth, battery or power profile of its own to manage, the audio devices are the
+# session's dummy ones, and the clipboard history is not wanted: take them out of the bar and the control center (once
+# per account, so what an account adds back stays).
+marker = os.path.join(d, ".trimmed")
+if settings is not None and not os.path.exists(marker):
+    gone = ("clipboard", "battery")
+    for bar in settings.get("barConfigs") or []:
+        for k in ("leftWidgets", "centerWidgets", "rightWidgets"):
+            if k in bar:
+                bar[k] = [w for w in bar[k] if (w.get("id") if isinstance(w, dict) else w) not in gone]
+    settings["controlCenterWidgets"] = [{"id": i, "enabled": True, "width": 50} for i in ("volumeSlider", "nightMode", "darkMode")]
+    settings["controlCenterShowNetworkIcon"] = False
+    settings["controlCenterShowBluetoothIcon"] = False
+    changed = True
     open(marker, "w").close()
 if changed:
     with open(os.path.join(d, "settings.json"), "w") as f:
