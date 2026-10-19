@@ -32,6 +32,12 @@ if "swayWindowControls" not in plugins:
     with open(os.path.join(d, "plugin_settings.json"), "w") as f:
         json.dump(plugins, f, indent=2)
 settings = load("settings.json")
+changed = False
+# The power menu offers only "log out": the machine is not the account's to shut down, suspend or reboot.
+if settings is not None and "powerMenuActions" not in settings:
+    settings["powerMenuActions"] = ["logout"]
+    settings["powerMenuDefaultAction"] = "logout"
+    changed = True
 if settings is not None and "barConfigs" not in settings:
     settings["barConfigs"] = [{
         "id": "default", "name": "Main Bar", "enabled": True, "position": 0, "screenPreferences": ["all"],
@@ -40,6 +46,8 @@ if settings is not None and "barConfigs" not in settings:
         "rightWidgets": ["systemTray", "clipboard", "cpuUsage", "memUsage", "notificationButton", "battery",
                          "controlCenterButton", "swayWindowControls"],
     }]
+    changed = True
+if changed:
     with open(os.path.join(d, "settings.json"), "w") as f:
         json.dump(settings, f, indent=2)
 PY
