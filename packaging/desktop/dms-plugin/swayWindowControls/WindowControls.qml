@@ -17,32 +17,33 @@ PluginComponent {
     }
 
     readonly property var buttons: [
-        { "icon": "close", "action": "close", "color": "#ff5f57" },
-        { "icon": "remove", "action": "minimize", "color": "#febc2e" },
-        { "icon": "add", "action": "maximize", "color": "#28c840" }
+        { "icon": "close", "action": "close", "tone": Theme.error },
+        { "icon": "remove", "action": "minimize", "tone": Theme.warning },
+        { "icon": "add", "action": "maximize", "tone": Theme.success }
     ]
 
     horizontalBarPill: Component {
         Row {
-            spacing: Theme.spacingS
+            spacing: Theme.spacingXS + 2
 
             Repeater {
                 model: root.buttons
 
                 Rectangle {
                     required property var modelData
-                    width: 14
-                    height: 14
-                    radius: 7
+                    width: 10
+                    height: 10
+                    radius: 5
                     anchors.verticalCenter: parent.verticalCenter
-                    color: modelData.color
+                    color: modelData.tone
+                    opacity: area.containsMouse ? 1 : 0.7
 
                     DankIcon {
                         anchors.centerIn: parent
                         visible: area.containsMouse
                         name: modelData.icon
-                        size: 12
-                        color: "#4d0000"
+                        size: 10
+                        color: Theme.surface
                     }
 
                     MouseArea {
@@ -58,7 +59,7 @@ PluginComponent {
             DankIcon {
                 anchors.verticalCenter: parent.verticalCenter
                 name: "unfold_more"
-                size: 16
+                size: 14
                 color: restoreArea.containsMouse ? Theme.surfaceText : Theme.surfaceVariantText
 
                 MouseArea {
