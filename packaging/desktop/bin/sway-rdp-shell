@@ -85,15 +85,49 @@ if settings is not None and not os.path.exists(marker):
         for k in ("leftWidgets", "centerWidgets", "rightWidgets"):
             if k in bar:
                 bar[k] = [w for w in bar[k] if (w.get("id") if isinstance(w, dict) else w) not in gone]
-    settings["controlCenterWidgets"] = [{"id": i, "enabled": True, "width": 50} for i in ("volumeSlider", "nightMode", "darkMode")]
+    settings["controlCenterWidgets"] = [{"id": i, "enabled": True, "width": 50} for i in ("volumeSlider", "darkMode")]
     settings["controlCenterShowNetworkIcon"] = False
     settings["controlCenterShowBluetoothIcon"] = False
     changed = True
+    open(marker, "w").close()
+# Night mode is not wanted either (accounts trimmed by an earlier version lose the tile once).
+marker = os.path.join(d, ".no-night-mode")
+if settings is not None and not os.path.exists(marker):
+    tiles = settings.get("controlCenterWidgets")
+    if tiles:
+        settings["controlCenterWidgets"] = [t for t in tiles if (t.get("id") if isinstance(t, dict) else t) != "nightMode"]
+        changed = True
     open(marker, "w").close()
 if changed:
     with open(os.path.join(d, "settings.json"), "w") as f:
         json.dump(settings, f, indent=2)
 PY
+fi
+# The control center header has an edit button (rearranging its tiles) that has no setting to hide it. The account runs DMS from
+# a copy of the shell made of links to the installed files, with that one button hidden. Without a match (another DMS version)
+# the installed shell is used as it is.
+dms_src=/usr/share/quickshell/dms
+dms_copy="${XDG_CACHE_HOME:-$HOME/.cache}/sway-rdp/dms-shell"
+rm -rf "$dms_copy"
+systemctl --user unset-environment DMS_SHELL_DIR 2>/dev/null
+if [ -d "$dms_src" ] && command -v python3 >/dev/null 2>&1 && mkdir -p "$(dirname "$dms_copy")" && cp -rs "$dms_src" "$dms_copy" 2>/dev/null; then
+    header="$dms_copy/Modules/ControlCenter/Components/HeaderPane.qml"
+    if python3 - "$dms_src/Modules/ControlCenter/Components/HeaderPane.qml" "$header" <<'PY'
+import os, sys
+src, dst = sys.argv[1:]
+text = open(src).read()
+needle = 'iconName: editMode ? "done" : "edit"'
+if needle not in text:
+    sys.exit(1)
+os.remove(dst)
+with open(dst, "w") as f:
+    f.write(text.replace(needle, "visible: false\n            " + needle, 1))
+PY
+    then
+        systemctl --user set-environment DMS_SHELL_DIR="$dms_copy"
+    else
+        rm -rf "$dms_copy"
+    fi
 fi
 dbus-update-activation-environment --systemd --all 2>/dev/null
 if command -v dms >/dev/null 2>&1 && systemctl --user start sway-session.target 2>/dev/null; then
