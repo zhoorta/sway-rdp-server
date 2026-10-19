@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Window helpers for sway-rdp sessions (floating windows): maximize, minimize, and keeping title bars reachable.
+
+  sway-rdp-windows maximize   toggle: fill the usable area (below the shell's bar), or go back to the old size
+  sway-rdp-windows minimize   send the focused window to the scratchpad
+  sway-rdp-windows restore    bring the last minimized window back
+  sway-rdp-windows fit        pull every window of this workspace back into the usable area
+  sway-rdp-windows watch      run `fit` twice a second (started by the session's sway config)
+"""
+import json
+import os
+import socket
+import struct
+import time
+import sys
+
+STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "sway-rdp-windows.json")
+
+
+def ipc(kind, payload=""):
+    """One request on sway's IPC socket (0 = run command, 1 = get workspaces, 4 = get tree)."""
+    with socket.socket(socket.AF_UNIX) as s:
+        s.connect(os.environ["SWAYSOCK"])
+        data = payload.encode()
+        s.sendall(b"i3-ipc" + struct.pack("=II", len(data), kind) + data)
+        head = b""
+        while len(head) < 14:
+            head += s.recv(14 - len(head))
+        size = struct.unpack("=I", head[6:10])[0]
+        body = b""
+        while len(body) < size:
+            body += s.recv(size - len(body))
+    return json.loads(body)
+
+
+def command(text):
+    ipc(0, text)
+
+
+def tree():
+    return ipc(4)
+
+
+def workspaces():
+    return ipc(1)
+
+
+def walk(node, ws=None):
+    """Yields (workspace node, node) for every node below `node`."""
+    if node.get("type") == "workspace":
+        ws = node
+    yield ws, node
+    for c in node.get("nodes", []) + node.get("floating_nodes", []):
+        yield from walk(c, ws)
+
+
+def usable(ws_name):
+    """Usable area of a workspace (sway leaves out what the shell's bar reserves)."""
+    for w in workspaces():
+        if w["name"] == ws_name:
+            r = w["rect"]
+            return r["x"], r["y"], r["width"], r["height"]
+    return None
+
+
+def geometry(n):
+    """Container position and content size: sway places the container, the rect is the content inside it."""
+    r, d = n["rect"], n.get("deco_rect", {}).get("height", 0)
+    return r["x"], r["y"] - d, r["width"], r["height"], d
+
+
+def place(con_id, x, y, w=None, h=None, deco=0):
+    """Move a container to layout position x, y; w, h (content size) too when given."""
+    cmd = f"[con_id={con_id}] "
+    if w is not None:
+        cmd += f"resize set width {w}px height {h + deco}px, "
+    command(cmd + f"move absolute position {x} {y}")
+
+
+def fit_node(ws, n):
+    """Keep a floating window, title bar included, inside the usable area of its workspace."""
+    area = usable(ws["name"])
+    if not area or n.get("fullscreen_mode"):
+        return
+    ax, ay, aw, ah = area
+    x, y, w, h, deco = geometry(n)
+    nw, nh = min(w, aw), min(h, ah - deco)
+    nx = min(max(x, ax), ax + aw - nw)
+    ny = min(max(y, ay), ay + ah - nh - deco)
+    if (nx, ny, nw, nh) != (x, y, w, h):
+        place(n["id"], nx, ny, nw, nh, deco)
+
+
+def floating_windows():
+    for ws, n in walk(tree()):
+        if ws is not None and any(f["id"] == n["id"] for f in ws.get("floating_nodes", [])):
+            yield ws, n
+
+
+def focused():
+    for ws, n in walk(tree()):
+        if n.get("focused") and ws is not None:
+            return ws, n
+    return None, None
+
+
+def load():
+    try:
+        with open(STATE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def maximize():
+    ws, n = focused()
+    if n is None:
+        return
+    saved = load()
+    key = str(n["id"])
+    x, y, w, h, deco = geometry(n)
+    if key in saved:
+        x, y, w, h = saved.pop(key)
+        place(n["id"], x, y, w, h, deco)
+    else:
+        area = usable(ws["name"])
+        if not area:
+            return
+        saved[key] = [x, y, w, h]
+        ax, ay, aw, ah = area
+        place(n["id"], ax, ay, aw, ah - deco, deco)
+    try:
+        with open(STATE, "w") as f:
+            json.dump(saved, f)
+    except OSError:
+        pass
+
+
+def fit_all():
+    focused_ws = next((w["name"] for w in workspaces() if w["focused"]), None)
+    for ws, n in floating_windows():
+        if ws["name"] == focused_ws:
+            fit_node(ws, n)
+
+
+def watch():
+    """Dragging a window sends sway no event, so look twice a second."""
+    while True:
+        try:
+            fit_all()
+        except (OSError, ValueError, KeyError):
+            return  # sway is gone
+        time.sleep(0.5)
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "maximize":
+        maximize()
+    elif cmd == "minimize":
+        command("move scratchpad")
+    elif cmd == "restore":
+        command("scratchpad show")
+    elif cmd == "fit":
+        fit_all()
+    elif cmd == "watch":
+        watch()
+    else:
+        sys.exit(__doc__)
+
+
+main()
