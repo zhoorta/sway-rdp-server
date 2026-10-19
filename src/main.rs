@@ -83,7 +83,11 @@ impl RdpServerDisplayUpdates for Updates {
 
             let event = self.link.events.lock().await.recv().await.unwrap_or(Event::Closed);
             match event {
-                Event::Closed => anyhow::bail!("the session process ended"),
+                // An error here would be logged and retried at once, for ever; ending the updates ends the connection.
+                Event::Closed => {
+                    info!("the session process ended; closing this connection");
+                    return Ok(None);
+                }
                 Event::Resized(width, height) => {
                     if (width, height) != self.size {
                         info!(width, height, "telling the client to resize");
