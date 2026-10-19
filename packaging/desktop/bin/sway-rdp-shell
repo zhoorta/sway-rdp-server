@@ -47,6 +47,15 @@ if settings is not None and "barConfigs" not in settings:
                          "controlCenterButton", "swayWindowControls"],
     }]
     changed = True
+# An account that already has a bar layout gets the buttons once (the marker keeps a removal by the account).
+marker = os.path.join(d, ".window-controls-added")
+if settings is not None and not os.path.exists(marker):
+    if not changed and settings.get("barConfigs"):
+        right = settings["barConfigs"][0].setdefault("rightWidgets", [])
+        if not any(w == "swayWindowControls" or (isinstance(w, dict) and w.get("id") == "swayWindowControls") for w in right):
+            right.append("swayWindowControls")
+            changed = True
+    open(marker, "w").close()
 if changed:
     with open(os.path.join(d, "settings.json"), "w") as f:
         json.dump(settings, f, indent=2)
