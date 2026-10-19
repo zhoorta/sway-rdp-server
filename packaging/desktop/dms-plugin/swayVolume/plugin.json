@@ -1,0 +1,12 @@
+{
+    "id": "swayVolume",
+    "name": "Volume",
+    "description": "Speaker icon for the session's volume: click to mute, scroll to change it (no panel)",
+    "version": "1.0.0",
+    "author": "sway-rdp",
+    "type": "widget",
+    "capabilities": ["volume"],
+    "component": "./Volume.qml",
+    "icon": "volume_up",
+    "permissions": []
+}
