@@ -2,6 +2,13 @@
 # Starts the session's shell: DankMaterialShell through the account's systemd user session when it is installed,
 # otherwise sway's own bar.
 export XDG_CURRENT_DESKTOP=sway XDG_SESSION_TYPE=wayland
+# First start of an account: DankMaterialShell without animations. Every animation frame is drawn in software and then
+# sent over the network; on a VM without a GPU they cost about three times the CPU of the rest of the session. The
+# account can turn them back on in the shell's settings (which then own the file).
+dms_settings="${XDG_CONFIG_HOME:-$HOME/.config}/DankMaterialShell/settings.json"
+if [ ! -e "$dms_settings" ]; then
+    mkdir -p "$(dirname "$dms_settings")" && printf '%s\n' '{"animationSpeed":0,"syncComponentAnimationSpeeds":true,"popoutAnimationSpeed":0,"modalAnimationSpeed":0,"notificationAnimationSpeed":0}' > "$dms_settings"
+fi
 dbus-update-activation-environment --systemd --all 2>/dev/null
 if command -v dms >/dev/null 2>&1 && systemctl --user start sway-session.target 2>/dev/null; then
     exit 0
