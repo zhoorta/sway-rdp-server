@@ -63,6 +63,9 @@ pub enum FrameKind {
     Bgra = 1,
 }
 
+/// Longest clipboard text either side relays (UTF-8 bytes).
+pub const MAX_CLIPBOARD: usize = 1024 * 1024;
+
 /// From the network daemon to the session.
 #[derive(Debug, PartialEq)]
 pub enum Down {
@@ -78,7 +81,10 @@ pub enum Down {
     RequestFull,
     /// Prefer bitmaps: the client has no H.264.
     UseBitmaps,
+    /// The client's clipboard text (UTF-8) for the session's clipboard.
     Clipboard { data: Vec<u8> },
+    /// The client has a clipboard channel: start watching the session's clipboard.
+    ClipboardOn,
     Bye,
 }
 
@@ -221,6 +227,7 @@ impl Down {
             }
             Down::RequestFull => o.u8(8),
             Down::UseBitmaps => o.u8(9),
+            Down::ClipboardOn => o.u8(11),
             Down::Clipboard { data } => {
                 o.u8(10);
                 o.bytes(data);
@@ -243,6 +250,7 @@ impl Down {
             8 => Down::RequestFull,
             9 => Down::UseBitmaps,
             10 => Down::Clipboard { data: i.bytes()? },
+            11 => Down::ClipboardOn,
             255 => Down::Bye,
             t => return Err(ProtoError::UnknownTag(t)),
         };
@@ -494,6 +502,7 @@ mod tests {
             Down::RequestFull,
             Down::UseBitmaps,
             Down::Clipboard { data: b"hello".to_vec() },
+            Down::ClipboardOn,
             Down::Bye,
         ]
     }

@@ -1,9 +1,8 @@
-//! Clipboard (CLIPRDR), text only, through the `wl-clipboard` tools.
-//! Client copy: the client announces formats, we ask for the text and `wl-copy` it.
-//! Session copy: `wl-paste --watch` notices a change, we announce it, and `wl-paste` supplies the text when asked.
+//! Clipboard (CLIPRDR), text only. The RDP channel lives here, in the network daemon; the Wayland clipboard belongs to
+//! the account and is reached through the session process (`sessionclip.rs`), which this side talks to over the link.
+//! Client copy: the client announces formats, we ask for the text and send it to the session.
+//! Session copy: the session sends its text when the clipboard changes, we announce it and answer the client's request.
 
-use std::io::{BufRead as _, BufReader, Write as _};
-use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 
 use ironrdp_cliprdr::backend::{CliprdrBackend, CliprdrBackendFactory, ClipboardMessage};
@@ -13,13 +12,17 @@ use ironrdp_cliprdr::pdu::{
 };
 use ironrdp_server::tokio::sync::mpsc::UnboundedSender;
 use ironrdp_server::{CliprdrServerFactory, ServerEvent, ServerEventSender};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
-#[derive(Default)]
+use crate::proto::{Down, MAX_CLIPBOARD};
+use crate::Slot;
+
 struct Shared {
     sender: Mutex<Option<UnboundedSender<ServerEvent>>>,
-    /// Text we put on the Wayland clipboard for the client: its echo must not go back to the client.
-    last_set: Mutex<Option<String>>,
+    /// The connection's session (its link appears once the session is up).
+    slot: Arc<Slot>,
+    /// The text the session's clipboard holds, as the session last reported it.
+    session_text: Mutex<Option<String>>,
 }
 
 impl Shared {
@@ -37,8 +40,8 @@ pub struct Factory {
 }
 
 impl Factory {
-    pub fn new() -> Self {
-        Self { st: Arc::new(Shared::default()) }
+    pub fn new(slot: Arc<Slot>) -> Self {
+        Self { st: Arc::new(Shared { sender: Mutex::new(None), slot, session_text: Mutex::new(None) }) }
     }
 }
 
@@ -50,7 +53,7 @@ impl ServerEventSender for Factory {
 
 impl CliprdrBackendFactory for Factory {
     fn build_cliprdr_backend(&self) -> Box<dyn CliprdrBackend> {
-        Box::new(Backend { st: self.st.clone(), watcher: None, ready_at: None })
+        Box::new(Backend { st: self.st.clone(), ready_at: None })
     }
 }
 
@@ -59,7 +62,6 @@ impl CliprdrServerFactory for Factory {}
 #[derive(Debug)]
 struct Backend {
     st: Arc<Shared>,
-    watcher: Option<Child>,
     ready_at: Option<std::time::Instant>,
 }
 
@@ -77,27 +79,8 @@ impl std::fmt::Debug for Shared {
 
 ironrdp_core::impl_as_any!(Backend);
 
-impl Drop for Backend {
-    fn drop(&mut self) {
-        if let Some(mut c) = self.watcher.take() {
-            let _ = c.kill();
-            let _ = c.wait();
-        }
-    }
-}
-
 fn text_format() -> ClipboardFormat {
     ClipboardFormat::new(ClipboardFormatId::CF_UNICODETEXT)
-}
-
-/// What the Wayland clipboard holds as text, if anything.
-fn wayland_text() -> Option<String> {
-    let out = Command::new("wl-paste").args(["--no-newline", "--type", "text"]).stderr(Stdio::null()).output().ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let text = String::from_utf8(out.stdout).ok()?;
-    (!text.is_empty()).then_some(text)
 }
 
 /// CF_UNICODETEXT: UTF-16LE, CRLF line ends, NUL terminated.
@@ -124,39 +107,24 @@ impl CliprdrBackend for Backend {
     fn on_ready(&mut self) {
         info!("clipboard channel ready");
         self.ready_at = Some(std::time::Instant::now());
-        // One line on stdout per clipboard change in the session.
-        let child = Command::new("wl-paste")
-            .args(["--watch", "sh", "-c", "echo c"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn();
-        match child {
-            Ok(mut c) => {
-                let out = c.stdout.take().expect("piped stdout");
-                self.watcher = Some(c);
-                let st = self.st.clone();
-                std::thread::spawn(move || {
-                    for line in BufReader::new(out).lines() {
-                        if line.is_err() {
-                            break;
-                        }
-                        let Some(text) = wayland_text() else { continue };
-                        if st.last_set.lock().unwrap().as_deref() == Some(text.as_str()) {
-                            continue; // this is the client's own text coming back
-                        }
-                        info!(len = text.len(), "session clipboard changed; announcing to the client");
-                        st.send(ClipboardMessage::SendInitiateCopy(vec![text_format()]));
-                    }
-                });
-            }
-            Err(e) => warn!("clipboard from session to client is off (cannot run wl-paste --watch): {e}"),
-        }
+        let Some(link) = self.st.slot.link() else {
+            info!("clipboard: no session yet; the clipboard stays off for this connection");
+            return;
+        };
+        let st = self.st.clone();
+        link.set_clipboard_sink(Box::new(move |data| {
+            let Ok(text) = String::from_utf8(data) else { return };
+            info!(len = text.len(), "session clipboard changed; announcing to the client");
+            *st.session_text.lock().unwrap() = Some(text);
+            st.send(ClipboardMessage::SendInitiateCopy(vec![text_format()]));
+        }));
+        // The session offers what is on its clipboard now, then every change.
+        link.send(Down::ClipboardOn);
     }
 
     fn on_request_format_list(&mut self) {
         // Start of the session: offer what is already on the clipboard.
-        if wayland_text().is_some() {
+        if self.st.session_text.lock().unwrap().is_some() {
             self.st.send(ClipboardMessage::SendInitiateCopy(vec![text_format()]));
         }
     }
@@ -183,21 +151,19 @@ impl CliprdrBackend for Backend {
     }
 
     fn on_format_data_request(&mut self, request: FormatDataRequest) {
-        let st = self.st.clone();
         info!(format = request.format.0, "client asks for the session clipboard");
-        std::thread::spawn(move || {
-            let msg = match (request.format == ClipboardFormatId::CF_UNICODETEXT, wayland_text()) {
-                (true, Some(text)) => {
-                    info!(chars = text.chars().count(), "sending the session clipboard to the client");
-                    FormatDataResponse::new_data(to_unicode_text(&text))
-                }
-                (is_text, text) => {
-                    info!(is_text, has_text = text.is_some(), "cannot provide that format");
-                    FormatDataResponse::new_error()
-                }
-            };
-            st.send(ClipboardMessage::SendFormatData(msg));
-        });
+        let text = self.st.session_text.lock().unwrap().clone();
+        let msg = match (request.format == ClipboardFormatId::CF_UNICODETEXT, text) {
+            (true, Some(text)) => {
+                info!(chars = text.chars().count(), "sending the session clipboard to the client");
+                FormatDataResponse::new_data(to_unicode_text(&text))
+            }
+            (is_text, text) => {
+                info!(is_text, has_text = text.is_some(), "cannot provide that format");
+                FormatDataResponse::new_error()
+            }
+        };
+        self.st.send(ClipboardMessage::SendFormatData(msg));
     }
 
     fn on_format_data_response(&mut self, response: FormatDataResponse<'_>) {
@@ -207,24 +173,13 @@ impl CliprdrBackend for Backend {
         }
         let text = from_unicode_text(response.data());
         info!(bytes = response.data().len(), chars = text.chars().count(), "client clipboard text received");
-        if text.is_empty() {
+        if text.is_empty() || text.len() > MAX_CLIPBOARD {
             return;
         }
-        *self.st.last_set.lock().unwrap() = Some(text.clone());
-        std::thread::spawn(move || {
-            // wl-copy forks into the background to keep serving the selection; its parent returns at once.
-            let child = Command::new("wl-copy").stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn();
-            match child {
-                Ok(mut c) => {
-                    if let Some(mut stdin) = c.stdin.take() {
-                        let _ = stdin.write_all(text.as_bytes());
-                    }
-                    let status = c.wait();
-                    info!(?status, "wl-copy done");
-                }
-                Err(e) => warn!("cannot run wl-copy: {e}"),
-            }
-        });
+        match self.st.slot.link() {
+            Some(link) => link.send(Down::Clipboard { data: text.into_bytes() }),
+            None => debug!("client clipboard text dropped: no session"),
+        }
     }
 
     fn on_file_contents_request(&mut self, _request: FileContentsRequest) {}

@@ -15,6 +15,7 @@ mod input;
 mod link;
 mod proto;
 mod session;
+mod sessionclip;
 mod spawn;
 mod worker;
 
@@ -648,7 +649,7 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
         .with_input_handler(handler.clone())
         .with_display_handler(handler)
         .with_gfx_factory(common.egfx.map(|_| Box::new(egfx::Factory::new(egfx_state.clone())) as Box<dyn ironrdp_server::GfxServerFactory>))
-        .with_cliprdr_factory(common.clipboard.then(|| Box::new(clipboard::Factory::new()) as Box<dyn ironrdp_server::CliprdrServerFactory>))
+        .with_cliprdr_factory(common.clipboard.then(|| Box::new(clipboard::Factory::new(slot.clone())) as Box<dyn ironrdp_server::CliprdrServerFactory>))
         .with_sound_factory(audio_lease.is_some().then(|| Box::new(audio::Factory::new()) as Box<dyn ironrdp_server::SoundServerFactory>))
         .with_honor_client_desktop_size(true)
         .with_replace_on_new_connection(false)

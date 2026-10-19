@@ -34,7 +34,7 @@ exists (run the binary inside your own sway).
   `libopenh264` (Debian: package `libopenh264-8`) loaded at run time; sway-rdp-server contains no encoder code.
 - Input: virtual keyboard and pointer (layout taken from the client's keyboard id), Command works as Ctrl on Macs.
 - Audio: RDPSND from a PipeWire/PulseAudio null sink (`sway-rdp-server`), PCM 44.1 kHz.
-- Clipboard: text only, **off by default** (`--clipboard`); it works with FreeRDP but hangs the macOS Windows App.
+- Clipboard: text only (up to 1 MiB), both ways, **off by default** (`--clipboard`, for the multi-user form in `SWAY_RDP_ARGS`). The session process does the `wl-copy`/`wl-paste` as the account; the daemon only relays text. Tried with FreeRDP and the macOS Windows App (2026-10-19). The server waits 5 s after connecting before it asks the client for its clipboard.
 - Security: TLS always on. There is **no built-in credential**. Two ways to log in (one user, the one running the server):
   - `--auth file` (default): NLA with the `user:password` on the first line of `--credentials FILE` (password of at least 8
     characters). NLA protects the password even if you accept an unverified certificate.
@@ -73,8 +73,8 @@ because the old client is dropped before the new one has authenticated (so anyon
 
 ## Known gaps
 
-No dynamic hardware encoding (VA-API), no Opus, clipboard with the Windows App, relative mouse and Unicode key events,
-Caps Lock sync. In the multi-user form sound and clipboard are off, and sessions share the helper's control group (no
+No dynamic hardware encoding (VA-API), no Opus, relative mouse and Unicode key events,
+Caps Lock sync. In the multi-user form sound is off, and sessions share the helper's control group (no
 per-account resource limits yet). See docs/MULTIUSER-DESIGN.md.
 
 ## Licence

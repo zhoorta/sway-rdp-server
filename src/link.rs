@@ -70,6 +70,8 @@ pub struct Link {
     /// Notified when a resize has finished.
     pub resized: tokio::sync::Notify,
     child: Mutex<Option<Child>>,
+    /// Where the session's clipboard text goes (set by the clipboard channel when the client opens it).
+    clipboard: Mutex<Option<Box<dyn Fn(Vec<u8>) + Send + Sync>>>,
     _slot: Slot,
 }
 
@@ -128,6 +130,7 @@ impl Link {
             size: Mutex::new((width, height)),
             resized: tokio::sync::Notify::new(),
             child: Mutex::new(child),
+            clipboard: Mutex::new(None),
             _slot: slot,
         });
         let reader = link.clone();
@@ -163,7 +166,15 @@ impl Link {
                             break;
                         }
                     }
-                    Ok(Up::Ready { .. }) | Ok(Up::Audio { .. }) | Ok(Up::Clipboard { .. }) => {}
+                    Ok(Up::Clipboard { data }) => {
+                        // Untrusted like everything from the session: bounded here, and only text is made of it.
+                        if data.len() <= proto::MAX_CLIPBOARD {
+                            if let Some(sink) = reader.clipboard.lock().unwrap().as_ref() {
+                                sink(data);
+                            }
+                        }
+                    }
+                    Ok(Up::Ready { .. }) | Ok(Up::Audio { .. }) => {}
                     Ok(Up::Bye) => break,
                     Err(e) => {
                         warn!("bad message from the session: {e}");
@@ -174,6 +185,11 @@ impl Link {
             let _ = ev_tx.send(Event::Closed).await;
         });
         Ok(link)
+    }
+
+    /// Sets where the session's clipboard text is delivered.
+    pub fn set_clipboard_sink(&self, sink: Box<dyn Fn(Vec<u8>) + Send + Sync>) {
+        *self.clipboard.lock().unwrap() = Some(sink);
     }
 
     pub fn send(&self, msg: Down) {
