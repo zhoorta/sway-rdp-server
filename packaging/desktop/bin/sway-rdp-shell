@@ -41,20 +41,28 @@ if settings is not None and "powerMenuActions" not in settings:
 if settings is not None and "barConfigs" not in settings:
     settings["barConfigs"] = [{
         "id": "default", "name": "Main Bar", "enabled": True, "position": 0, "screenPreferences": ["all"],
-        "leftWidgets": ["launcherButton", "workspaceSwitcher", "focusedWindow"],
+        "leftWidgets": ["launcherButton", "swayWindowControls", "workspaceSwitcher", "focusedWindow"],
         "centerWidgets": ["music", "clock", "weather"],
         "rightWidgets": ["systemTray", "clipboard", "cpuUsage", "memUsage", "notificationButton", "battery",
-                         "controlCenterButton", "swayWindowControls"],
+                         "controlCenterButton"],
     }]
     changed = True
-# An account that already has a bar layout gets the buttons once (the marker keeps a removal by the account).
-marker = os.path.join(d, ".window-controls-added")
+# An account that already has a bar layout gets the buttons once, after the launcher button (the marker keeps a removal
+# by the account). An earlier version put them at the right end of the bar: they move.
+marker = os.path.join(d, ".window-controls-left")
 if settings is not None and not os.path.exists(marker):
-    if not changed and settings.get("barConfigs"):
-        right = settings["barConfigs"][0].setdefault("rightWidgets", [])
-        if not any(w == "swayWindowControls" or (isinstance(w, dict) and w.get("id") == "swayWindowControls") for w in right):
-            right.append("swayWindowControls")
-            changed = True
+    def is_ours(w):
+        return w == "swayWindowControls" or (isinstance(w, dict) and w.get("id") == "swayWindowControls")
+    bars = settings.get("barConfigs") or []
+    if bars and not changed:
+        bar = bars[0]
+        old = [w for k in ("leftWidgets", "centerWidgets", "rightWidgets") for w in bar.get(k, []) if is_ours(w)]
+        for k in ("leftWidgets", "centerWidgets", "rightWidgets"):
+            bar[k] = [w for w in bar.get(k, []) if not is_ours(w)]
+        left = bar.setdefault("leftWidgets", [])
+        at = next((i + 1 for i, w in enumerate(left) if w == "launcherButton" or (isinstance(w, dict) and w.get("id") == "launcherButton")), 0)
+        left.insert(at, old[0] if old else "swayWindowControls")
+        changed = True
     open(marker, "w").close()
 if changed:
     with open(os.path.join(d, "settings.json"), "w") as f:
