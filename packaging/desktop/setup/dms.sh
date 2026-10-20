@@ -24,7 +24,22 @@ repo avengemedia-dms https://download.opensuse.org/repositories/home:/AvengeMedi
 $SUDO apt-get update
 $SUDO apt-get install -y -t trixie-backports quickshell
 # qt6-wayland: without it the shell opens as plain windows instead of a bar and wallpaper
-$SUDO apt-get install -y dms qt6-wayland
+# DMS is pinned: its repository is not versioned by us and a new major release moves files the shell patches (sway-rdp-shell) and
+# the plugins rely on, which broke running sessions once (1.6.3 -> 2.0.0). The tested version is installed and held; SWAY_RDP_DMS_UPDATE=1
+# lifts the hold and installs the newest one (check the patches afterwards), SWAY_RDP_DMS_VERSION=x.y.z picks another version.
+DMS_TESTED=2.0.0db1
+DMS_WANT="${SWAY_RDP_DMS_VERSION:-$DMS_TESTED}"
+$SUDO apt-get install -y qt6-wayland
+if [ -n "${SWAY_RDP_DMS_UPDATE:-}" ]; then
+  $SUDO apt-mark unhold dms >/dev/null 2>&1 || true
+  $SUDO apt-get install -y dms
+elif dpkg -s dms >/dev/null 2>&1; then
+  echo "DMS $(dpkg-query -W -f='${Version}' dms) is installed and held (SWAY_RDP_DMS_UPDATE=1 to update)."
+elif ! $SUDO apt-get install -y "dms=$DMS_WANT"; then
+  echo "warning: DMS $DMS_WANT is not in the repository any more: installing the newest, which the shell patches may not match." >&2
+  $SUDO apt-get install -y dms
+fi
+$SUDO apt-mark hold dms >/dev/null
 
 # With sway-rdp-desktop the system config (/etc/xdg/sway-rdp/sway.conf) starts DMS through sway-session.target. Without it,
 # set that up in the account's own sway config, as the DMS docs ask for sway.
