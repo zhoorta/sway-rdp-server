@@ -35,6 +35,7 @@ install -m 644 packaging/desktop/setup/*.tsv $D/usr/share/sway-rdp/setup/
 mkdir -p $D/usr/share/sway-rdp/gtk $D/usr/lib/environment.d && install -m 644 packaging/desktop/gtk/*.css $D/usr/share/sway-rdp/gtk/
 install -m 644 packaging/desktop/environment.d/*.conf $D/usr/lib/environment.d/
 mkdir -p $D/usr/share/polkit-1/rules.d && install -m 644 packaging/desktop/polkit/*.rules $D/usr/share/polkit-1/rules.d/
+mkdir -p $D/usr/share/applications && install -m 644 packaging/desktop/applications/*.desktop $D/usr/share/applications/
 install -m 755 packaging/debian/postinst-desktop $D/DEBIAN/postinst
 mkdir -p $D/usr/share/sway-rdp/dms-plugin && cp -r packaging/desktop/dms-plugin/. $D/usr/share/sway-rdp/dms-plugin/ && chmod -R go-w,a+rX $D/usr/share/sway-rdp/dms-plugin
 install -m 644 packaging/desktop/systemd-user/sway-session.target $D/usr/lib/systemd/user/sway-session.target

@@ -22,7 +22,8 @@ general="Inter,10"
 EOC
 fi
 # The desktop is the whole screen and the shell's bar covers its top edge: keep the icons below it. The Qt font and
-# the terminal match the rest of the session.
+# the terminal match the rest of the session. It does not mount drives by itself: that asks an administrator's password
+# in a session without a seat, before anyone asked for it.
 fm_dir="${XDG_CONFIG_HOME:-$HOME/.config}/pcmanfm-qt/default"
 if [ ! -e "$fm_dir/settings.conf" ]; then
     mkdir -p "$fm_dir" && cat > "$fm_dir/settings.conf" <<'EOC'
@@ -32,6 +33,11 @@ WorkAreaMargins=12, 56, 12, 12
 
 [System]
 Terminal=foot
+
+[Volume]
+AutoRun=false
+MountOnStartup=false
+MountRemovable=false
 EOC
 fi
 exec pcmanfm-qt --desktop
