@@ -106,3 +106,7 @@ Listing is open to everybody; everything else needs root. A new account's passwo
 the account changes it with `passwd` in a terminal on the desktop. The tool never touches root or accounts below uid 1000, and refuses to
 remove or demote the account that runs it or the last administrator. Passwords go to `chpasswd` over a pipe, never as arguments.
 
+On the desktop, **Users & Access** (start menu, or `sway-rdp-users`) does the same with switches and buttons: who can log in, who
+installs Flatpaks without a password, who is an administrator, the running sessions, new passwords (shown once) and removal. Changes
+go through `pkexec sway-rdp-admin` (polkit action `org.sway-rdp.admin`), so an administrator's password is asked for each time.
+

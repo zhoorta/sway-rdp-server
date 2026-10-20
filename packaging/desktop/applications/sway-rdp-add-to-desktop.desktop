@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Add app to desktop
-Comment=Put a shortcut of an installed app on the desktop
-Exec=sway-rdp-add-to-desktop
-Icon=user-desktop
-Categories=Utility;
-Terminal=false

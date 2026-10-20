@@ -251,23 +251,30 @@ if command -v gsettings >/dev/null 2>&1; then
     apply_gsettings
     ( sleep 10; apply_gsettings; sleep 20; apply_gsettings ) >/dev/null 2>&1 &
 fi
-# The control center header has an edit button (rearranging its tiles) that has no setting to hide it. The account runs DMS from
-# a copy of the shell made of links to the installed files, with that one button hidden. Without a match (another DMS version)
-# the installed shell is used as it is.
+# DMS does not offer a few things on sway, or offers what a remote desktop has no use for. The account runs DMS from a copy of the
+# shell made of links to the installed files, with the changes below. Each one is skipped when another DMS version does not match,
+# and the installed shell is used as it is when none applies.
+#  - The focused-window menu in the bar (right click) shows the PID and has "Kill Process", but DMS finds the PID only on niri,
+#    Hyprland and Mango; on sway it says "Unavailable". Ask sway for it (sway-rdp-focused-pid).
+#  - The launcher menu (right click on an app) says "Pin to Dock" and there is no dock: "Pin to desktop" puts the app on the
+#    desktop (sway-rdp-add-to-desktop).
+#  - The control center header of DMS 1.x has an edit button (rearranging its tiles) that has no setting to hide it.
 dms_src=/usr/share/quickshell/dms
 dms_copy="${XDG_CACHE_HOME:-$HOME/.cache}/sway-rdp/dms-shell"
 rm -rf "$dms_copy"
 systemctl --user unset-environment DMS_SHELL_DIR 2>/dev/null
 if [ -d "$dms_src" ] && command -v python3 >/dev/null 2>&1 && mkdir -p "$(dirname "$dms_copy")" && cp -rs "$dms_src" "$dms_copy" 2>/dev/null; then
-    # The focused-window menu in the bar (right click) shows the window's PID and has "Kill Process", but DMS finds the PID only on
-    # niri, Hyprland and Mango; on sway it says "Unavailable" and the button is off. Ask sway for it (sway-rdp-focused-pid).
-    # Without a match (another DMS version) the widget stays as it is.
-    python3 - "$dms_src/Modules/DankBar/Widgets/FocusedApp.qml" "$dms_copy/Modules/DankBar/Widgets/FocusedApp.qml" <<'PY' || true
+    patched=0
+    # DMS 1.x keeps the bar widgets in Modules/DankBar, DMS 2.x in Modules/DBar.
+    for rel in Modules/DankBar/Widgets/FocusedApp.qml Modules/DBar/Widgets/FocusedApp.qml; do
+        [ -f "$dms_src/$rel" ] || continue
+        python3 - "$dms_src/$rel" "$dms_copy/$rel" <<'PY' && patched=1
 import os, sys
 src, dst = sys.argv[1:]
 text = open(src).read()
-needle = "    function resolveActiveWindowPid() {\n        if (!activeWindow)\n            return 0;\n"
-if needle not in text or "import Quickshell.Io" in text:
+old1 = "    function resolveActiveWindowPid() {\n        if (!activeWindow)\n            return 0;\n"
+old2 = "        popout.processId = CompositorService.windowPid(activeWindow);\n"
+if "import Quickshell.Io" in text or (old1 not in text and old2 not in text):
     sys.exit(1)
 add = '''    property int swayFocusedPid: 0
     Process {
@@ -287,13 +294,49 @@ add = '''    property int swayFocusedPid: 0
 
 '''
 text = text.replace("import Quickshell\n", "import Quickshell\nimport Quickshell.Io\n", 1)
-text = text.replace(needle, add + needle + "        if (CompositorService.isSway)\n            return swayFocusedPid;\n", 1)
+if old1 in text:
+    text = text.replace(old1, add + old1 + "        if (CompositorService.isSway)\n            return swayFocusedPid;\n", 1)
+else:
+    text = text.replace(old2, "        popout.processId = CompositorService.windowPid(activeWindow) || (CompositorService.isSway ? swayFocusedPid : 0);\n", 1)
+    text = text.replace("    function syncPopoutState() {", add + "    function syncPopoutState() {", 1)
+os.remove(dst)
+with open(dst, "w") as f:
+    f.write(text)
+PY
+    done
+    python3 - "$dms_src/Modals/DLauncherV2/LauncherContextMenu.qml" "$dms_copy/Modals/DLauncherV2/LauncherContextMenu.qml" <<'PY' && patched=1
+import os, sys
+src, dst = sys.argv[1:]
+text = open(src).read()
+old = '''        if (item?.type === "app" && pinDockId)
+            items.push({
+                type: "item",
+                icon: isPinned ? "keep_off" : "push_pin",
+                text: isPinned ? I18n.tr("Unpin from Dock") : I18n.tr("Pin to Dock"),
+                action: togglePin
+            });
+'''
+new = '''        if (isRegularApp && desktopEntry?.id)
+            items.push({
+                type: "item",
+                icon: "push_pin",
+                text: "Pin to desktop",
+                action: () => {
+                    Quickshell.execDetached(["sway-rdp-add-to-desktop", desktopEntry.id]);
+                    hide();
+                }
+            });
+'''
+if old not in text or "import Quickshell\n" in text:
+    sys.exit(1)
+text = text.replace("import QtQuick\n", "import QtQuick\nimport Quickshell\n", 1).replace(old, new, 1)
 os.remove(dst)
 with open(dst, "w") as f:
     f.write(text)
 PY
     header="$dms_copy/Modules/ControlCenter/Components/HeaderPane.qml"
-    if python3 - "$dms_src/Modules/ControlCenter/Components/HeaderPane.qml" "$header" <<'PY'
+    if [ -f "$dms_src/Modules/ControlCenter/Components/HeaderPane.qml" ]; then
+        python3 - "$dms_src/Modules/ControlCenter/Components/HeaderPane.qml" "$header" <<'PY' && patched=1
 import os, sys
 src, dst = sys.argv[1:]
 text = open(src).read()
@@ -304,7 +347,8 @@ os.remove(dst)
 with open(dst, "w") as f:
     f.write(text.replace(needle, "visible: false\n            " + needle, 1))
 PY
-    then
+    fi
+    if [ "$patched" = 1 ]; then
         systemctl --user set-environment DMS_SHELL_DIR="$dms_copy"
     else
         rm -rf "$dms_copy"
