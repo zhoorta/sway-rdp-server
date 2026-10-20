@@ -127,6 +127,15 @@ fn pam_check(service: &str, user: &str, password: &str) -> bool {
 struct Guard {
     failures: u32,
     locked_until: Option<Instant>,
+    /// How many times this key has been locked (the next lockout is longer).
+    lockouts: u32,
+    /// The last attempt.
+    last: Instant,
+}
+
+/// How long the `lockouts`-th lockout of a key lasts.
+fn lockout_for(lockouts: u32) -> Duration {
+    LOCKOUT.saturating_mul(1u32 << lockouts.saturating_sub(1).min(16)).min(LOCKOUT_MAX)
 }
 
 /// Whether an account with this login shell is meant to have an interactive login: the shell is listed in `/etc/shells` (the
@@ -166,14 +175,24 @@ pub struct PamPolicy {
     /// A group every account has to be in (None = no such rule). A group that does not exist lets nobody in.
     require_group: Option<String>,
     guards: Mutex<HashMap<String, Guard>>,
+    /// Failures per account over the last `WATCH_WINDOW`, from any address: (start of the window, failures, warned).
+    watch: Mutex<HashMap<String, (Instant, u32, bool)>>,
 }
 
 const FAIL_DELAY: Duration = Duration::from_secs(2);
-/// Failures in a row for one account, and for one source address (higher: a office may share one address).
-const MAX_FAILURES_USER: u32 = 5;
+/// Failures in a row for one account from one source address, and for one source address in all (higher: an office may share
+/// one address). A lockout lasts `LOCKOUT` and doubles each time the same key is locked again, up to `LOCKOUT_MAX`; a key that
+/// has been quiet for `DECAY` starts again from the beginning.
+const MAX_FAILURES_PAIR: u32 = 5;
 const MAX_FAILURES_SOURCE: u32 = 20;
 const LOCKOUT: Duration = Duration::from_secs(60);
-/// Accounts tracked at once; unknown names are tracked too, so this bounds the memory an attacker can use.
+const LOCKOUT_MAX: Duration = Duration::from_secs(3600);
+const DECAY: Duration = Duration::from_secs(3600);
+/// Failures of one account, from anywhere, that are worth a warning in the log (no rule per address sees a guess spread over
+/// many addresses), counted over `WATCH_WINDOW`.
+const WATCH_FAILURES: u32 = 20;
+const WATCH_WINDOW: Duration = Duration::from_secs(600);
+/// Keys tracked at once; unknown names are tracked too, so this bounds the memory an attacker can use.
 const MAX_TRACKED: usize = 4096;
 
 impl PamPolicy {
@@ -190,7 +209,7 @@ impl PamPolicy {
         };
         let name = name.ok_or_else(|| anyhow::anyhow!("cannot find the name of the user running the server"))?;
         let running = lookup_user(&name).ok_or_else(|| anyhow::anyhow!("cannot look up {name}"))?;
-        Ok(Arc::new(Self { service: service.to_owned(), running, root: uid == 0, allow, require_group, guards: Mutex::new(HashMap::new()) }))
+        Ok(Arc::new(Self { service: service.to_owned(), running, root: uid == 0, allow, require_group, guards: Mutex::new(HashMap::new()), watch: Mutex::new(HashMap::new()) }))
     }
 
     pub fn running_user(&self) -> &str {
@@ -227,50 +246,89 @@ impl PamPolicy {
 
     /// Counts this attempt as a failure right away (it is cleared again on success), so an attempt that is cancelled
     /// half way, for example because the client reconnects at once, still counts. Returns false while locked out.
-    fn begin_attempt(&self, name: &str, max_failures: u32) -> bool {
+    fn begin_attempt(&self, key: &str, max_failures: u32) -> bool {
+        self.begin_attempt_at(key, max_failures, Instant::now())
+    }
+
+    fn begin_attempt_at(&self, key: &str, max_failures: u32, now: Instant) -> bool {
         let mut guards = self.guards.lock().unwrap();
         if guards.len() >= MAX_TRACKED {
-            let now = Instant::now();
             guards.retain(|_, g| g.locked_until.is_some_and(|t| t > now));
         }
-        let g = guards.entry(name.to_owned()).or_insert(Guard { failures: 0, locked_until: None });
+        let g = guards.entry(key.to_owned()).or_insert(Guard { failures: 0, locked_until: None, lockouts: 0, last: now });
         if let Some(t) = g.locked_until {
-            if t > Instant::now() {
+            if t > now {
                 return false;
             }
             g.locked_until = None;
             g.failures = 0;
         }
+        if now.duration_since(g.last) >= DECAY {
+            g.failures = 0;
+            g.lockouts = 0;
+        }
+        g.last = now;
         g.failures += 1;
         if g.failures > max_failures {
-            g.locked_until = Some(Instant::now() + LOCKOUT);
-            warn!(key = ?name, "too many failed logins: refusing this one for {}s", LOCKOUT.as_secs());
+            g.lockouts += 1;
+            let for_how_long = lockout_for(g.lockouts);
+            g.locked_until = Some(now + for_how_long);
+            warn!(key = ?key, lockouts = g.lockouts, "too many failed logins: refusing this one for {}s", for_how_long.as_secs());
             return false;
         }
         true
     }
 
+    /// The key is forgotten (a login that worked ends the run of failures of that account from that address).
     fn succeeded(&self, key: &str) {
         self.guards.lock().unwrap().remove(key);
+    }
+
+    /// A success counts for one failure less, not for none: logging in once with an account of one's own must not wipe the
+    /// failures that an address has piled up against other accounts.
+    fn eased(&self, key: &str) {
+        if let Some(g) = self.guards.lock().unwrap().get_mut(key) {
+            g.failures = g.failures.saturating_sub(1);
+        }
+    }
+
+    /// Notes a failed login of `name` (from any address) and warns once per window when there are many.
+    fn note_failure(&self, name: &str, now: Instant) {
+        let mut watch = self.watch.lock().unwrap();
+        if watch.len() >= MAX_TRACKED {
+            watch.retain(|_, (start, _, _)| now.duration_since(*start) < WATCH_WINDOW);
+        }
+        let entry = watch.entry(name.to_owned()).or_insert((now, 0, false));
+        if now.duration_since(entry.0) >= WATCH_WINDOW {
+            *entry = (now, 0, false);
+        }
+        entry.1 += 1;
+        if entry.1 >= WATCH_FAILURES && !entry.2 {
+            entry.2 = true;
+            warn!(user = ?name, failures = entry.1, "many failed logins of one account in {} minutes, from any address: guessing?", WATCH_WINDOW.as_secs() / 60);
+        }
     }
 
     /// Checks `password` for the account `name`, coming from `source` (an address, for the failure counters).
     /// Blocking: PAM can take a while and a failed attempt is delayed on purpose. Unknown accounts and wrong
     /// passwords get the same answer and the same delay.
     pub fn authenticate(&self, name: &str, password: &str, source: &str) -> Option<UserInfo> {
-        let (user_key, source_key) = (format!("user:{name}"), format!("ip:{source}"));
-        if !self.begin_attempt(&user_key, MAX_FAILURES_USER) || !self.begin_attempt(&source_key, MAX_FAILURES_SOURCE) {
+        // Per account and address together (with the length of the name, so no two pairs can be written the same way), and per
+        // address: someone who guesses at an account from elsewhere cannot lock its owner out of their own address.
+        let (pair_key, source_key) = (format!("pair:{}:{name}:{source}", name.len()), format!("ip:{source}"));
+        if !self.begin_attempt(&pair_key, MAX_FAILURES_PAIR) || !self.begin_attempt(&source_key, MAX_FAILURES_SOURCE) {
             return None;
         }
         let candidate = if password.is_empty() { None } else { self.candidate(name) };
         let accepted = candidate.filter(|_| pam_check(&self.service, name, password));
         match &accepted {
             Some(info) => {
-                self.succeeded(&user_key);
-                self.succeeded(&source_key);
+                self.succeeded(&pair_key);
+                self.eased(&source_key);
                 info!(user = ?name, uid = info.uid, source = ?source, "login accepted (PAM)");
             }
             None => {
+                self.note_failure(name, Instant::now());
                 warn!(user = ?name, source = ?source, "login rejected (PAM)");
                 std::thread::sleep(FAIL_DELAY);
             }
@@ -349,11 +407,73 @@ mod tests {
     #[test]
     fn failures_are_counted_per_key_and_lock_out() {
         let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let t0 = Instant::now();
         for _ in 0..5 {
-            assert!(policy.begin_attempt("user:x", 5));
+            assert!(policy.begin_attempt_at("pair:x", 5, t0));
         }
-        assert!(!policy.begin_attempt("user:x", 5), "the sixth failure in a row is refused");
-        assert!(policy.begin_attempt("user:y", 5), "another account is not affected");
-        policy.succeeded("user:y");
+        assert!(!policy.begin_attempt_at("pair:x", 5, t0), "the sixth failure in a row is refused");
+        assert!(policy.begin_attempt_at("pair:y", 5, t0), "another key is not affected");
+        policy.succeeded("pair:y");
+    }
+
+    #[test]
+    fn every_lockout_of_a_key_lasts_longer_and_a_quiet_hour_starts_again() {
+        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let mut now = Instant::now();
+        let mut locked_for = Vec::new();
+        for _ in 0..4 {
+            for _ in 0..5 {
+                assert!(policy.begin_attempt_at("pair:z", 5, now));
+            }
+            assert!(!policy.begin_attempt_at("pair:z", 5, now), "locked");
+            let wait = lockout_for(policy.guards.lock().unwrap()["pair:z"].lockouts);
+            locked_for.push(wait.as_secs());
+            now += wait + Duration::from_secs(1); // the lockout has ended
+        }
+        assert_eq!(locked_for, vec![60, 120, 240, 480], "doubling");
+        assert_eq!(lockout_for(40).as_secs(), 3600, "and never more than an hour");
+        // An hour without attempts: the key is as new.
+        now += DECAY;
+        assert!(policy.begin_attempt_at("pair:z", 5, now));
+        assert_eq!(policy.guards.lock().unwrap()["pair:z"].lockouts, 0);
+    }
+
+    #[test]
+    fn a_stranger_cannot_lock_an_account_out_of_its_owners_address() {
+        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let t0 = Instant::now();
+        let stranger = format!("pair:{}:alice:203.0.113.9", "alice".len());
+        let owner = format!("pair:{}:alice:198.51.100.7", "alice".len());
+        for _ in 0..5 {
+            assert!(policy.begin_attempt_at(&stranger, 5, t0));
+        }
+        assert!(!policy.begin_attempt_at(&stranger, 5, t0), "the stranger is locked");
+        assert!(policy.begin_attempt_at(&owner, 5, t0), "the owner, from the owner's address, is not");
+    }
+
+    #[test]
+    fn a_success_eases_an_address_by_one_failure_and_does_not_wipe_it() {
+        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let t0 = Instant::now();
+        for _ in 0..10 {
+            assert!(policy.begin_attempt_at("ip:a", 20, t0));
+        }
+        policy.eased("ip:a");
+        assert_eq!(policy.guards.lock().unwrap()["ip:a"].failures, 9);
+        policy.eased("ip:unknown"); // nothing tracked: nothing happens
+    }
+
+    #[test]
+    fn many_failures_of_one_account_are_noted_once_per_window() {
+        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let t0 = Instant::now();
+        for _ in 0..30 {
+            policy.note_failure("bob", t0);
+        }
+        assert_eq!(policy.watch.lock().unwrap()["bob"].1, 30);
+        assert!(policy.watch.lock().unwrap()["bob"].2, "warned");
+        policy.note_failure("bob", t0 + WATCH_WINDOW);
+        let w = policy.watch.lock().unwrap()["bob"];
+        assert_eq!((w.1, w.2), (1, false), "a new window starts again");
     }
 }
