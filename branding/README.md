@@ -14,3 +14,9 @@ PNG versions are in `png/`, with transparent backgrounds: `deskwire-logo.png` an
 
 Colours: ink `#14171d`, paper `#f2eee8`, copper `#c4661a` (`#f29a4c` on dark). The wordmark is outlined from Bricolage Grotesque
 (SIL Open Font License 1.1), so no font is needed to show the files. Deskwire is a working name: no trademark clearance has been done.
+
+## Alternative: the monitor
+
+`alternatives/` has a second direction: a monitor whose screen is crossed by a wire in the shape of a W, with the same wordmark and colours
+(`deskwire-monitor-*.svg`, PNGs in `alternatives/png/`). It is the more literal "remote desktop" picture and suits places where the logo is
+always large. It turns into a blob at 16 and 24 pixels, so the D mark above stays the main logo.
