@@ -39,6 +39,7 @@ fm_dir="${XDG_CONFIG_HOME:-$HOME/.config}/pcmanfm-qt/default"
 if [ ! -e "$fm_dir/settings.conf" ]; then
     mkdir -p "$fm_dir" && cat > "$fm_dir/settings.conf" <<'EOC'
 [Desktop]
+DesktopShortcuts=Home, Trash
 Font="Inter,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
 WorkAreaMargins=12, 56, 12, 12
 
@@ -50,6 +51,19 @@ AutoRun=false
 MountOnStartup=false
 MountRemovable=false
 EOC
+fi
+# A desktop that is not empty from the first start: Home and Trash (built into the file manager) and launchers of a few apps, made
+# once. An account that already set the built-in items up, or put things on its desktop, keeps what it has.
+seed_dir="${XDG_CONFIG_HOME:-$HOME/.config}/sway-rdp"
+if [ ! -e "$seed_dir/.desktop-seeded" ]; then
+    mkdir -p "$seed_dir" && : > "$seed_dir/.desktop-seeded"
+    [ -e "$fm_dir/settings.conf" ] && sed -i 's/^DesktopShortcuts=@Invalid()$/DesktopShortcuts=Home, Trash/' "$fm_dir/settings.conf"
+    if [ -z "$(ls -A "$HOME/Desktop" 2>/dev/null)" ]; then
+        # The launchers are marked trusted through gvfs, which needs the account's session bus.
+        : "${DBUS_SESSION_BUS_ADDRESS:=unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}"
+        export DBUS_SESSION_BUS_ADDRESS
+        sway-rdp-add-to-desktop sway-rdp-terminal firefox-esr org.gnome.Software >/dev/null 2>&1
+    fi
 fi
 # The session starts before its screen exists (the output is made when the RDP client arrives, and it may be gone while the
 # client is away) and pcmanfm-qt ends when it finds no screen: wait for one, as long as it takes, and start the desktop again

@@ -43,7 +43,7 @@ apt-get update -qq
 # Without the recommended packages (apt would add a screensaver, a second portal and a policy-kit agent of its own). The ones
 # that matter are named here: audio, the clipboard, the picker of "Add app to desktop", the wallpaper, Flatpak, a browser.
 apt-get install -y --no-install-recommends flatpak ./sway-rdp_*.deb ./sway-rdp-desktop_*.deb \
-    pipewire pipewire-pulse wireplumber wl-clipboard wmenu whiptail swaybg firefox-esr
+    pipewire pipewire-pulse pulseaudio-utils wireplumber wl-clipboard wmenu whiptail swaybg firefox-esr
 bash ./dms.sh
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 # Only the forward of the Mac (127.0.0.1) reaches this address: listen on every interface, not on the loopback of the VM only.

@@ -5,6 +5,12 @@ export XDG_CURRENT_DESKTOP=sway XDG_SESSION_TYPE=wayland
 # Qt apps take their palette and icons from qt6ct (kept in step with DMS). The account's user manager reads this from environment.d
 # only when it starts, which can be before the package that ships the file: say it here too, the shell hands it on to launched apps.
 export QT_QPA_PLATFORMTHEME=qt6ct
+# DMS shows a welcome page on a first start and a "what is new" page once per release (it looks for a marker file named after the
+# release, whose version is in its own QML). Neither is wanted on a desktop that is already set up: make the markers.
+dms_markers="${XDG_CONFIG_HOME:-$HOME/.config}/DankMaterialShell"
+mkdir -p "$dms_markers" && : > "$dms_markers/.firstlaunch"
+dms_release=$(sed -n 's/.*currentVersion: "\(.*\)".*/\1/p' /usr/share/quickshell/dms/Services/ChangelogService.qml 2>/dev/null | head -1)
+[ -n "$dms_release" ] && : > "$dms_markers/.changelog-$dms_release"
 # The shell only watches app folders that exist when it starts: make the account's Flatpak one now, or its first
 # Flatpak app stays out of the launcher until the shell restarts.
 mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share/applications"
