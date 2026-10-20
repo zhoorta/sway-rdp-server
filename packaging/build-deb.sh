@@ -17,6 +17,7 @@ install -m 644 packaging/systemd/*.service $P/lib/systemd/system/   # includes s
 install -m 644 packaging/default-sway-rdp $P/etc/default/sway-rdp
 install -m 644 packaging/pam-sway-rdp-server $P/etc/pam.d/sway-rdp-server
 install -m 644 packaging/pam-sway-rdp-session $P/etc/pam.d/sway-rdp-session
+mkdir -p $P/usr/share/icons && cp -a packaging/cursors/sway-rdp-blank $P/usr/share/icons/   # cursors with nothing in them
 install -m 644 README.md $P/usr/share/doc/sway-rdp/README.md
 install -m 644 docs/MULTIUSER-DESIGN.md $P/usr/share/doc/sway-rdp/MULTIUSER-DESIGN.md
 cat LICENSE-MIT > $P/usr/share/doc/sway-rdp/copyright

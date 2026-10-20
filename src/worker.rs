@@ -492,6 +492,10 @@ impl OwnSway {
         if !runtime.join("bus").exists() {
             cmd.env("GSETTINGS_BACKEND", "memory");
         }
+        if !crate::capture::cursor_in_picture() {
+            // The apps of the session load their cursors from this theme too (see session.rs): nothing of them in the picture.
+            cmd.env("XCURSOR_THEME", "sway-rdp-blank").env("XCURSOR_SIZE", "24");
+        }
         let child = cmd
             .env("WLR_BACKENDS", "headless")
             .env("WLR_LIBINPUT_NO_DEVICES", "1")

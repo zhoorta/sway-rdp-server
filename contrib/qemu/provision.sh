@@ -42,7 +42,7 @@ cd /home/jose/provision
 apt-get update -qq
 # Without the recommended packages (apt would add a screensaver, a second portal and a policy-kit agent of its own). The ones
 # that matter are named here: audio, the clipboard, the picker of "Add app to desktop", the wallpaper, Flatpak, a browser.
-apt-get install -y --no-install-recommends flatpak ./sway-rdp_*.deb ./sway-rdp-desktop_*.deb \
+apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold flatpak ./sway-rdp_*.deb ./sway-rdp-desktop_*.deb \
     pipewire pipewire-pulse pulseaudio-utils wireplumber wl-clipboard wmenu whiptail swaybg firefox-esr
 bash ./dms.sh
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo

@@ -12,6 +12,18 @@ use wayland_client::{Connection, Dispatch, EventQueue, Proxy, QueueHandle, WEnum
 use wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1};
 use wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1;
 
+/// Whether the mouse cursor is in the picture (`SWAY_RDP_CURSOR=server`). By default it is not: the client draws its own
+/// pointer, instantly and without a second one a network round trip behind (the Windows App on a Mac did not hide its own
+/// pointer when told to). A headless sway draws its cursor into every frame whatever screencopy is asked for, so in this
+/// mode the session gives it an invisible cursor theme (sway-rdp-blank, see session.rs). With `server` the cursor has the shape
+/// the app asked for, and the client's own pointer is made invisible, which only some clients honour. Set in
+/// /etc/default/sway-rdp, which the daemon and the sessions both read.
+pub fn cursor_in_picture() -> bool {
+    static MODE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *MODE.get_or_init(|| std::env::var("SWAY_RDP_CURSOR").is_ok_and(|v| v.eq_ignore_ascii_case("server")))
+}
+
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Rect {
     pub x: u32,
@@ -227,7 +239,7 @@ impl Capturer {
     /// Blocks until the compositor has a changed frame (copy_with_damage), then returns it as tight BGRA.
     pub fn next_frame(&mut self) -> Result<Captured> {
         self.state.reset_frame();
-        let frame = self.manager.capture_output(1, &self.output, &self.qh, ());
+        let frame = self.manager.capture_output(i32::from(cursor_in_picture()), &self.output, &self.qh, ());
 
         while self.state.buffer.is_none() || (self.manager_version >= 3 && !self.state.buffer_done) {
             if self.state.failed {

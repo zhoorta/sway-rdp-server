@@ -206,6 +206,11 @@ impl Session {
 
     fn attach(output: &str, index: u32, workspace: &str, (w, h): (u16, u16), layout: &str, opts: &Options) -> Result<Self> {
         swaymsg(&["output", output, "mode", "--custom", &format!("{w}x{h}@60Hz"), "scale", "1"])?;
+        if !crate::capture::cursor_in_picture() {
+            // A headless sway has no hardware cursor, so it draws the cursor into the picture whatever screencopy is asked
+            // for: with the client's own pointer that makes two. Give sway a theme whose cursors have nothing in them.
+            let _ = swaymsg(&["seat", "*", "xcursor_theme", "sway-rdp-blank", "24"]);
+        }
         // A workspace is created on the focused output, so focus the session output first.
         swaymsg(&["focus", "output", output])?;
         swaymsg(&["workspace", workspace])?;

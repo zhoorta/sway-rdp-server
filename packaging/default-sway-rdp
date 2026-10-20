@@ -12,3 +12,8 @@ SWAY_RDP_ARGS=
 #   --end-on-disconnect      a session ends as soon as its client leaves
 #   --bitrate BITS           H.264 bitrate (default 40000000); lower it for slow links, with --quality MAXQP
 SWAY_RDP_SESSION_ARGS=
+
+# Where the mouse pointer is drawn: "client" (default) = by the RDP client, which is instant but always an arrow (sway gets a
+# cursor theme with nothing in it, sway-rdp-blank); "server" = in the picture, with the shape the app asked for (text cursor,
+# resize arrows), but a network round trip behind, and only for clients that make their own pointer invisible when told to.
+#SWAY_RDP_CURSOR=client

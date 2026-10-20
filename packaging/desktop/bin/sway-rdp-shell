@@ -239,6 +239,12 @@ if command -v gsettings >/dev/null 2>&1; then
     gs() { gsettings set org.gnome.desktop.interface "$@" 2>/dev/null; }
     apply_gsettings() {
         [ -d /usr/share/icons/Papirus-Dark ] && gs icon-theme Papirus-Dark
+        # GTK apps name their cursor theme themselves (the session sets XCURSOR_THEME for the rest): no pointer in the picture.
+        if [ "${SWAY_RDP_CURSOR:-client}" = server ]; then
+            gsettings reset org.gnome.desktop.interface cursor-theme 2>/dev/null
+        else
+            gs cursor-theme sway-rdp-blank
+        fi
         gs color-scheme prefer-dark
         gs font-name 'Inter 10'
     }

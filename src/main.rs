@@ -68,12 +68,17 @@ enum Mode {
 impl RdpServerDisplayUpdates for Updates {
     async fn next_update(&mut self) -> anyhow::Result<Option<DisplayUpdate>> {
         loop {
-            // The cursor is part of the picture (wlr-screencopy draws it in, with the shape the app asked for): make the one of
-            // the client invisible, or there are two, and the one in the picture is a network round trip behind.
+            // By default the client draws the pointer (the picture has none): say which one, the default arrow. With
+            // SWAY_RDP_CURSOR=server the cursor is in the picture, so the client's own is made invisible: with both there are
+            // two, and the one in the picture is a network round trip behind.
             if !self.pointer_hidden {
                 self.pointer_hidden = true;
-                // A pointer shape with nothing in it: the Windows App did not take the "hidden pointer" update.
-                return Ok(Some(DisplayUpdate::RGBAPointer(RGBAPointer { cache_index: 0, width: 32, height: 32, hot_x: 0, hot_y: 0, data: vec![0; 32 * 32 * 4] })));
+                return Ok(Some(if capture::cursor_in_picture() {
+                    // A pointer shape with nothing in it: the Windows App did not take the "hidden pointer" update.
+                    DisplayUpdate::RGBAPointer(RGBAPointer { cache_index: 0, width: 32, height: 32, hot_x: 0, hot_y: 0, data: vec![0; 32 * 32 * 4] })
+                } else {
+                    DisplayUpdate::DefaultPointer
+                }));
             }
             // Graphics pipeline first: it is what the Windows App is built around. Give the client a
             // few seconds to open it before falling back to the old bitmap updates.
@@ -98,7 +103,8 @@ impl RdpServerDisplayUpdates for Updates {
             let event = match received {
                 Ok(event) => event.unwrap_or(Event::Closed),
                 Err(_) => {
-                    self.pointer_hidden = false;
+                    // Only the empty pointer has to be repeated: the client's own arrow comes back by itself.
+                    self.pointer_hidden = !capture::cursor_in_picture();
                     continue;
                 }
             };
