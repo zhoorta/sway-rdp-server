@@ -46,6 +46,8 @@ struct Updates {
     size: (u16, u16),
     mode: Mode,
     max_qp: u8,
+    /// The client was told to hide its own pointer.
+    pointer_hidden: bool,
 }
 
 struct EgfxLink {
@@ -65,6 +67,12 @@ enum Mode {
 impl RdpServerDisplayUpdates for Updates {
     async fn next_update(&mut self) -> anyhow::Result<Option<DisplayUpdate>> {
         loop {
+            // The cursor is part of the picture (wlr-screencopy draws it in, with the shape the app asked for): hide the one of
+            // the client, or there are two, and the one in the picture is a network round trip behind.
+            if !self.pointer_hidden {
+                self.pointer_hidden = true;
+                return Ok(Some(DisplayUpdate::HidePointer));
+            }
             // Graphics pipeline first: it is what the Windows App is built around. Give the client a
             // few seconds to open it before falling back to the old bitmap updates.
             if self.mode == Mode::Undecided {
@@ -314,7 +322,7 @@ impl RdpServerDisplay for Handler {
         }
         let egfx = self.egfx.as_ref().map(|(st, _)| EgfxLink { st: st.clone(), out: egfx::Out::new(st.clone(), size.0, size.1) });
         let max_qp = self.egfx.as_ref().map_or(0, |(_, t)| t.max_qp.clamp(1, 51));
-        Ok(Box::new(Updates { link, egfx, start: std::time::Instant::now(), size, mode: Mode::Undecided, max_qp }))
+        Ok(Box::new(Updates { link, egfx, start: std::time::Instant::now(), size, mode: Mode::Undecided, max_qp, pointer_hidden: false }))
     }
 
     fn request_layout(&mut self, layout: ironrdp_displaycontrol::pdu::DisplayControlMonitorLayout) {
