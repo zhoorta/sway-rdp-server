@@ -12,7 +12,7 @@ PNG versions are in `png/`, with transparent backgrounds: `deskwire-logo.png` an
 `deskwire-mark.png` and `deskwire-mark-dark.png` (512x512), and `icon-16.png` up to `icon-1024.png` (16, 32, 48, 64, 128, 180, 256,
 512, 1024) for favicons, the Apple touch icon (180) and app stores.
 
-Colours: ink `#14171d`, paper `#f2eee8`, copper `#c4661a` (`#f29a4c` on dark). The wordmark is outlined from Bricolage Grotesque
+Colours: ink `#14171d`, paper `#f2eee8`, copper `#c4661a` (`#f29a4c` on dark). The wordmark is outlined from Outfit, one weight for both words
 (SIL Open Font License 1.1), so no font is needed to show the files. Deskwire is a working name: no trademark clearance has been done.
 
 ## Alternative: the monitor
