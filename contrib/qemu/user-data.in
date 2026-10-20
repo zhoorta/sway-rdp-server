@@ -1,0 +1,22 @@
+#cloud-config
+# First boot of the development VM (filled in by vm.sh).
+hostname: @HOSTNAME@
+manage_etc_hosts: true
+users:
+  - name: jose
+    gecos: sway-rdp development
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - @PUBKEY@
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+growpart:
+  mode: auto
+  devices: ["/"]
+resize_rootfs: true
