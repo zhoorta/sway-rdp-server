@@ -48,7 +48,7 @@ apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold fl
 # The patched file manager (menus without Desktop Preferences, Create Launcher, Open in Terminal), when it was built; held so that
 # Debian's own pcmanfm-qt does not replace it.
 if ls ./pcmanfm-qt_*.deb >/dev/null 2>&1; then
-    apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold ./pcmanfm-qt_*.deb
+    apt-get install -y --reinstall --no-install-recommends -o Dpkg::Options::=--force-confold ./pcmanfm-qt_*.deb
     apt-mark hold pcmanfm-qt
 fi
 bash ./dms.sh

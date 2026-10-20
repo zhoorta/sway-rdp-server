@@ -43,3 +43,9 @@ QTreeView::branch { background: transparent; }
 QAbstractItemView { outline: none; }
 QListView::item:selected, QTreeView::item:selected { background: palette(highlight); color: palette(highlighted-text); }
 QSplitter::handle { background: transparent; }
+/* the file manager (pcmanfm-qt): the side pane and the folder view are two panes on the window, as in the DMS settings */
+QMainWindow { background: palette(window); }
+Fm--SidePane, Fm--PlacesView { background: palette(window); border: none; }
+Fm--PlacesView { padding: 4px; }
+QMainWindow Fm--FolderView QAbstractItemView { background: palette(light); border: none; border-radius: 14px; padding: 6px; }
+Fm--PathBar { background: transparent; }
