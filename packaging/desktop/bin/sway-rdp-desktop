@@ -50,6 +50,13 @@ Terminal=sway-rdp-terminal
 AutoRun=false
 MountOnStartup=false
 MountRemovable=false
+
+[Window]
+FixedWidth=960
+FixedHeight=640
+LastWindowWidth=960
+LastWindowHeight=640
+SplitterPos=200
 EOC
 fi
 # A desktop that is not empty from the first start: Home and Trash (built into the file manager) and launchers of a few apps, made
