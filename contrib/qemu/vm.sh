@@ -28,7 +28,7 @@ QEMU_SHARE=$(brew --prefix qemu 2>/dev/null)/share/qemu
 running() { [ -f "$DIR/qemu.pid" ] && kill -0 "$(cat "$DIR/qemu.pid")" 2>/dev/null; }
 
 vm_ssh() {
-    ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o BatchMode=yes \
+    ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o BatchMode=yes -o "SendEnv -*" \
         -i "$KEY" -p 2222 jose@127.0.0.1 "$@"
 }
 
