@@ -89,6 +89,10 @@ struct Injector {
     vk: ZwpVirtualKeyboardV1,
     ptr: ZwlrVirtualPointerV1,
     start: Instant,
+    /// Wheel amounts that do not make a whole notch yet (vertical, horizontal).
+    scroll: [f64; 2],
+    /// Multiplies every wheel amount (`SWAY_RDP_SCROLL_SCALE`, 1 = a notch is a notch).
+    scroll_scale: f64,
 }
 
 fn setup(want_output: Option<&str>, layout: &str) -> Result<Injector> {
@@ -137,7 +141,8 @@ fn setup(want_output: Option<&str>, layout: &str) -> Result<Injector> {
     let ptr = ptr_mgr.create_virtual_pointer_with_output(Some(&seat), Some(&output), &qh, ());
     queue.roundtrip(&mut state).context("roundtrip after creating virtual devices")?;
     let xkb_state = xkb::State::new(&keymap);
-    Ok(Injector { conn, xkb_state, mods: (0, 0, 0, 0), vk, ptr, start: Instant::now() })
+    let scroll_scale = std::env::var("SWAY_RDP_SCROLL_SCALE").ok().and_then(|v| v.parse::<f64>().ok()).filter(|v| *v > 0.0).unwrap_or(1.0);
+    Ok(Injector { conn, xkb_state, mods: (0, 0, 0, 0), vk, ptr, start: Instant::now(), scroll: [0.0; 2], scroll_scale })
 }
 
 impl Injector {
@@ -172,18 +177,33 @@ impl Injector {
                     self.ptr.frame();
                 }
                 Cmd::Wheel { vertical, horizontal } => {
-                    self.ptr.axis_source(wl_pointer::AxisSource::Wheel);
-                    for (axis, notches) in [(wl_pointer::Axis::VerticalScroll, vertical), (wl_pointer::Axis::HorizontalScroll, horizontal)] {
-                        if notches != 0.0 {
-                            // Wayland: positive = down/right; RDP: positive = up.
-                            let signed = if matches!(axis, wl_pointer::Axis::VerticalScroll) { -notches } else { notches };
-                            let discrete = signed.round() as i32;
-                            let discrete = if discrete == 0 { signed.signum() as i32 } else { discrete };
-                            self.ptr.axis(t, axis, signed * 15.0);
-                            self.ptr.axis_discrete(t, axis, signed * 15.0, discrete);
+                    let mut sent = false;
+                    for (i, (axis, notches)) in [(wl_pointer::Axis::VerticalScroll, vertical), (wl_pointer::Axis::HorizontalScroll, horizontal)].into_iter().enumerate() {
+                        if notches == 0.0 {
+                            continue;
+                        }
+                        // Wayland: positive = down/right; RDP: positive = up.
+                        let signed = if i == 0 { -notches } else { notches } * self.scroll_scale;
+                        // A trackpad sends many small amounts. Each one used to go out as a whole step, so a gentle swipe
+                        // scrolled pages: collect them, and a step goes out when a whole notch has come together.
+                        if self.scroll[i] * signed < 0.0 {
+                            self.scroll[i] = 0.0; // the other way: start again
+                        }
+                        self.scroll[i] += signed;
+                        let steps = self.scroll[i].trunc();
+                        if steps != 0.0 {
+                            self.scroll[i] -= steps;
+                            if !sent {
+                                self.ptr.axis_source(wl_pointer::AxisSource::Wheel);
+                                sent = true;
+                            }
+                            self.ptr.axis(t, axis, steps * 15.0);
+                            self.ptr.axis_discrete(t, axis, steps * 15.0, steps as i32);
                         }
                     }
-                    self.ptr.frame();
+                    if sent {
+                        self.ptr.frame();
+                    }
                 }
             }
             if let Err(e) = self.conn.flush() {

@@ -72,6 +72,8 @@ pub struct Link {
     child: Mutex<Option<Child>>,
     /// Where the session's clipboard text goes (set by the clipboard channel when the client opens it).
     clipboard: Mutex<Option<Box<dyn Fn(Vec<u8>) + Send + Sync>>>,
+    /// Where the session's sound goes (set by the sound channel when the client opens it).
+    audio: Mutex<Option<Box<dyn Fn(Vec<u8>) + Send + Sync>>>,
     _slot: Slot,
 }
 
@@ -131,6 +133,7 @@ impl Link {
             resized: tokio::sync::Notify::new(),
             child: Mutex::new(child),
             clipboard: Mutex::new(None),
+            audio: Mutex::new(None),
             _slot: slot,
         });
         let reader = link.clone();
@@ -174,7 +177,15 @@ impl Link {
                             }
                         }
                     }
-                    Ok(Up::Ready { .. }) | Ok(Up::Audio { .. }) => {}
+                    Ok(Up::Audio { pcm }) => {
+                        // Untrusted too: a chunk is 20 ms of sound, nothing near this size.
+                        if pcm.len() <= proto::MAX_AUDIO_CHUNK {
+                            if let Some(sink) = reader.audio.lock().unwrap().as_ref() {
+                                sink(pcm);
+                            }
+                        }
+                    }
+                    Ok(Up::Ready { .. }) => {}
                     Ok(Up::Bye) => break,
                     Err(e) => {
                         warn!("bad message from the session: {e}");
@@ -190,6 +201,11 @@ impl Link {
     /// Sets where the session's clipboard text is delivered.
     pub fn set_clipboard_sink(&self, sink: Box<dyn Fn(Vec<u8>) + Send + Sync>) {
         *self.clipboard.lock().unwrap() = Some(sink);
+    }
+
+    /// Sets where the session's sound is delivered; `None` when the sound channel closes.
+    pub fn set_audio_sink(&self, sink: Option<Box<dyn Fn(Vec<u8>) + Send + Sync>>) {
+        *self.audio.lock().unwrap() = sink;
     }
 
     pub fn send(&self, msg: Down) {

@@ -15,6 +15,7 @@ mod input;
 mod link;
 mod proto;
 mod session;
+mod sessionaudio;
 mod sessionclip;
 mod spawn;
 mod worker;
@@ -26,7 +27,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Context as _;
 use ironrdp_server::{
-    BitmapUpdate, Credentials, DesktopSize, DisplayUpdate, KeyboardEvent, MouseEvent, PixelFormat, RdpServer,
+    BitmapUpdate, Credentials, DesktopSize, DisplayUpdate, KeyboardEvent, MouseEvent, PixelFormat, RGBAPointer, RdpServer,
     RdpServerDisplay, RdpServerDisplayUpdates, RdpServerInputHandler, TlsIdentityCtx,
 };
 use tracing::{error, info, warn};
@@ -67,11 +68,12 @@ enum Mode {
 impl RdpServerDisplayUpdates for Updates {
     async fn next_update(&mut self) -> anyhow::Result<Option<DisplayUpdate>> {
         loop {
-            // The cursor is part of the picture (wlr-screencopy draws it in, with the shape the app asked for): hide the one of
-            // the client, or there are two, and the one in the picture is a network round trip behind.
+            // The cursor is part of the picture (wlr-screencopy draws it in, with the shape the app asked for): make the one of
+            // the client invisible, or there are two, and the one in the picture is a network round trip behind.
             if !self.pointer_hidden {
                 self.pointer_hidden = true;
-                return Ok(Some(DisplayUpdate::HidePointer));
+                // A pointer shape with nothing in it: the Windows App did not take the "hidden pointer" update.
+                return Ok(Some(DisplayUpdate::RGBAPointer(RGBAPointer { cache_index: 0, width: 32, height: 32, hot_x: 0, hot_y: 0, data: vec![0; 32 * 32 * 4] })));
             }
             // Graphics pipeline first: it is what the Windows App is built around. Give the client a
             // few seconds to open it before falling back to the old bitmap updates.
@@ -90,7 +92,16 @@ impl RdpServerDisplayUpdates for Updates {
                 }
             }
 
-            let event = self.link.events.lock().await.recv().await.unwrap_or(Event::Closed);
+            // The client forgets its pointer shape when it activates the display again (after a resize, for one): say it again
+            // from time to time, it is a few KB.
+            let received = tokio::time::timeout(std::time::Duration::from_secs(2), async { self.link.events.lock().await.recv().await }).await;
+            let event = match received {
+                Ok(event) => event.unwrap_or(Event::Closed),
+                Err(_) => {
+                    self.pointer_hidden = false;
+                    continue;
+                }
+            };
             match event {
                 // An error here would be logged and retried at once, for ever; ending the updates ends the connection.
                 Event::Closed => {
@@ -100,6 +111,7 @@ impl RdpServerDisplayUpdates for Updates {
                 Event::Resized(width, height) => {
                     if (width, height) != self.size {
                         info!(width, height, "telling the client to resize");
+                        self.pointer_hidden = false; // sent again after the resize
                         return Ok(Some(DisplayUpdate::Resize(DesktopSize { width, height })));
                     }
                 }
@@ -531,7 +543,7 @@ async fn main() -> anyhow::Result<()> {
         helper_socket: via_helper.then_some(helper_socket),
         egfx: (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 }),
         clipboard,
-        audio: audio && !per_user && !via_helper,
+        audio: audio && !per_user,
     });
     if let Some(p) = &common.pam {
         info!(user = p.running_user(), root = p.is_root(), per_user, "login: PAM service sway-rdp-server, plain TLS login (no NLA)");
@@ -539,8 +551,8 @@ async fn main() -> anyhow::Result<()> {
             warn!("running as root: any ordinary account can log in and the whole daemon, including the network side, has root rights. Development only (see docs/MULTIUSER-DESIGN.md).");
         }
     }
-    if (per_user || via_helper) && audio {
-        warn!("per-user sessions: sound is off (it still runs in the daemon, not in the account's own session)");
+    if per_user && audio {
+        warn!("--per-user: sound is off (it needs the root helper: the sound is recorded in the account's own session)");
     }
     if replace == Some(true) {
         warn!("--replace is ignored: every connection now gets its own session");
@@ -642,8 +654,9 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
         cfg: common.cfg.clone(),
         egfx: common.egfx.map(|tuning| (egfx_state.clone(), tuning)),
     };
-    let audio_lease = if common.audio { AudioLease::take() } else { None };
-    if common.audio && audio_lease.is_none() {
+    // With the root helper every account records in its own session; without it the machine has one speaker.
+    let audio_lease = if common.audio && helper.is_none() { AudioLease::take() } else { None };
+    if common.audio && helper.is_none() && audio_lease.is_none() {
         info!(%peer, "another session has the sound; this one is silent");
     }
 
@@ -658,7 +671,13 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
         .with_display_handler(handler)
         .with_gfx_factory(common.egfx.map(|_| Box::new(egfx::Factory::new(egfx_state.clone())) as Box<dyn ironrdp_server::GfxServerFactory>))
         .with_cliprdr_factory(common.clipboard.then(|| Box::new(clipboard::Factory::new(slot.clone())) as Box<dyn ironrdp_server::CliprdrServerFactory>))
-        .with_sound_factory(audio_lease.is_some().then(|| Box::new(audio::Factory::new()) as Box<dyn ironrdp_server::SoundServerFactory>))
+        .with_sound_factory(if !common.audio {
+            None
+        } else if helper.is_some() {
+            Some(Box::new(audio::Factory::remote(slot.clone())) as Box<dyn ironrdp_server::SoundServerFactory>)
+        } else {
+            audio_lease.is_some().then(|| Box::new(audio::Factory::new()) as Box<dyn ironrdp_server::SoundServerFactory>)
+        })
         .with_honor_client_desktop_size(true)
         .with_replace_on_new_connection(false)
         .with_credential_validator(match (&common.pam, &helper) {

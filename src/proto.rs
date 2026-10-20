@@ -66,6 +66,9 @@ pub enum FrameKind {
 /// Longest clipboard text either side relays (UTF-8 bytes).
 pub const MAX_CLIPBOARD: usize = 1024 * 1024;
 
+/// Longest chunk of sound the daemon takes from a session (a normal one is 3528 bytes: 20 ms).
+pub const MAX_AUDIO_CHUNK: usize = 64 * 1024;
+
 /// From the network daemon to the session.
 #[derive(Debug, PartialEq)]
 pub enum Down {
@@ -85,6 +88,10 @@ pub enum Down {
     Clipboard { data: Vec<u8> },
     /// The client has a clipboard channel: start watching the session's clipboard.
     ClipboardOn,
+    /// The client has a sound channel: record the session's speaker and send it as `Up::Audio`.
+    AudioOn,
+    /// The sound channel is closed: stop recording.
+    AudioOff,
     Bye,
 }
 
@@ -228,6 +235,8 @@ impl Down {
             Down::RequestFull => o.u8(8),
             Down::UseBitmaps => o.u8(9),
             Down::ClipboardOn => o.u8(11),
+            Down::AudioOn => o.u8(12),
+            Down::AudioOff => o.u8(13),
             Down::Clipboard { data } => {
                 o.u8(10);
                 o.bytes(data);
@@ -251,6 +260,8 @@ impl Down {
             9 => Down::UseBitmaps,
             10 => Down::Clipboard { data: i.bytes()? },
             11 => Down::ClipboardOn,
+            12 => Down::AudioOn,
+            13 => Down::AudioOff,
             255 => Down::Bye,
             t => return Err(ProtoError::UnknownTag(t)),
         };
@@ -503,6 +514,8 @@ mod tests {
             Down::UseBitmaps,
             Down::Clipboard { data: b"hello".to_vec() },
             Down::ClipboardOn,
+            Down::AudioOn,
+            Down::AudioOff,
             Down::Bye,
         ]
     }

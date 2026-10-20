@@ -11,19 +11,32 @@ use ironrdp_server::tokio::sync::mpsc::UnboundedSender;
 use ironrdp_server::{ServerEvent, ServerEventSender, SoundServerFactory};
 use tracing::info;
 
-const SINK: &str = "sway-rdp-server";
-const RATE: u32 = 44_100;
+use crate::link::Link;
+use crate::proto::Down;
+use crate::Slot;
+
+pub const SINK: &str = "sway-rdp-server";
+pub const RATE: u32 = 44_100;
 /// 20 ms of 16-bit stereo.
-const CHUNK: usize = (RATE as usize / 50) * 4;
+pub const CHUNK: usize = (RATE as usize / 50) * 4;
 
 #[derive(Default)]
 pub struct Factory {
     sender: Arc<Mutex<Option<UnboundedSender<ServerEvent>>>>,
+    /// With sessions of their own (the root helper starts them as the account) the sound is recorded there, in the
+    /// account's PipeWire (`sessionaudio.rs`), and only relayed here; without, this process records it itself.
+    slot: Option<Arc<Slot>>,
 }
 
 impl Factory {
+    /// Records in this process (one session, the whole machine's speaker).
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Relays what the connection's own session records.
+    pub fn remote(slot: Arc<Slot>) -> Self {
+        Self { sender: Arc::default(), slot: Some(slot) }
     }
 }
 
@@ -48,6 +61,8 @@ impl SoundServerFactory for Factory {
             }],
             child: None,
             previous_sink: None,
+            slot: self.slot.clone(),
+            remote: None,
         })
     }
 }
@@ -58,6 +73,9 @@ struct Handler {
     child: Option<Child>,
     /// The default sink before the session took over, put back when the stream ends.
     previous_sink: Option<String>,
+    slot: Option<Arc<Slot>>,
+    /// The session whose sound is relayed.
+    remote: Option<Arc<Link>>,
 }
 
 impl std::fmt::Debug for Handler {
@@ -66,13 +84,13 @@ impl std::fmt::Debug for Handler {
     }
 }
 
-fn pactl(args: &[&str]) -> io::Result<String> {
+pub fn pactl(args: &[&str]) -> io::Result<String> {
     let out = Command::new("pactl").args(args).stderr(Stdio::null()).output()?;
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 /// The virtual speaker apps play into, made the default so the session's apps use it.
-fn ensure_sink() -> io::Result<()> {
+pub fn ensure_sink() -> io::Result<()> {
     if !pactl(&["list", "short", "sinks"])?.lines().any(|l| l.split_whitespace().nth(1) == Some(SINK)) {
         pactl(&["load-module", "module-null-sink", &format!("sink_name={SINK}"), "sink_properties=device.description=sway-rdp-server"])?;
     }
@@ -90,6 +108,22 @@ impl RdpsndServerHandler for Handler {
     }
 
     fn start(&mut self, _format: &NegotiatedFormat) -> Result<(), Box<dyn RdpsndError>> {
+        if let Some(slot) = &self.slot {
+            let Some(link) = slot.link() else {
+                return Err(Box::new(io::Error::other("sound: no session yet")) as Box<dyn RdpsndError>);
+            };
+            let sender = self.sender.clone();
+            let t0 = std::time::Instant::now();
+            link.set_audio_sink(Some(Box::new(move |pcm| {
+                if let Some(tx) = sender.lock().unwrap().as_ref() {
+                    let _ = tx.send(ServerEvent::Rdpsnd(RdpsndServerMessage::Wave(pcm, t0.elapsed().as_millis() as u32)));
+                }
+            })));
+            link.send(Down::AudioOn);
+            info!("sound: relaying the session speaker");
+            self.remote = Some(link);
+            return Ok(());
+        }
         let previous = pactl(&["get-default-sink"]).ok().map(|s| s.trim().to_owned()).filter(|s| !s.is_empty() && s != SINK);
         if previous.is_some() {
             self.previous_sink = previous;
@@ -128,6 +162,10 @@ impl RdpsndServerHandler for Handler {
     }
 
     fn stop(&mut self) {
+        if let Some(link) = self.remote.take() {
+            link.send(Down::AudioOff);
+            link.set_audio_sink(None);
+        }
         if let Some(mut c) = self.child.take() {
             let _ = c.kill();
             let _ = c.wait();

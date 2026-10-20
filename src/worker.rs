@@ -14,6 +14,7 @@ use crate::capture::Rect;
 use crate::encode::{Tuning, H264};
 use crate::input;
 use crate::proto::{self, Down, FrameKind, Up};
+use crate::sessionaudio::Audio;
 use crate::sessionclip::Clipboard;
 use crate::session::{self, Session};
 
@@ -107,6 +108,7 @@ struct Worker {
     /// Send raw bitmaps instead of H.264.
     bitmaps: bool,
     up: mpsc::UnboundedSender<Up>,
+    audio: Audio,
     clipboard: Clipboard,
     /// Area changed since the last settle refresh. Between keyframes the encoder keeps improving the picture in
     /// places the client was not told to redraw, so a region drawn roughly during motion would stay rough.
@@ -292,7 +294,7 @@ async fn serve_client(
     };
     let (w, h) = (session.shared.width, session.shared.height);
     session.shared.force_full();
-    let mut me = Worker { session: Some(session), enc: None, tuning: cfg.tuning, credits: 0, bitmaps: cfg.tuning.is_none(), up: up_tx.clone(), clipboard: Clipboard::new(up_tx), settle: None, settling: false, last_frame: tokio::time::Instant::now(), last_rect: None, last_change: tokio::time::Instant::now() };
+    let mut me = Worker { session: Some(session), enc: None, tuning: cfg.tuning, credits: 0, bitmaps: cfg.tuning.is_none(), up: up_tx.clone(), audio: Audio::new(up_tx.clone()), clipboard: Clipboard::new(up_tx), settle: None, settling: false, last_frame: tokio::time::Instant::now(), last_rect: None, last_change: tokio::time::Instant::now() };
     let _ = me.up.send(Up::Ready { width: w, height: h });
 
     let mut tick = tokio::time::interval(Duration::from_secs(2));
@@ -384,6 +386,8 @@ impl Worker {
             }
             Down::Clipboard { data } => self.clipboard.set(data),
             Down::ClipboardOn => self.clipboard.watch(),
+            Down::AudioOn => self.audio.start(),
+            Down::AudioOff => self.audio.stop(),
             Down::Resize { width, height, scale_percent } => self.resize(width, height, scale_percent).await,
             Down::Bye => {}
         }
