@@ -1,0 +1,11 @@
+// Administrators (group sudo) install and remove Flatpaks system-wide without a password prompt per step (a single
+// install asks for the runtime, the app and the metadata one by one). Debian's own Flatpak rule does the same, but only
+// for local sessions; an RDP session has no seat, so polkit does not count it as local. Still needs an active session.
+polkit.addRule(function(action, subject) {
+    if (action.id.indexOf("org.freedesktop.Flatpak.") == 0 &&
+        action.id != "org.freedesktop.Flatpak.override-parental-controls" &&
+        subject.active == true && subject.isInGroup("sudo")) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

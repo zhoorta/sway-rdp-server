@@ -2,6 +2,9 @@
 # Starts the session's shell: DankMaterialShell through the account's systemd user session when it is installed,
 # otherwise sway's own bar.
 export XDG_CURRENT_DESKTOP=sway XDG_SESSION_TYPE=wayland
+# The shell only watches app folders that exist when it starts: make the account's Flatpak one now, or its first
+# Flatpak app stays out of the launcher until the shell restarts.
+mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share/applications"
 # First start of an account: DankMaterialShell without animations. Every animation frame is drawn in software and then
 # sent over the network; on a VM without a GPU they cost about three times the CPU of the rest of the session. The
 # account can turn them back on in the shell's settings (which then own the file).

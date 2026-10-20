@@ -16,6 +16,7 @@ install -m 755 /tmp/target/release/sway-rdp-server $P/usr/bin/sway-rdp-server
 install -m 644 packaging/systemd/*.service $P/lib/systemd/system/   # includes sway-rdp-session@.service
 install -m 644 packaging/default-sway-rdp $P/etc/default/sway-rdp
 install -m 644 packaging/pam-sway-rdp-server $P/etc/pam.d/sway-rdp-server
+install -m 644 packaging/pam-sway-rdp-session $P/etc/pam.d/sway-rdp-session
 install -m 644 README.md $P/usr/share/doc/sway-rdp/README.md
 install -m 644 docs/MULTIUSER-DESIGN.md $P/usr/share/doc/sway-rdp/MULTIUSER-DESIGN.md
 cat LICENSE-MIT > $P/usr/share/doc/sway-rdp/copyright
@@ -33,6 +34,7 @@ install -m 755 packaging/desktop/setup/*.sh $D/usr/share/sway-rdp/setup/
 install -m 644 packaging/desktop/setup/*.tsv $D/usr/share/sway-rdp/setup/
 mkdir -p $D/usr/share/sway-rdp/gtk $D/usr/lib/environment.d && install -m 644 packaging/desktop/gtk/*.css $D/usr/share/sway-rdp/gtk/
 install -m 644 packaging/desktop/environment.d/*.conf $D/usr/lib/environment.d/
+mkdir -p $D/usr/share/polkit-1/rules.d && install -m 644 packaging/desktop/polkit/*.rules $D/usr/share/polkit-1/rules.d/
 install -m 755 packaging/debian/postinst-desktop $D/DEBIAN/postinst
 mkdir -p $D/usr/share/sway-rdp/dms-plugin && cp -r packaging/desktop/dms-plugin/. $D/usr/share/sway-rdp/dms-plugin/ && chmod -R go-w,a+rX $D/usr/share/sway-rdp/dms-plugin
 install -m 644 packaging/desktop/systemd-user/sway-session.target $D/usr/lib/systemd/user/sway-session.target

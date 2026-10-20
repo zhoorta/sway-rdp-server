@@ -1,0 +1,4 @@
+# PAM service of the sway-rdp session units (PAMName= in sway-rdp-session@.service): gives each RDP session a real
+# logind session, so polkit agents, loginctl and the like see it. No authentication here, the helper already did that.
+session required pam_limits.so
+session optional pam_systemd.so

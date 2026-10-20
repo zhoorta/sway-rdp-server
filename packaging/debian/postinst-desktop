@@ -4,4 +4,9 @@ set -e
 if [ "$1" = configure ] && [ -x /usr/bin/sway-rdp-mkicons ]; then
     /usr/bin/sway-rdp-mkicons || echo "sway-rdp-desktop: could not make the SwayRdp-Mono icon theme" >&2
 fi
+# DMS only watches app folders that exist when it starts; Flatpak makes this one on the first install, so the first
+# Flatpak app would not show up in the launcher until DMS restarts.
+if [ "$1" = configure ]; then
+    mkdir -p /var/lib/flatpak/exports/share/applications
+fi
 exit 0
