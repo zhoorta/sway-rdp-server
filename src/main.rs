@@ -39,6 +39,29 @@ use proto::{Down, FrameKind};
 /// own credits in H.264 mode).
 const BITMAP_CREDITS: u16 = 3;
 
+/// The classic arrow (X = black, . = white), as a 32 bit pointer image: the pointer the client draws itself.
+fn arrow_pointer() -> RGBAPointer {
+    const ART: [&str; 19] = [
+        "X", "XX", "X.X", "X..X", "X...X", "X....X", "X.....X", "X......X", "X.......X", "X........X", "X.....XXXXX", "X..X..X", "X.X X..X",
+        "XX  X..X", "X    X..X", "     X..X", "      X..X", "      X..X", "       XX",
+    ];
+    const SIZE: usize = 32;
+    let mut data = vec![0u8; SIZE * SIZE * 4];
+    for (row, line) in ART.iter().enumerate() {
+        for (col, c) in line.chars().enumerate() {
+            let value = match c {
+                'X' => 0,
+                '.' => 255,
+                _ => continue,
+            };
+            // The rows of an RDP pointer image run from the bottom up; the pixels are blue, green, red, alpha.
+            let at = ((SIZE - 1 - row) * SIZE + col) * 4;
+            data[at..at + 4].copy_from_slice(&[value, value, value, 255]);
+        }
+    }
+    RGBAPointer { cache_index: 1, width: SIZE as u16, height: SIZE as u16, hot_x: 0, hot_y: 0, data }
+}
+
 struct Updates {
     link: Arc<Link>,
     egfx: Option<EgfxLink>,
@@ -77,7 +100,8 @@ impl RdpServerDisplayUpdates for Updates {
                     // A pointer shape with nothing in it: the Windows App did not take the "hidden pointer" update.
                     DisplayUpdate::RGBAPointer(RGBAPointer { cache_index: 0, width: 32, height: 32, hot_x: 0, hot_y: 0, data: vec![0; 32 * 32 * 4] })
                 } else {
-                    DisplayUpdate::DefaultPointer
+                    // The default pointer is left to the client, and FreeRDP draws nothing for it: give an arrow to draw.
+                    DisplayUpdate::RGBAPointer(arrow_pointer())
                 }));
             }
             // Graphics pipeline first: it is what the Windows App is built around. Give the client a
