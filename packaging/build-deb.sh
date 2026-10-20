@@ -14,6 +14,7 @@ cd /src && cargo build --release
 P=/tmp/pkg; rm -rf $P; mkdir -p $P/DEBIAN $P/usr/bin $P/lib/systemd/system $P/etc/default $P/etc/pam.d $P/usr/share/doc/sway-rdp
 install -m 755 /tmp/target/release/sway-rdp-server $P/usr/bin/sway-rdp-server
 install -m 755 /tmp/target/release/sway-rdp-admin $P/usr/bin/sway-rdp-admin
+mkdir -p $P/usr/share/polkit-1/actions && install -m 644 packaging/org.sway-rdp.admin.policy $P/usr/share/polkit-1/actions/
 install -m 644 packaging/systemd/*.service $P/lib/systemd/system/   # includes sway-rdp-session@.service
 install -m 644 packaging/default-sway-rdp $P/etc/default/sway-rdp
 install -m 644 packaging/pam-sway-rdp-server $P/etc/pam.d/sway-rdp-server
@@ -41,6 +42,7 @@ mkdir -p $D/usr/lib/systemd/system/sway-rdp-session@.service.d && install -m 644
 mkdir -p $D/usr/share/sway-rdp/qt6ct && install -m 644 packaging/desktop/qt6ct/* $D/usr/share/sway-rdp/qt6ct/
 # /etc, not /usr/share: the Debian sway package owns /usr/share/xdg-desktop-portal/sway-portals.conf, and /etc wins over it
 mkdir -p $D/etc/xdg-desktop-portal && install -m 644 packaging/desktop/xdg-desktop-portal/*.conf $D/etc/xdg-desktop-portal/
+mkdir -p $D/usr/share/sway-rdp/users-panel && install -m 644 packaging/desktop/users-panel/*.qml $D/usr/share/sway-rdp/users-panel/
 mkdir -p $D/usr/share/applications && install -m 644 packaging/desktop/applications/*.desktop $D/usr/share/applications/
 install -m 755 packaging/debian/postinst-desktop $D/DEBIAN/postinst
 mkdir -p $D/usr/share/sway-rdp/dms-plugin && cp -r packaging/desktop/dms-plugin/. $D/usr/share/sway-rdp/dms-plugin/ && chmod -R go-w,a+rX $D/usr/share/sway-rdp/dms-plugin

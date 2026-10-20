@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Users & Access
+Comment=Who may log in, who is an administrator, and the running sessions
+Exec=sway-rdp-users
+Icon=system-users
+Categories=System;Settings;
+Terminal=false
