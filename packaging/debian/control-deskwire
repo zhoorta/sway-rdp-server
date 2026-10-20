@@ -1,0 +1,14 @@
+Package: deskwire
+Version: @VERSION@
+Architecture: all
+Maintainer: José Mendonça <jmendonca@gmail.com>
+Section: metapackages
+Priority: optional
+Depends: sway-rdp (= @VERSION@), sway-rdp-desktop (= @VERSION@)
+Description: Deskwire: a Windows-like remote Linux desktop over RDP
+ Installs the RDP server (sway-rdp) and the desktop for its sessions
+ (sway-rdp-desktop) in one step. Deskwire is the name of the product; the
+ packages keep the names sway-rdp and sway-rdp-desktop, which say what they
+ are: a server for the sway compositor and its desktop.
+ .
+ Deskwire builds on the sway compositor and is not part of the sway project.

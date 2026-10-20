@@ -13,12 +13,14 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../.." && pwd)
 VM="$HERE/vm.sh"
 OUT="$REPO/packaging/out"
-NAME=${VM_NAME:-sway-rdp-dev}
+ARCH=${VM_ARCH:-arm64}   # amd64: the x86_64 VM of vm.sh (VM_ARCH=amd64), with the amd64 packages
+case "$ARCH" in amd64) NAME=${VM_NAME:-sway-rdp-dev-amd64}; RDP_PORT=3396 ;; *) NAME=${VM_NAME:-sway-rdp-dev}; RDP_PORT=3395 ;; esac
 ACCOUNTS="${VM_DIR:-$HOME/vm/$NAME}/accounts.txt"
 
-BASE=$(ls -t "$OUT"/sway-rdp_*_arm64.deb 2>/dev/null | head -1)
+BASE=$(ls -t "$OUT"/sway-rdp_*_$ARCH.deb 2>/dev/null | head -1)
 DESKTOP=$(ls -t "$OUT"/sway-rdp-desktop_*_all.deb 2>/dev/null | head -1)
-FM=$(ls -t "$OUT"/pcmanfm-qt_*sway-rdp*_arm64.deb 2>/dev/null | head -1)   # optional: packaging/pcmanfm-qt/build.sh arm64
+META=$(ls -t "$OUT"/deskwire_*_all.deb 2>/dev/null | head -1)   # the metapackage: optional
+FM=$(ls -t "$OUT"/pcmanfm-qt_*sway-rdp*_$ARCH.deb 2>/dev/null | head -1)   # optional: packaging/pcmanfm-qt/build.sh arm64
 [ -n "$BASE" ] && [ -n "$DESKTOP" ] || { echo "no packages in $OUT: run packaging/build-deb.sh arm64" >&2; exit 1; }
 "$VM" status | grep -q running || { echo "the VM is not running: $VM start" >&2; exit 1; }
 
@@ -32,7 +34,7 @@ PW2=$(sed -n 's/^rdptest2 //p' "$ACCOUNTS")
 
 echo "pushing $(basename "$BASE") and $(basename "$DESKTOP")"
 "$VM" ssh 'rm -rf ~/provision && mkdir -p ~/provision'
-tar cf - -C "$OUT" "$(basename "$BASE")" "$(basename "$DESKTOP")" ${FM:+"$(basename "$FM")"} -C "$REPO/packaging/desktop/setup" dms.sh | "$VM" ssh 'tar xf - -C ~/provision'
+tar cf - -C "$OUT" "$(basename "$BASE")" "$(basename "$DESKTOP")" ${META:+"$(basename "$META")"} ${FM:+"$(basename "$FM")"} -C "$REPO/packaging/desktop/setup" dms.sh | "$VM" ssh 'tar xf - -C ~/provision'
 
 {
     printf "PW1='%s'\nPW2='%s'\n" "$PW1" "$PW2"
@@ -43,7 +45,7 @@ cd /home/jose/provision
 apt-get update -qq
 # Without the recommended packages (apt would add a screensaver, a second portal and a policy-kit agent of its own). The ones
 # that matter are named here: audio, the clipboard, the picker of "Add app to desktop", the wallpaper, Flatpak, a browser.
-apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold flatpak ./sway-rdp_*.deb ./sway-rdp-desktop_*.deb \
+apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold flatpak ./sway-rdp_*.deb ./sway-rdp-desktop_*.deb $(ls ./deskwire_*.deb 2>/dev/null) \
     pipewire pipewire-pulse pulseaudio-utils wireplumber wl-clipboard wmenu whiptail swaybg firefox-esr
 # The patched file manager (menus without Desktop Preferences, Create Launcher, Open in Terminal), when it was built; held so that
 # Debian's own pcmanfm-qt does not replace it.
@@ -70,5 +72,5 @@ REMOTE
 } | "$VM" ssh 'sudo sh -s'
 
 echo
-echo "RDP: connect the Windows App to 127.0.0.1:3395 with one of (kept in $ACCOUNTS):"
+echo "RDP: connect the Windows App to 127.0.0.1:$RDP_PORT with one of (kept in $ACCOUNTS):"
 sed 's/^/    /' "$ACCOUNTS"

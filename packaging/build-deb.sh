@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds the sway-rdp package in Docker (Debian 13). Usage: packaging/build-deb.sh [arm64|amd64]   (default arm64)
+# Builds the sway-rdp, sway-rdp-desktop and deskwire (metapackage) packages in Docker (Debian 13). Usage: packaging/build-deb.sh [arm64|amd64]   (default arm64)
 # Output: packaging/out/sway-rdp_<version>_<arch>.deb
 set -e
 cd "$(dirname "$0")/.."
@@ -53,5 +53,12 @@ echo /etc/xdg/sway-rdp/sway.conf > $D/DEBIAN/conffiles
 sed -e "s/@VERSION@/$VERSION/g" packaging/debian/control-desktop > $D/DEBIAN/control
 echo "Installed-Size: $(du -sk $D | cut -f1)" >> $D/DEBIAN/control
 dpkg-deb --root-owner-group -Zxz -b $D /src/packaging/out/ >/dev/null
+
+# the Deskwire metapackage: apt install deskwire gets the server and the desktop (same version, so they stay together)
+M=/tmp/pkgm; rm -rf $M; mkdir -p $M/DEBIAN $M/usr/share/doc/deskwire
+cat LICENSE-MIT > $M/usr/share/doc/deskwire/copyright
+sed -e "s/@VERSION@/$VERSION/g" packaging/debian/control-deskwire > $M/DEBIAN/control
+echo "Installed-Size: $(du -sk $M | cut -f1)" >> $M/DEBIAN/control
+dpkg-deb --root-owner-group -Zxz -b $M /src/packaging/out/ >/dev/null
 chown -R $UID_HOST:$GID_HOST /src/packaging/out'
 ls -l packaging/out

@@ -5,6 +5,13 @@ client asks for, so a Retina Mac or a laptop with 200 % scaling gets a sharp des
 window can be resized live. Status: **early, one author, tested mostly with FreeRDP in a VM; the Windows App on macOS
 was tested before the multi-user work and not since.**
 
+## Names
+
+**Deskwire** is the name of the product (a Windows-like remote Linux desktop over RDP); `apt install deskwire` installs everything.
+The packages, binaries and services keep the names that say what they are: `sway-rdp` (the server, the root helper and the
+`sway-rdp-admin` tool) and `sway-rdp-desktop` (the desktop for the sessions). Deskwire builds on the sway compositor and is not part of
+the sway project. Deskwire is a working name: no domain, trademark or package-name clearance has been done.
+
 ## Multi-user (Debian 13)
 
 `apt install ./sway-rdp_*.deb` (build it with `packaging/build-deb.sh [arm64|amd64]`, Docker needed) installs two
