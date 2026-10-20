@@ -251,6 +251,10 @@ PY
         rm -rf "$dms_copy"
     fi
 fi
+# The account's user manager outlives its sessions and keeps what an older one pushed into it (dbus-update-activation-environment
+# below only adds): GSETTINGS_BACKEND=memory, set by a session that started before the user bus existed, kept the portal from
+# reading dconf, so Flatpak apps never saw the dark preference. This session has the bus, so drop it.
+[ -z "${GSETTINGS_BACKEND:-}" ] && systemctl --user unset-environment GSETTINGS_BACKEND 2>/dev/null
 dbus-update-activation-environment --systemd --all 2>/dev/null
 if command -v dms >/dev/null 2>&1 && systemctl --user start sway-session.target 2>/dev/null; then
     exit 0
