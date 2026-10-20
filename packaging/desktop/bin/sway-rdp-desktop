@@ -28,6 +28,9 @@ if [ -e "$qss" ] && [ -e "$qt_dir/qt6ct.conf" ] && [ ! -e "$qt_dir/.dms-qss" ]; 
     : > "$qt_dir/.dms-qss"
     grep -q '^stylesheets=' "$qt_dir/qt6ct.conf" || printf '\n[Interface]\nstylesheets=%s\n' "$qss" >> "$qt_dir/qt6ct.conf"
 fi
+# Folders and places in the accent colour of the account's theme (a small overlay of the icon theme; the wallpaper script keeps it
+# up to date): before the desktop starts, so that it starts with them.
+sway-rdp-mkicons --user 2>/dev/null
 # The desktop is the whole screen and the shell's bar covers its top edge: keep the icons below it. The Qt font and
 # the terminal match the rest of the session. It does not mount drives by itself: that asks an administrator's password
 # in a session without a seat, before anyone asked for it.

@@ -32,7 +32,7 @@ QToolBar { background: palette(window); border: none; spacing: 4px; padding: 4px
 QStatusBar { background: palette(window); }
 QToolTip { background: palette(base); color: palette(text); border: 1px solid palette(mid); border-radius: 8px; padding: 4px 8px; }
 QHeaderView::section { background: palette(window); border: none; padding: 4px 8px; }
-QListView, QTreeView { border: none; background: palette(base); }
+QListView, QTreeView { border: none; }
 QListView::item, QTreeView::item { border-radius: 8px; padding: 2px; }
 QListView::item:selected, QTreeView::item:selected { background: palette(highlight); color: palette(highlighted-text); }
 QSplitter::handle { background: transparent; }
