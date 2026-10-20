@@ -55,6 +55,35 @@ fn check_frame(size: (u16, u16), (x, y, w, h): (u16, u16, u16, u16), kind: Frame
     }
 }
 
+/// The most sound chunks a session may send in a second. A real one sends 50 (20 ms each); a little more is allowed for jitter.
+const MAX_AUDIO_CHUNKS_PER_SECOND: u32 = 100;
+
+/// Decides which sound chunks of a session are passed on. A session is not trusted: sound only goes to the client's
+/// channel in chunks of exactly 20 ms and at about the speed of real time, so it cannot queue sound without limit in the
+/// daemon (which serves everybody).
+struct AudioGate {
+    window: std::time::Instant,
+    count: u32,
+}
+
+impl AudioGate {
+    fn new(now: std::time::Instant) -> Self {
+        Self { window: now, count: 0 }
+    }
+
+    fn allow(&mut self, now: std::time::Instant, len: usize) -> bool {
+        if now.duration_since(self.window) >= Duration::from_secs(1) {
+            self.window = now;
+            self.count = 0;
+        }
+        if len != crate::audio::CHUNK {
+            return false;
+        }
+        self.count += 1;
+        self.count <= MAX_AUDIO_CHUNKS_PER_SECOND
+    }
+}
+
 pub enum Event {
     Frame { x: u16, y: u16, w: u16, h: u16, kind: FrameKind, data: Vec<u8> },
     /// The picture has a new size from now on; frames before this message have the old one.
@@ -138,6 +167,7 @@ impl Link {
         });
         let reader = link.clone();
         tokio::spawn(async move {
+            let mut audio_gate = AudioGate::new(std::time::Instant::now());
             loop {
                 let body = match proto::read_frame_async(&mut rd).await {
                     Ok(Some(b)) => b,
@@ -178,8 +208,8 @@ impl Link {
                         }
                     }
                     Ok(Up::Audio { pcm }) => {
-                        // Untrusted too: a chunk is 20 ms of sound, nothing near this size.
-                        if pcm.len() <= proto::MAX_AUDIO_CHUNK {
+                        // Untrusted too: see `AudioGate`.
+                        if audio_gate.allow(std::time::Instant::now(), pcm.len()) {
                             if let Some(sink) = reader.audio.lock().unwrap().as_ref() {
                                 sink(pcm);
                             }
@@ -266,6 +296,20 @@ mod tests {
         assert!(check_frame(size, (0, 0, 4, 4), FrameKind::Bgra, 65).is_err(), "bitmap too long");
         assert!(check_frame(size, (0, 0, 4, 4), FrameKind::H264, 0).is_err());
         assert!(check_frame(size, (0, 0, 4, 4), FrameKind::H264, MAX_H264_FRAME + 1).is_err());
+    }
+
+    #[test]
+    fn sound_chunks_of_a_session_are_limited_in_size_and_speed() {
+        let t0 = std::time::Instant::now();
+        let mut gate = AudioGate::new(t0);
+        assert!(gate.allow(t0, crate::audio::CHUNK));
+        assert!(!gate.allow(t0, crate::audio::CHUNK - 1), "a chunk of another size");
+        assert!(!gate.allow(t0, 64 * 1024), "a big chunk");
+        for _ in 0..(MAX_AUDIO_CHUNKS_PER_SECOND - 1) {
+            assert!(gate.allow(t0, crate::audio::CHUNK));
+        }
+        assert!(!gate.allow(t0, crate::audio::CHUNK), "more than the limit in one second");
+        assert!(gate.allow(t0 + Duration::from_millis(1100), crate::audio::CHUNK), "a new second starts again");
     }
 
     #[test]

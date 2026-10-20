@@ -25,6 +25,20 @@ ProtectControlGroups=yes
 RestrictRealtime=yes
 LockPersonality=yes
 RestrictNamespaces=yes
+# The helper only talks to local sockets (the daemon, the sessions, systemd) and PAM: no network, no devices, no clock, no writable
+# homes, no writable and executable memory. An account database that needs the network from PAM itself (pam_ldap, not sssd)
+# needs IPAddressDeny=any and RestrictAddressFamilies lifted in a drop-in.
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+PrivateDevices=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectHome=read-only
+MemoryDenyWriteExecute=yes
+ProtectKernelLogs=yes
+# What it uses of root: handing its socket to the daemon account (chown), reading the account database for PAM, writing the
+# audit record of a login. Starting the sessions goes through systemd, which has the rest.
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_READ_SEARCH CAP_AUDIT_WRITE CAP_SETUID CAP_SETGID
 SystemCallArchitectures=native
 
 [Install]

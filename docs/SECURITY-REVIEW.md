@@ -60,3 +60,54 @@ with itself and with nothing else; its session process is treated as hostile by 
 
 The three entry points: `src/helper.rs` and `src/auth.rs` (root), `src/link.rs` (the daemon's handling of an untrusted
 session), and `packaging/systemd/*.service`. About 900 lines of Rust plus the units; the protocol is in `src/proto.rs`.
+
+---
+
+# Second pass (2026-10-20)
+
+Who wrote it: the author of the code, with an AI assistant, reading the code again after the changes of that day (sound for
+sessions of their own, the pointer, the desktop packaging). **Still not an independent review.** No active penetration testing
+was done in this pass: the checks below are code reading, unit tests, `systemd-analyze security` and logins in the development
+VM. Nothing here changes the stated deployment: loopback, an SSH tunnel or a VPN.
+
+## Fixed in this pass
+
+| # | Finding | Fix | Checked |
+|---|---|---|---|
+| 8 | **Sound from a session was passed on unchecked.** The new sound relay forwarded every chunk a session sent to the client's channel; a session is not trusted, and the channel's queue has no limit, so sound could have been queued in the daemon without bound (the same class as finding 4). | `AudioGate` in `link.rs`: only chunks of exactly 20 ms, at most 100 a second (a real stream sends 50). Everything else is dropped. | Unit test `sound_chunks_of_a_session_are_limited_in_size_and_speed`. |
+| 9 | **Any ordinary account got a desktop, whatever its login shell.** A desktop session gives the account a terminal and a file manager, so an account that sshd or the console would refuse (a file-transfer or service account with `nologin`) was given more than its administrator meant. | `shell_allows_login` in `auth.rs`: the shell must be listed in `/etc/shells` and must not be `nologin`, `false` and the like. Applies to every account, also with `--allow-users`. | Unit test; in the VM a correct password of an account with `/usr/sbin/nologin` was rejected (`login rejected`), a normal account accepted. |
+| 10 | **Names from the network were logged as typed**, so a name with a line break could look like a second log line. | The account name and source address are logged with `Debug` formatting (quoted and escaped). | Journal lines now read `user="rdptest3" source="10.0.2.2"`. |
+| 11 | **The root helper kept more than it needs**: network access, devices, the clock, the kernel log, writable homes, writable and executable memory, all capabilities. | `sway-rdp-helper.service`: `RestrictAddressFamilies=AF_UNIX`, `IPAddressDeny=any`, `PrivateDevices`, `ProtectClock`, `ProtectHostname`, `ProtectHome=read-only`, `ProtectKernelLogs`, `MemoryDenyWriteExecute`, and a capability bound of `CAP_CHOWN CAP_DAC_READ_SEARCH CAP_AUDIT_WRITE CAP_SETUID CAP_SETGID`. | `systemd-analyze security`: **7.2 MEDIUM to 4.0 OK** (the daemon stays at 1.8). After the change a login works and the helper starts a new session unit. |
+
+## Checked again against the current code
+
+The claims of the first review about the helper, the registration socket and the login policy still hold: root is refused whoever
+runs the server; a session is started only for the account that authenticated on the same connection and the helper takes no
+program or arguments from the daemon; the identity switch is `setgroups`, `setgid`, `setuid`; registration is refused below uid
+1000, counted per account and in all, and the account is the one the kernel reports; received descriptors are `CLOEXEC`; messages
+have size limits and strict decoding. The daemon unit is sandboxed (no capabilities, a syscall filter, `ProtectSystem=strict`).
+
+## Open, with the change that would close it
+
+1. **Counters are per account name and per source address.** Both are easy to share (a known account name; one VPN or NAT address
+   for a whole office), so the limits protect passwords but can also keep a real user out for a minute at a time. Options:
+   count per (account, source) pair as well as per account, back off longer after repeated lockouts, and add `pam_faillock` to the
+   PAM stack of the service. Needs a decision on what to protect first: availability or guessing.
+2. **Every ordinary account with a login shell may log in.** An opt-in group (for example `sway-rdp-users`) as the default would
+   make the set of accounts explicit; `--allow-users` exists but is a list of names.
+3. **The Flatpak polkit rule of the desktop package** (`40-sway-rdp-flatpak.rules`) lets members of `sudo` run every system Flatpak
+   action without a password in an *active* session, including a remote one (Debian's own rule is for local sessions only) and
+   including `modify-repo`. That is convenient and is the reason for the rule, but it is weaker than `sudo` asking for a password.
+   Consider a dedicated group and a shorter list of actions.
+4. **The helper unit can go further**: a system call filter and a narrower capability set, checked with a real PAM stack. A PAM stack
+   that needs the network by itself (`pam_ldap`, not `sssd`) needs `IPAddressDeny=any` and `RestrictAddressFamilies` lifted in a drop-in.
+5. **No resource limits per account or for the daemon by default** (`MemoryMax`, `TasksMax`, `LimitNOFILE`): a `user-.slice.d` drop-in
+   and limits on `sway-rdp.service` should be shipped or documented.
+6. **Clipboard messages from a session are limited in size but not in number.** A gate like the one for sound would close it.
+7. **The installer adds third-party apt repositories** (DankMaterialShell from the openSUSE build service, trixie-backports) and
+   fetches their keys over HTTPS without pinning a fingerprint. That is a supply chain decision to write down, or to pin.
+8. **The development VM listens on `0.0.0.0` inside the VM** (only the loopback forward of the host reaches it). Not for production.
+9. Still open from the first pass: plain TLS login, the daemon-supplied source address, passwords not wiped from memory, one binary
+   for daemon and helper, no second factor, no deadline for slow clients after login, no fuzzing of the RDP side, amd64 untested, and
+   no review by someone else. An independent review is the next real step: it should be given `src/helper.rs`, `src/auth.rs`,
+   `src/link.rs`, `src/proto.rs` and `packaging/systemd/*.service`.

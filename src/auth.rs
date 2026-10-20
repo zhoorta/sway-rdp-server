@@ -27,6 +27,8 @@ pub struct UserInfo {
     pub home: PathBuf,
     /// All group ids of the account (including `gid`).
     pub groups: Vec<u32>,
+    /// The login shell of the account (empty when it has none).
+    pub shell: String,
 }
 
 /// Looks an account up by name.
@@ -40,6 +42,7 @@ pub fn lookup_user(name: &str) -> Option<UserInfo> {
         return None;
     }
     let home = PathBuf::from(unsafe { std::ffi::CStr::from_ptr(pwd.pw_dir) }.to_string_lossy().into_owned());
+    let shell = if pwd.pw_shell.is_null() { String::new() } else { unsafe { std::ffi::CStr::from_ptr(pwd.pw_shell) }.to_string_lossy().into_owned() };
     let (uid, gid) = (pwd.pw_uid, pwd.pw_gid);
     let mut n: c_int = 64;
     let mut groups: Vec<libc::gid_t> = vec![0; n as usize];
@@ -50,7 +53,7 @@ pub fn lookup_user(name: &str) -> Option<UserInfo> {
         }
     }
     groups.truncate(n.max(0) as usize);
-    Some(UserInfo { name: name.to_owned(), uid, gid, home, groups })
+    Some(UserInfo { name: name.to_owned(), uid, gid, home, groups, shell })
 }
 
 #[repr(C)]
@@ -126,6 +129,22 @@ struct Guard {
     locked_until: Option<Instant>,
 }
 
+/// Whether an account with this login shell is meant to have an interactive login: the shell is listed in `/etc/shells` (the
+/// system's own list of login shells) and is not one of the programs that stand for "no login". A desktop session gives its
+/// account a terminal and a file manager, so an account that sshd or the console would refuse (a service or file-transfer
+/// account) must not get one here.
+fn shell_allows_login(shell: &str, listed: &str) -> bool {
+    let shell = shell.trim();
+    if shell.is_empty() {
+        return false;
+    }
+    let program = shell.rsplit('/').next().unwrap_or(shell);
+    if matches!(program, "nologin" | "false" | "true" | "sync" | "halt" | "shutdown") {
+        return false;
+    }
+    listed.lines().map(str::trim).any(|l| !l.starts_with('#') && l == shell)
+}
+
 /// Who may log in and how failures are counted. One per server.
 pub struct PamPolicy {
     service: String,
@@ -172,6 +191,9 @@ impl PamPolicy {
         if info.uid == 0 {
             return None;
         }
+        if !shell_allows_login(&info.shell, &std::fs::read_to_string("/etc/shells").unwrap_or_default()) {
+            return None;
+        }
         if info.uid == self.running.uid {
             return Some(info);
         }
@@ -199,7 +221,7 @@ impl PamPolicy {
         g.failures += 1;
         if g.failures > max_failures {
             g.locked_until = Some(Instant::now() + LOCKOUT);
-            warn!(key = name, "too many failed logins: refusing this one for {}s", LOCKOUT.as_secs());
+            warn!(key = ?name, "too many failed logins: refusing this one for {}s", LOCKOUT.as_secs());
             return false;
         }
         true
@@ -223,10 +245,10 @@ impl PamPolicy {
             Some(info) => {
                 self.succeeded(&user_key);
                 self.succeeded(&source_key);
-                info!(user = %name, uid = info.uid, %source, "login accepted (PAM)");
+                info!(user = ?name, uid = info.uid, source = ?source, "login accepted (PAM)");
             }
             None => {
-                warn!(user = %name, %source, "login rejected (PAM)");
+                warn!(user = ?name, source = ?source, "login rejected (PAM)");
                 std::thread::sleep(FAIL_DELAY);
             }
         }
@@ -275,6 +297,19 @@ mod tests {
         assert!(policy.candidate("no such account").is_none());
         assert!(policy.candidate("").is_none());
         assert!(policy.candidate("a\0b").is_none());
+    }
+
+    #[test]
+    fn only_accounts_with_a_login_shell_may_log_in() {
+        let listed = "# /etc/shells\n/bin/sh\n/bin/bash\n/usr/bin/zsh\n";
+        assert!(shell_allows_login("/bin/bash", listed));
+        assert!(shell_allows_login("/usr/bin/zsh", listed));
+        assert!(!shell_allows_login("/usr/sbin/nologin", listed), "an account that may not log in");
+        assert!(!shell_allows_login("/bin/false", listed));
+        assert!(!shell_allows_login("", listed), "no shell");
+        assert!(!shell_allows_login("/usr/bin/rssh", listed), "a restricted shell that /etc/shells does not list");
+        assert!(!shell_allows_login("/bin/bash", "# /bin/bash\n"), "a commented line is not a listing");
+        assert!(!shell_allows_login("/bin/bash", ""), "no list at all");
     }
 
     #[test]

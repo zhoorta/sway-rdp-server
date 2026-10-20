@@ -66,9 +66,6 @@ pub enum FrameKind {
 /// Longest clipboard text either side relays (UTF-8 bytes).
 pub const MAX_CLIPBOARD: usize = 1024 * 1024;
 
-/// Longest chunk of sound the daemon takes from a session (a normal one is 3528 bytes: 20 ms).
-pub const MAX_AUDIO_CHUNK: usize = 64 * 1024;
-
 /// From the network daemon to the session.
 #[derive(Debug, PartialEq)]
 pub enum Down {
