@@ -78,6 +78,7 @@ VM. Nothing here changes the stated deployment: loopback, an SSH tunnel or a VPN
 | 9 | **Any ordinary account got a desktop, whatever its login shell.** A desktop session gives the account a terminal and a file manager, so an account that sshd or the console would refuse (a file-transfer or service account with `nologin`) was given more than its administrator meant. | `shell_allows_login` in `auth.rs`: the shell must be listed in `/etc/shells` and must not be `nologin`, `false` and the like. Applies to every account, also with `--allow-users`. | Unit test; in the VM a correct password of an account with `/usr/sbin/nologin` was rejected (`login rejected`), a normal account accepted. |
 | 10 | **Names from the network were logged as typed**, so a name with a line break could look like a second log line. | The account name and source address are logged with `Debug` formatting (quoted and escaped). | Journal lines now read `user="rdptest3" source="10.0.2.2"`. |
 | 11 | **The root helper kept more than it needs**: network access, devices, the clock, the kernel log, writable homes, writable and executable memory, all capabilities. | `sway-rdp-helper.service`: `RestrictAddressFamilies=AF_UNIX`, `IPAddressDeny=any`, `PrivateDevices`, `ProtectClock`, `ProtectHostname`, `ProtectHome=read-only`, `ProtectKernelLogs`, `MemoryDenyWriteExecute`, and a capability bound of `CAP_CHOWN CAP_DAC_READ_SEARCH CAP_AUDIT_WRITE CAP_SETUID CAP_SETGID`. | `systemd-analyze security`: **7.2 MEDIUM to 4.0 OK** (the daemon stays at 1.8). After the change a login works and the helper starts a new session unit. |
+| 12 | **The Flatpak polkit rule was wide**: members of `sudo` could run every system Flatpak action without a password in an active remote session, including sideloading bundles and changing remotes; weaker than `sudo` asking for a password. | `40-sway-rdp-flatpak.rules`: only members of the new group `sway-rdp-admins` (empty at first, made by the package; `adduser ACCOUNT sway-rdp-admins`), and only install, update, uninstall and metadata actions. Sideloading, remotes and configuration always ask. | `pkcheck` inside active sessions: a member of the group gets `app-install` without a password and still a password for `modify-repo` and `install-bundle`; a `sudo` member outside the group and an ordinary account get a password for all three. |
 
 ## Checked again against the current code
 
@@ -95,10 +96,7 @@ have size limits and strict decoding. The daemon unit is sandboxed (no capabilit
    PAM stack of the service. Needs a decision on what to protect first: availability or guessing.
 2. **Every ordinary account with a login shell may log in.** An opt-in group (for example `sway-rdp-users`) as the default would
    make the set of accounts explicit; `--allow-users` exists but is a list of names.
-3. **The Flatpak polkit rule of the desktop package** (`40-sway-rdp-flatpak.rules`) lets members of `sudo` run every system Flatpak
-   action without a password in an *active* session, including a remote one (Debian's own rule is for local sessions only) and
-   including `modify-repo`. That is convenient and is the reason for the rule, but it is weaker than `sudo` asking for a password.
-   Consider a dedicated group and a shorter list of actions.
+3. (Closed: see finding 12.)
 4. **The helper unit can go further**: a system call filter and a narrower capability set, checked with a real PAM stack. A PAM stack
    that needs the network by itself (`pam_ldap`, not `sssd`) needs `IPAddressDeny=any` and `RestrictAddressFamilies` lifted in a drop-in.
 5. **No resource limits per account or for the daemon by default** (`MemoryMax`, `TasksMax`, `LimitNOFILE`): a `user-.slice.d` drop-in

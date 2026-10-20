@@ -52,7 +52,7 @@ systemctl restart sway-rdp.service
 for acct in rdptest rdptest2; do
     id "$acct" >/dev/null 2>&1 && continue
     useradd -m -s /bin/bash "$acct"
-    if [ "$acct" = rdptest ]; then echo "$acct:$PW1" | chpasswd; else echo "$acct:$PW2" | chpasswd; usermod -aG sudo "$acct"; fi
+    if [ "$acct" = rdptest ]; then echo "$acct:$PW1" | chpasswd; else echo "$acct:$PW2" | chpasswd; usermod -aG sudo,sway-rdp-admins "$acct"; fi
 done
 systemctl is-active sway-rdp-helper.service sway-rdp.service
 ss -ltn | grep ':3389 ' || true

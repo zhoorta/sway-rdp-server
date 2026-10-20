@@ -9,6 +9,11 @@ fi
 if [ "$1" = configure ]; then
     mkdir -p /var/lib/flatpak/exports/share/applications
 fi
+# The group whose members install Flatpaks system-wide without a password (see the polkit rule); empty until an administrator adds
+# somebody: adduser ACCOUNT sway-rdp-admins
+if [ "$1" = configure ]; then
+    getent group sway-rdp-admins >/dev/null || addgroup --system sway-rdp-admins >/dev/null
+fi
 # Flatpak apps are sandboxed: let them read the GTK settings of the account (the shell's colours), or they look like stock GNOME.
 if [ "$1" = configure ] && command -v flatpak >/dev/null 2>&1; then
     flatpak override --system --filesystem=xdg-config/gtk-3.0:ro --filesystem=xdg-config/gtk-4.0:ro || true
