@@ -1,8 +1,8 @@
 // Users & Access: who may log in over RDP, who is an administrator, and the sessions that are running.
 //
-// The list is read with `sway-rdp-admin users list --json` (open to everybody); every change goes through
-// `pkexec sway-rdp-admin ...`, which asks an administrator's password in the shell's own dialog (polkit action
-// org.sway-rdp.admin). All the rules (who may be touched, nobody removing themselves or the last administrator) are in that
+// The list is read with `waydesk-admin users list --json` (open to everybody); every change goes through
+// `pkexec waydesk-admin ...`, which asks an administrator's password in the shell's own dialog (polkit action
+// org.waydesk.admin). All the rules (who may be touched, nobody removing themselves or the last administrator) are in that
 // command, not here: this window only shows and asks. Colours come from the Qt palette, which qt6ct keeps in step with DMS.
 
 import QtQuick
@@ -64,7 +64,7 @@ ShellRoot {
             return;
         root.working = true;
         root.notice = "";
-        run(["pkexec", "/usr/bin/sway-rdp-admin"].concat(args), (code, out, err) => {
+        run(["pkexec", "/usr/bin/waydesk-admin"].concat(args), (code, out, err) => {
             root.working = false;
             if (code !== 0) {
                 // 126 and 127 are pkexec itself: the dialog was cancelled or the password was wrong.
@@ -77,7 +77,7 @@ ShellRoot {
     }
 
     function refresh() {
-        run(["/usr/bin/sway-rdp-admin", "users", "list", "--json"], (code, out, err) => {
+        run(["/usr/bin/waydesk-admin", "users", "list", "--json"], (code, out, err) => {
             if (code !== 0) {
                 root.notice = err.trim() || "Cannot read the list of accounts";
                 return;
@@ -85,7 +85,7 @@ ShellRoot {
             try {
                 root.users = JSON.parse(out);
             } catch (e) {
-                root.notice = "Unexpected answer from sway-rdp-admin";
+                root.notice = "Unexpected answer from waydesk-admin";
             }
         });
     }
@@ -96,7 +96,7 @@ ShellRoot {
             root.sheetPasswordLabel = label;
             root.sheet = "password";
         } catch (e) {
-            root.notice = "Unexpected answer from sway-rdp-admin";
+            root.notice = "Unexpected answer from waydesk-admin";
         }
     }
 

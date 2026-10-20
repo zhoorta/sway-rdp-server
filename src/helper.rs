@@ -1,4 +1,4 @@
-//! The root helper (`sway-rdp-server --helper`): the only part that runs with root rights, and the only part that
+//! The root helper (`waydesk-server --helper`): the only part that runs with root rights, and the only part that
 //! does what needs them: check a password for any account (PAM) and start a session process as that account.
 //! It speaks the small protocol of `proto::HelperReq` on a Unix socket that only the daemon's account can open, and
 //! never touches the network or the RDP protocol.
@@ -41,7 +41,7 @@ pub struct Config {
     pub exe: PathBuf,
     pub worker_args: Vec<String>,
     pub workspace: String,
-    /// Start sessions as `sway-rdp-session@<uid>.service` (the packaged way: they get the account's own slice and none
+    /// Start sessions as `waydesk-session@<uid>.service` (the packaged way: they get the account's own slice and none
     /// of the helper's sandbox) instead of as children of the helper.
     pub systemd_sessions: bool,
 }
@@ -101,7 +101,7 @@ pub fn run(cfg: Config) -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "the helper has to run as root");
     let daemon = lookup_user(&cfg.daemon_user).with_context(|| format!("no account named {}", cfg.daemon_user))?;
     ensure!(daemon.uid != 0, "the daemon must not be root");
-    let policy = PamPolicy::new("sway-rdp-server", cfg.allow_users.clone(), cfg.require_group.clone())?;
+    let policy = PamPolicy::new("waydesk-server", cfg.allow_users.clone(), cfg.require_group.clone())?;
 
     let dir = cfg.socket.parent().context("--helper-socket needs a directory")?.to_path_buf();
     std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
@@ -281,7 +281,7 @@ fn session_for(user: &UserInfo, cfg: &Config, sessions: &Sessions, register_path
     }
     ensure_runtime_dir(user)?;
     if cfg.systemd_sessions {
-        let unit = format!("sway-rdp-session@{}.service", user.uid);
+        let unit = format!("waydesk-session@{}.service", user.uid);
         let status = std::process::Command::new("systemctl").arg("start").arg(&unit).stdin(std::process::Stdio::null()).status().context("cannot run systemctl")?;
         ensure!(status.success(), "systemctl start {unit} failed ({status})");
         info!(user = %user.name, %unit, "session unit started");

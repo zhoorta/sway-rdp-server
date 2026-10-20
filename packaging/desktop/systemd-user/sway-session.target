@@ -1,4 +1,4 @@
 [Unit]
-Description=sway-rdp session
+Description=waydesk session
 Requires=graphical-session.target
 After=graphical-session.target

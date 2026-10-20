@@ -16,7 +16,7 @@ QTabBar { background: palette(window); qproperty-drawBase: 0; }
 QTabBar::tab { background: transparent; color: palette(window-text); padding: 6px 14px; margin: 4px 2px 4px 2px; border-radius: 10px; }
 QTabBar::tab:selected { background: palette(highlight); color: palette(highlighted-text); }
 QTabBar::tab:hover:!selected { background: palette(mid); }
-QTabBar::close-button { image: url(/usr/share/sway-rdp/qt6ct/close.svg); subcontrol-position: right; border-radius: 8px; margin: 2px; }
+QTabBar::close-button { image: url(/usr/share/waydesk/qt6ct/close.svg); subcontrol-position: right; border-radius: 8px; margin: 2px; }
 QTabBar::close-button:hover { background: palette(mid); }
 QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }
 QScrollBar:horizontal { background: transparent; height: 10px; margin: 0; }

@@ -1,0 +1,12 @@
+Package: waydesk
+Version: @VERSION@
+Architecture: all
+Maintainer: José Mendonça <jmendonca@gmail.com>
+Section: metapackages
+Priority: optional
+Depends: waydesk-server (= @VERSION@), waydesk-desktop (= @VERSION@)
+Description: Waydesk: a Windows-like remote Linux desktop over RDP
+ Installs the RDP server (waydesk-server) and the desktop for its sessions
+ (waydesk-desktop) in one step.
+ .
+ Waydesk builds on the sway compositor and is not part of the sway project.

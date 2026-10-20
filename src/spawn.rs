@@ -1,4 +1,4 @@
-//! Starting a session process (`sway-rdp-server --session-worker`) with one end of a socket pair as its fd 3.
+//! Starting a session process (`waydesk-server --session-worker`) with one end of a socket pair as its fd 3.
 
 use std::os::fd::AsRawFd;
 use std::os::unix::net::UnixStream;
@@ -58,8 +58,8 @@ pub fn spawn_worker(exe: &Path, args: &[String], workspace: &str, user: Option<&
             .env("XDG_RUNTIME_DIR", format!("/run/user/{}", u.uid))
             .env("LANG", "C.UTF-8")
             .current_dir(&u.home);
-        if let Ok(level) = std::env::var("SWAY_RDP_LOG") {
-            cmd.env("SWAY_RDP_LOG", level);
+        if let Ok(level) = std::env::var("WAYDESK_LOG") {
+            cmd.env("WAYDESK_LOG", level);
         }
     }
     // SAFETY: only async-signal-safe calls (setgroups, setgid, setuid, dup2, fcntl) between fork and exec.

@@ -1,4 +1,4 @@
-Package: sway-rdp
+Package: waydesk-server
 Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: José Mendonça <jmendonca@gmail.com>

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Chooses and installs desktop shell, developer, creative and AI apps (whiptail wizard). Run it as an ordinary account
+# that may use sudo; --list shows what can be installed.
+case "${1:-}" in
+    --list) exec /usr/share/waydesk/setup/install.sh --list ;;
+    --check) exec /usr/share/waydesk/setup/install.sh --check ;;
+    "") exec /usr/share/waydesk/setup/wizard.sh ;;
+    *) echo "usage: waydesk-setup [--list|--check]" >&2; exit 1 ;;
+esac

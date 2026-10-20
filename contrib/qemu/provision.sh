@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installs the sway-rdp desktop into the development VM (see vm.sh), from the packages in packaging/out:
+# Installs the waydesk desktop into the development VM (see vm.sh), from the packages in packaging/out:
 #
 #   packaging/build-deb.sh arm64           builds the two .deb files (Docker)
 #   contrib/qemu/provision.sh              pushes the newest ones, and sets the VM up
@@ -17,10 +17,10 @@ ARCH=${VM_ARCH:-arm64}   # amd64: the x86_64 VM of vm.sh (VM_ARCH=amd64), with t
 case "$ARCH" in amd64) NAME=${VM_NAME:-sway-rdp-dev-amd64}; RDP_PORT=3396 ;; *) NAME=${VM_NAME:-sway-rdp-dev}; RDP_PORT=3395 ;; esac
 ACCOUNTS="${VM_DIR:-$HOME/vm/$NAME}/accounts.txt"
 
-BASE=$(ls -t "$OUT"/sway-rdp_*_$ARCH.deb 2>/dev/null | head -1)
-DESKTOP=$(ls -t "$OUT"/sway-rdp-desktop_*_all.deb 2>/dev/null | head -1)
-META=$(ls -t "$OUT"/deskwire_*_all.deb 2>/dev/null | head -1)   # the metapackage: optional
-FM=$(ls -t "$OUT"/pcmanfm-qt_*sway-rdp*_$ARCH.deb 2>/dev/null | head -1)   # optional: packaging/pcmanfm-qt/build.sh arm64
+BASE=$(ls -t "$OUT"/waydesk-server_*_$ARCH.deb 2>/dev/null | head -1)
+DESKTOP=$(ls -t "$OUT"/waydesk-desktop_*_all.deb 2>/dev/null | head -1)
+META=$(ls -t "$OUT"/waydesk_*_all.deb 2>/dev/null | head -1)   # the metapackage: optional
+FM=$(ls -t "$OUT"/pcmanfm-qt_*waydesk*_$ARCH.deb 2>/dev/null | head -1)   # optional: packaging/pcmanfm-qt/build.sh arm64
 [ -n "$BASE" ] && [ -n "$DESKTOP" ] || { echo "no packages in $OUT: run packaging/build-deb.sh arm64" >&2; exit 1; }
 "$VM" status | grep -q running || { echo "the VM is not running: $VM start" >&2; exit 1; }
 
@@ -45,28 +45,31 @@ cd /home/jose/provision
 apt-get update -qq
 # Without the recommended packages (apt would add a screensaver, a second portal and a policy-kit agent of its own). The ones
 # that matter are named here: audio, the clipboard, the picker of "Add app to desktop", the wallpaper, Flatpak, a browser.
-apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold flatpak ./sway-rdp_*.deb ./sway-rdp-desktop_*.deb $(ls ./deskwire_*.deb 2>/dev/null) \
+apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold flatpak ./waydesk-server_*.deb ./waydesk-desktop_*.deb $(ls ./waydesk_*.deb 2>/dev/null) \
     pipewire pipewire-pulse pulseaudio-utils wireplumber wl-clipboard wmenu whiptail swaybg firefox-esr
 # The patched file manager (menus without Desktop Preferences, Create Launcher, Open in Terminal), when it was built; held so that
 # Debian's own pcmanfm-qt does not replace it.
 if ls ./pcmanfm-qt_*.deb >/dev/null 2>&1; then
-    apt-get install -y --reinstall --no-install-recommends -o Dpkg::Options::=--force-confold ./pcmanfm-qt_*.deb
+    apt-mark unhold pcmanfm-qt >/dev/null 2>&1 || true
+    apt-get install -y --reinstall --allow-downgrades --no-install-recommends -o Dpkg::Options::=--force-confold ./pcmanfm-qt_*.deb
     apt-mark hold pcmanfm-qt
 fi
 bash ./dms.sh
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 # Only the forward of the Mac (127.0.0.1) reaches this address: listen on every interface, not on the loopback of the VM only.
-sed -i 's|^SWAY_RDP_BIND=.*|SWAY_RDP_BIND=0.0.0.0:3389|' /etc/default/sway-rdp
-systemctl restart sway-rdp.service
+sed -i 's|^WAYDESK_BIND=.*|WAYDESK_BIND=0.0.0.0:3389|' /etc/default/waydesk
+systemctl restart waydesk.service
 for acct in rdptest rdptest2; do
     id "$acct" >/dev/null 2>&1 && continue
     useradd -m -s /bin/bash "$acct"
-    if [ "$acct" = rdptest ]; then echo "$acct:$PW1" | chpasswd; else echo "$acct:$PW2" | chpasswd; usermod -aG sudo,sway-rdp-admins "$acct"; fi
+    if [ "$acct" = rdptest ]; then echo "$acct:$PW1" | chpasswd; else echo "$acct:$PW2" | chpasswd; usermod -aG sudo,waydesk-admins "$acct"; fi
 done
 # Who may log in over RDP: the accounts of this VM (the group is made by the package).
-for acct in rdptest rdptest2 rdptest3; do id "$acct" >/dev/null 2>&1 && usermod -aG sway-rdp-users "$acct"; done
-systemctl restart sway-rdp-helper.service sway-rdp.service
-systemctl is-active sway-rdp-helper.service sway-rdp.service
+for acct in rdptest rdptest2 rdptest3; do id "$acct" >/dev/null 2>&1 && usermod -aG waydesk-users "$acct"; done
+# rdptest2 is the administrator (also on a rerun, and after the groups were remade by a reinstall)
+id rdptest2 >/dev/null 2>&1 && usermod -aG sudo,waydesk-admins rdptest2
+systemctl restart waydesk-helper.service waydesk.service
+systemctl is-active waydesk-helper.service waydesk.service
 ss -ltn | grep ':3389 ' || true
 REMOTE
 } | "$VM" ssh 'sudo sh -s'

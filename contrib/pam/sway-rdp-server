@@ -1,3 +1,0 @@
-# Install as /etc/pam.d/sway-rdp-server. PAM service of `sway-rdp-server --auth pam`: the login password of the user running the server.
-auth     required   pam_unix.so
-account  required   pam_unix.so

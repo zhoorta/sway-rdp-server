@@ -1,4 +1,4 @@
-//! sway-rdp-server: an RDP server on IronRDP for a sway desktop.
+//! waydesk-server: an RDP server on IronRDP for a sway desktop.
 //! Each connection gets its own headless output (client size and scale), captured with wlr-screencopy,
 //! sent as H.264 over the graphics pipeline (bitmap updates as a fallback), with keyboard and pointer injected.
 
@@ -92,7 +92,7 @@ impl RdpServerDisplayUpdates for Updates {
     async fn next_update(&mut self) -> anyhow::Result<Option<DisplayUpdate>> {
         loop {
             // By default the client draws the pointer (the picture has none): say which one, the default arrow. With
-            // SWAY_RDP_CURSOR=server the cursor is in the picture, so the client's own is made invisible: with both there are
+            // WAYDESK_CURSOR=server the cursor is in the picture, so the client's own is made invisible: with both there are
             // two, and the one in the picture is a network round trip behind.
             if !self.pointer_hidden {
                 self.pointer_hidden = true;
@@ -443,7 +443,7 @@ impl RdpServerInputHandler for Handler {
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_env("SWAY_RDP_LOG").unwrap_or_else(|_| "info".into()))
+        .with_env_filter(tracing_subscriber::EnvFilter::try_from_env("WAYDESK_LOG").unwrap_or_else(|_| "info".into()))
         .init();
 
     let mut args = std::env::args().skip(1);
@@ -472,8 +472,8 @@ async fn main() -> anyhow::Result<()> {
     let mut require_group: Option<String> = None;
     // The root helper (`--helper`), or the daemon using one (`--auth helper`).
     let mut run_helper = false;
-    let mut helper_socket = PathBuf::from("/run/sway-rdp/helper.sock");
-    let mut daemon_user = "sway-rdp".to_string();
+    let mut helper_socket = PathBuf::from("/run/waydesk/helper.sock");
+    let mut daemon_user = "waydesk".to_string();
     let mut systemd_sessions = false;
     // How long a session without a client lives (seconds, 0 = for ever), and whether it ends when the client leaves.
     let mut idle_timeout = 8 * 3600u64;
@@ -488,7 +488,7 @@ async fn main() -> anyhow::Result<()> {
             "--kb-layout" => layout = args.next().context("--kb-layout needs a value (used when the client announces none)")?,
             "--no-terminal" => spawn_terminal = false,
             "--workspace" => workspace = args.next().context("--workspace needs a name")?,
-            // Started per session with SWAY_RDP_OUTPUT, SWAY_RDP_WORKSPACE and SWAY_RDP_INDEX set; stopped when it ends.
+            // Started per session with WAYDESK_OUTPUT, WAYDESK_WORKSPACE and WAYDESK_INDEX set; stopped when it ends.
             "--session-hook" => hook = args.next().map(PathBuf::from),
             "--no-egfx" => no_egfx = true,
             "--session-worker" => worker = true,
@@ -548,7 +548,7 @@ async fn main() -> anyhow::Result<()> {
     anyhow::ensure!(matches!(auth_mode.as_str(), "file" | "pam" | "helper"), "--auth must be file, pam or helper");
     anyhow::ensure!(!per_user || auth_mode == "pam", "--per-user needs --auth pam (the account comes from the login)");
     let via_helper = auth_mode == "helper";
-    anyhow::ensure!(!via_helper || unsafe { libc::geteuid() } != 0, "--auth helper: the network daemon refuses to run as root (start sway-rdp-server --helper as root and this as an ordinary service account)");
+    anyhow::ensure!(!via_helper || unsafe { libc::geteuid() } != 0, "--auth helper: the network daemon refuses to run as root (start waydesk-server --helper as root and this as an ordinary service account)");
     let pam = auth_mode == "pam";
     let tls_only = tls_only || pam || via_helper;
     let (username, password) = if pam || via_helper {
@@ -570,7 +570,7 @@ async fn main() -> anyhow::Result<()> {
         acceptor,
         pub_key: identity.pub_key,
         tls_only,
-        pam: if pam { Some(auth::PamPolicy::new("sway-rdp-server", allow_users, require_group)?) } else { None },
+        pam: if pam { Some(auth::PamPolicy::new("waydesk-server", allow_users, require_group)?) } else { None },
         credentials: (username, password),
         helper_socket: via_helper.then_some(helper_socket),
         egfx: (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 }),
@@ -578,7 +578,7 @@ async fn main() -> anyhow::Result<()> {
         audio: audio && !per_user,
     });
     if let Some(p) = &common.pam {
-        info!(user = p.running_user(), root = p.is_root(), per_user, "login: PAM service sway-rdp-server, plain TLS login (no NLA)");
+        info!(user = p.running_user(), root = p.is_root(), per_user, "login: PAM service waydesk-server, plain TLS login (no NLA)");
         if p.is_root() {
             warn!("running as root: any ordinary account can log in and the whole daemon, including the network side, has root rights. Development only (see docs/MULTIUSER-DESIGN.md).");
         }
@@ -593,7 +593,7 @@ async fn main() -> anyhow::Result<()> {
     let addr = bind.parse::<std::net::SocketAddr>().context("bad --bind address")?;
     let listener = tokio::net::TcpListener::bind(addr).await.with_context(|| format!("cannot listen on {addr}"))?;
     let permits = Arc::new(tokio::sync::Semaphore::new(max_sessions));
-    info!(%bind, max_sessions, "sway-rdp-server listening");
+    info!(%bind, max_sessions, "waydesk-server listening");
 
     // One RDP server per connection, all on this thread: connections are independent and each owns a session.
     let local = tokio::task::LocalSet::new();

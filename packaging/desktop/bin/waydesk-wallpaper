@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""A desktop background and folder icons in the accent colours of the shell: waydesk-wallpaper [--once]
+
+The folders and places follow the accent too: waydesk-mkicons --user makes this account's overlay of the icon theme, and the
+desktop (pcmanfm-qt) is started again to show it, once no file manager window is open (they would close with it).
+
+Soft glows of the DankMaterialShell palette (the accent and its companions) on the surface colour, made as a PNG with no
+image library and handed to pcmanfm-qt, which draws the desktop. It is made again when the account changes the theme
+colour (DMS rewrites ~/.cache/DankMaterialShell/dms-colors.json). An account that picked a wallpaper of its own in the
+desktop settings keeps it: this only replaces what it made itself.
+"""
+import colorsys
+import hashlib
+import json
+import math
+import os
+import random
+import struct
+import subprocess
+import sys
+import time
+import zlib
+
+HOME = os.path.expanduser("~")
+CACHE = os.environ.get("XDG_CACHE_HOME") or os.path.join(HOME, ".cache")
+COLORS = os.path.join(CACHE, "DankMaterialShell/dms-colors.json")
+OUT_DIR = os.path.join(CACHE, "waydesk")
+FM_SETTINGS = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "pcmanfm-qt/default/settings.conf")
+W, H = 960, 540  # smooth gradients: pcmanfm-qt scales it to the screen
+
+
+def rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def palette():
+    with open(COLORS) as f:
+        data = json.load(f)
+    mode = data.get("mode") if data.get("mode") in data.get("colors", {}) else "dark"
+    c = data["colors"][mode]
+    primary = rgb(c["primary"])
+    glow = rgb(c.get("primary_container", c["primary"]))
+
+    def turned(colour, hue, light=None, sat=None):
+        """The colour with its hue turned, so a second and third glow go with the accent whatever the user picked."""
+        h, l, s = colorsys.rgb_to_hls(*(v / 255 for v in colour))
+        return tuple(round(v * 255) for v in colorsys.hls_to_rgb((h + hue) % 1, l if light is None else light, s if sat is None else sat))
+
+    return {
+        "mode": mode,
+        "base": rgb(c.get("surface_container_lowest") if mode == "dark" else c.get("surface", c["background"])),
+        "glow": glow,
+        "primary": primary,
+        "deep": turned(glow, -0.09),  # towards blue
+        "tertiary": turned(primary, 0.09),  # towards pink
+    }
+
+
+def render(p):
+    dark = p["mode"] == "dark"
+    # (centre x, centre y, radius, colour, strength): the blobs overlap, strongest first.
+    blobs = [
+        (0.14, 0.10, 0.85, p["glow"], 0.95 if dark else 0.60),
+        (0.92, 0.92, 0.75, p["deep"], 0.85 if dark else 0.55),
+        (0.52, 0.38, 0.30, p["primary"], 0.16 if dark else 0.25),
+        (0.88, 0.28, 0.22, p["tertiary"], 0.10 if dark else 0.18),
+    ]
+    k = 2.2  # how fast a blob fades out
+    cols = []
+    for cx, cy, r, colour, strength in blobs:
+        # Distances in units of the screen width, so a blob is round; exp(-a-b) = exp(-a) * exp(-b) keeps it cheap.
+        ex = [math.exp(-k * ((x / W - cx) ** 2) / (r * r)) for x in range(W)]
+        ey = [math.exp(-k * (((y / H - cy) * H / W) ** 2) / (r * r)) for y in range(H)]
+        cols.append((ex, ey, colour, strength))
+    ux = [(x / W - 0.5) ** 2 for x in range(W)]
+    uy = [(y / H - 0.5) ** 2 for y in range(H)]
+    vignette = 0.45 if dark else 0.10
+    base = p["base"]
+    rnd = random.Random(7)
+    noise = [rnd.random() - 0.5 for _ in range(4096)]
+    raw = bytearray()
+    i = 0
+    for y in range(H):
+        raw.append(0)  # PNG filter: none
+        row_weights = [(ey[y], colour, strength) for ex, ey, colour, strength in cols]
+        v_row = uy[y]
+        for x in range(W):
+            r, g, b = base
+            for n, (ey_y, colour, strength) in enumerate(row_weights):
+                w = strength * cols[n][0][x] * ey_y
+                r += (colour[0] - r) * w
+                g += (colour[1] - g) * w
+                b += (colour[2] - b) * w
+            v = 1 - vignette * (ux[x] + v_row)
+            d = noise[i & 4095]  # a little noise: smooth dark gradients show bands without it
+            i += 1
+            raw += bytes((max(0, min(255, int(r * v + d + 0.5))), max(0, min(255, int(g * v + d + 0.5))), max(0, min(255, int(b * v + d + 0.5)))))
+
+    def chunk(tag, data):
+        body = tag + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(bytes(raw), 6)) + chunk(b"IEND", b"")
+
+
+def account_has_its_own():
+    """True when the desktop settings name a wallpaper that this script did not make."""
+    try:
+        with open(FM_SETTINGS) as f:
+            for line in f:
+                if line.startswith("Wallpaper="):
+                    path = line.split("=", 1)[1].strip()
+                    return bool(path) and not path.startswith(OUT_DIR + os.sep)
+    except OSError:
+        pass
+    return False
+
+
+def apply(p):
+    tag = hashlib.sha1(json.dumps(p, sort_keys=True).encode()).hexdigest()[:10]
+    path = os.path.join(OUT_DIR, f"wallpaper-{tag}.png")
+    if not os.path.exists(path):
+        os.makedirs(OUT_DIR, exist_ok=True)
+        data = render(p)
+        with open(path + ".new", "wb") as f:
+            f.write(data)
+        os.replace(path + ".new", path)
+    env = dict(os.environ, QT_QPA_PLATFORM="wayland", QT_QPA_PLATFORMTHEME="qt6ct")
+    subprocess.run(["pcmanfm-qt", f"--set-wallpaper={path}", "--wallpaper-mode=zoom"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for name in os.listdir(OUT_DIR):  # earlier ones of this script
+        if name.startswith("wallpaper-") and name.endswith(".png") and os.path.join(OUT_DIR, name) != path:
+            os.remove(os.path.join(OUT_DIR, name))
+
+
+ICON_STAMP = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local/share"), "icons/Papirus-Dark/.hue")
+
+
+def icon_hue():
+    try:
+        with open(ICON_STAMP) as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def file_manager_windows():
+    """How many pcmanfm-qt windows are open (the desktop itself is not a window of sway)."""
+    try:
+        tree = json.loads(subprocess.check_output(["swaymsg", "-t", "get_tree"]))
+    except Exception:
+        return 0
+
+    def count(node):
+        return (node.get("app_id") == "pcmanfm-qt") + sum(count(c) for c in node.get("nodes", []) + node.get("floating_nodes", []))
+
+    return count(tree)
+
+
+def main():
+    once = "--once" in sys.argv
+    last = None
+    restart_desktop = False
+    while True:
+        try:
+            stamp = os.path.getmtime(COLORS)
+        except OSError:
+            stamp = None
+        if stamp is not None and stamp != last:
+            # pcmanfm-qt may not be there yet (the desktop waits for the screen): --set-wallpaper then starts nothing useful
+            if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "pcmanfm-qt"], stdout=subprocess.DEVNULL).returncode == 0:
+                if account_has_its_own():
+                    return
+                apply(palette())
+                before = icon_hue()
+                subprocess.run(["waydesk-mkicons", "--user"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                restart_desktop = restart_desktop or icon_hue() != before
+                last = stamp
+        # A running pcmanfm-qt keeps the icons it has: it has to start again to show the new ones. The desktop script
+        # (waydesk-desktop) starts it again by itself.
+        if restart_desktop and not file_manager_windows():
+            subprocess.run(["pkill", "-u", str(os.getuid()), "-x", "pcmanfm-qt"])
+            restart_desktop = False
+        if once:
+            return
+        time.sleep(1)
+
+
+main()

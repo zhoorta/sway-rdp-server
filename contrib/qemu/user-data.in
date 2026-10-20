@@ -4,7 +4,7 @@ hostname: @HOSTNAME@
 manage_etc_hosts: true
 users:
   - name: jose
-    gecos: sway-rdp development
+    gecos: waydesk development
     groups: [sudo]
     shell: /bin/bash
     sudo: "ALL=(ALL) NOPASSWD:ALL"

@@ -1,25 +1,25 @@
 #!/bin/sh
 set -e
 if [ "$1" = configure ]; then
-    getent passwd sway-rdp >/dev/null || adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin --gecos "sway-rdp daemon" sway-rdp
+    getent passwd waydesk >/dev/null || adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin --gecos "waydesk daemon" waydesk
     # The group whose members may log in over RDP. On a first install the account that ran the installation joins it, or nobody could.
-    getent group sway-rdp-users >/dev/null || addgroup --system sway-rdp-users >/dev/null
+    getent group waydesk-users >/dev/null || addgroup --system waydesk-users >/dev/null
     if [ -z "$2" ] && [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ] && id "$SUDO_USER" >/dev/null 2>&1; then
-        adduser "$SUDO_USER" sway-rdp-users >/dev/null 2>&1 || true
+        adduser "$SUDO_USER" waydesk-users >/dev/null 2>&1 || true
     fi
-    mkdir -p /etc/sway-rdp
-    if [ ! -f /etc/sway-rdp/key.pem ]; then
+    mkdir -p /etc/waydesk
+    if [ ! -f /etc/waydesk/key.pem ]; then
         openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=$(hostname)" \
-            -keyout /etc/sway-rdp/key.pem -out /etc/sway-rdp/cert.pem >/dev/null 2>&1
-        echo "sway-rdp: made a self-signed certificate. Check this fingerprint in your RDP client on first connect:"
-        openssl x509 -in /etc/sway-rdp/cert.pem -noout -fingerprint -sha256 | sed 's/^/    /'
+            -keyout /etc/waydesk/key.pem -out /etc/waydesk/cert.pem >/dev/null 2>&1
+        echo "waydesk: made a self-signed certificate. Check this fingerprint in your RDP client on first connect:"
+        openssl x509 -in /etc/waydesk/cert.pem -noout -fingerprint -sha256 | sed 's/^/    /'
     fi
-    chown root:sway-rdp /etc/sway-rdp
-    chmod 750 /etc/sway-rdp
-    chown sway-rdp:sway-rdp /etc/sway-rdp/key.pem /etc/sway-rdp/cert.pem
-    chmod 600 /etc/sway-rdp/key.pem
+    chown root:waydesk /etc/waydesk
+    chmod 750 /etc/waydesk
+    chown waydesk:waydesk /etc/waydesk/key.pem /etc/waydesk/cert.pem
+    chmod 600 /etc/waydesk/key.pem
     systemctl daemon-reload >/dev/null 2>&1 || true
-    systemctl enable sway-rdp-helper.service sway-rdp.service >/dev/null 2>&1 || true
-    systemctl restart sway-rdp-helper.service sway-rdp.service >/dev/null 2>&1 || true
+    systemctl enable waydesk-helper.service waydesk.service >/dev/null 2>&1 || true
+    systemctl restart waydesk-helper.service waydesk.service >/dev/null 2>&1 || true
 fi
 exit 0

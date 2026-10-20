@@ -1,0 +1,24 @@
+// Members of the group waydesk-admins install, update and remove Flatpaks system-wide, from the remotes already set up, without a
+// password prompt per step (one install asks for the runtime, the app and the metadata one after the other). Debian's own
+// Flatpak rule does something like it for local sessions of the group sudo; an RDP session has no seat, so polkit does not count
+// it as local, and this one is for active sessions of a group the administrator chose on purpose (none is a member at first).
+// Everything else keeps asking for an administrator's password: sideloading a bundle, adding or changing a remote, the
+// configuration and the parental-controls actions.
+var passwordless = [
+    "org.freedesktop.Flatpak.app-install",
+    "org.freedesktop.Flatpak.runtime-install",
+    "org.freedesktop.Flatpak.app-update",
+    "org.freedesktop.Flatpak.runtime-update",
+    "org.freedesktop.Flatpak.app-uninstall",
+    "org.freedesktop.Flatpak.runtime-uninstall",
+    "org.freedesktop.Flatpak.update-remote",
+    "org.freedesktop.Flatpak.appstream-update",
+    "org.freedesktop.Flatpak.metadata-update"
+];
+
+polkit.addRule(function(action, subject) {
+    if (passwordless.indexOf(action.id) >= 0 && subject.active == true && subject.isInGroup("waydesk-admins")) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

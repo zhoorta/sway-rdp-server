@@ -1,0 +1,365 @@
+#!/bin/sh
+# Starts the session's shell: DankMaterialShell through the account's systemd user session when it is installed,
+# otherwise sway's own bar.
+export XDG_CURRENT_DESKTOP=sway XDG_SESSION_TYPE=wayland
+# Qt apps take their palette and icons from qt6ct (kept in step with DMS). The account's user manager reads this from environment.d
+# only when it starts, which can be before the package that ships the file: say it here too, the shell hands it on to launched apps.
+export QT_QPA_PLATFORMTHEME=qt6ct
+# DMS shows a welcome page on a first start and a "what is new" page once per release (it looks for a marker file named after the
+# release, whose version is in its own QML). Neither is wanted on a desktop that is already set up: make the markers.
+dms_markers="${XDG_CONFIG_HOME:-$HOME/.config}/DankMaterialShell"
+mkdir -p "$dms_markers" && : > "$dms_markers/.firstlaunch"
+dms_release=$(sed -n 's/.*currentVersion: "\(.*\)".*/\1/p' /usr/share/quickshell/dms/Services/ChangelogService.qml 2>/dev/null | head -1)
+[ -n "$dms_release" ] && : > "$dms_markers/.changelog-$dms_release"
+# The shell only watches app folders that exist when it starts: make the account's Flatpak one now, or its first
+# Flatpak app stays out of the launcher until the shell restarts.
+mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share/applications"
+# The user manager (which started before this session) had its XDG_DATA_DIRS made by Flatpak's environment generator when the
+# folder above did not exist yet, so the account's own Flatpak apps were missing from it. Ask Flatpak again; the shell gets
+# this through dbus-update-activation-environment below.
+if command -v flatpak >/dev/null 2>&1; then
+    flatpak_dirs=$(flatpak --print-updated-env 2>/dev/null | sed -n 's/^XDG_DATA_DIRS=//p')
+    [ -n "$flatpak_dirs" ] && export XDG_DATA_DIRS="$flatpak_dirs"
+fi
+# First start of an account: DankMaterialShell without animations. Every animation frame is drawn in software and then
+# sent over the network; on a VM without a GPU they cost about three times the CPU of the rest of the session. The
+# account can turn them back on in the shell's settings (which then own the file).
+dms_dir="${XDG_CONFIG_HOME:-$HOME/.config}/DankMaterialShell"
+dms_settings="$dms_dir/settings.json"
+if [ ! -e "$dms_settings" ]; then
+    mkdir -p "$dms_dir" && printf '%s\n' '{"animationSpeed":0,"syncComponentAnimationSpeeds":true,"popoutAnimationSpeed":0,"modalAnimationSpeed":0,"notificationAnimationSpeed":0}' > "$dms_settings"
+fi
+# Window buttons (minimize, maximize, close): sway's title bars have none, so a DMS bar plugin provides them. An account that
+# already has its own bar layout keeps it and can add the widget "Window Controls" in the shell's settings.
+plugins=/usr/share/waydesk/dms-plugin
+if [ -d "$plugins" ] && command -v python3 >/dev/null 2>&1; then
+    mkdir -p "$dms_dir/plugins"
+    for plugin in "$plugins"/*; do ln -sfn "$plugin" "$dms_dir/plugins/$(basename "$plugin")"; done
+    python3 - "$dms_dir" <<'PY'
+import json, os, sys
+d = sys.argv[1]
+def load(name):
+    try:
+        with open(os.path.join(d, name)) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+plugins = load("plugin_settings.json")
+if plugins is None:
+    plugins = {}
+added = False
+for name in ("swayWindowControls", "swayVolume", "swaySettings"):
+    if name not in plugins:
+        plugins[name] = {"enabled": True}
+        added = True
+if added:
+    with open(os.path.join(d, "plugin_settings.json"), "w") as f:
+        json.dump(plugins, f, indent=2)
+settings = load("settings.json")
+changed = False
+# The power menu offers only "log out": the machine is not the account's to shut down, suspend or reboot.
+if settings is not None and "powerMenuActions" not in settings:
+    settings["powerMenuActions"] = ["logout"]
+    settings["powerMenuDefaultAction"] = "logout"
+    changed = True
+if settings is not None and "barConfigs" not in settings:
+    settings["barConfigs"] = [{
+        "id": "default", "name": "Main Bar", "enabled": True, "position": 0, "screenPreferences": ["all"],
+        "leftWidgets": ["launcherButton", "swayWindowControls", "workspaceSwitcher", "focusedWindow"],
+        "centerWidgets": ["clock"],
+        "rightWidgets": ["systemTray", "swayVolume", "notificationButton", "swaySettings", "powerMenuButton"],
+    }]
+    changed = True
+# An account that already has a bar layout gets the buttons once, after the launcher button (the marker keeps a removal
+# by the account). An earlier version put them at the right end of the bar: they move.
+marker = os.path.join(d, ".window-controls-left")
+if settings is not None and not os.path.exists(marker):
+    def is_ours(w):
+        return w == "swayWindowControls" or (isinstance(w, dict) and w.get("id") == "swayWindowControls")
+    bars = settings.get("barConfigs") or []
+    if bars and not changed:
+        bar = bars[0]
+        old = [w for k in ("leftWidgets", "centerWidgets", "rightWidgets") for w in bar.get(k, []) if is_ours(w)]
+        for k in ("leftWidgets", "centerWidgets", "rightWidgets"):
+            bar[k] = [w for w in bar.get(k, []) if not is_ours(w)]
+        left = bar.setdefault("leftWidgets", [])
+        at = next((i + 1 for i, w in enumerate(left) if w == "launcherButton" or (isinstance(w, dict) and w.get("id") == "launcherButton")), 0)
+        left.insert(at, old[0] if old else "swayWindowControls")
+        changed = True
+    open(marker, "w").close()
+# The log out button (the power menu, which offers only log out) is the last item of the bar, once per account as well.
+marker = os.path.join(d, ".power-button-last")
+if settings is not None and not os.path.exists(marker):
+    bars = settings.get("barConfigs") or []
+    if bars:
+        right = bars[0].setdefault("rightWidgets", [])
+        is_power = lambda w: w == "powerMenuButton" or (isinstance(w, dict) and w.get("id") == "powerMenuButton")
+        kept = [w for w in right if is_power(w)] or ["powerMenuButton"]
+        bars[0]["rightWidgets"] = [w for w in right if not is_power(w)] + kept[:1]
+        changed = True
+    open(marker, "w").close()
+# A remote desktop has no network, Bluetooth, battery or power profile of its own to manage, the audio devices are the
+# session's dummy ones, and the clipboard history is not wanted: take them out of the bar and the control center (once
+# per account, so what an account adds back stays).
+marker = os.path.join(d, ".trimmed")
+if settings is not None and not os.path.exists(marker):
+    gone = ("clipboard", "battery")
+    for bar in settings.get("barConfigs") or []:
+        for k in ("leftWidgets", "centerWidgets", "rightWidgets"):
+            if k in bar:
+                bar[k] = [w for w in bar[k] if (w.get("id") if isinstance(w, dict) else w) not in gone]
+    settings["controlCenterWidgets"] = [{"id": i, "enabled": True, "width": 50} for i in ("volumeSlider", "darkMode")]
+    settings["controlCenterShowNetworkIcon"] = False
+    settings["controlCenterShowBluetoothIcon"] = False
+    changed = True
+    open(marker, "w").close()
+# Night mode is not wanted either (accounts trimmed by an earlier version lose the tile once).
+marker = os.path.join(d, ".no-night-mode")
+if settings is not None and not os.path.exists(marker):
+    tiles = settings.get("controlCenterWidgets")
+    if tiles:
+        settings["controlCenterWidgets"] = [t for t in tiles if (t.get("id") if isinstance(t, dict) else t) != "nightMode"]
+        changed = True
+    open(marker, "w").close()
+# A quiet bar: no control center (its tiles are gone anyway), no CPU, memory, weather or music. The volume is a plain icon.
+marker = os.path.join(d, ".quiet-bar")
+if settings is not None and not os.path.exists(marker):
+    gone = ("controlCenterButton", "cpuUsage", "memUsage", "weather", "music")
+    for bar in settings.get("barConfigs") or []:
+        for k in ("leftWidgets", "centerWidgets", "rightWidgets"):
+            if k in bar:
+                bar[k] = [w for w in bar[k] if (w.get("id") if isinstance(w, dict) else w) not in gone]
+        right = bar.setdefault("rightWidgets", [])
+        if "swayVolume" not in [(w.get("id") if isinstance(w, dict) else w) for w in right]:
+            at = next((i for i, w in enumerate(right) if (w.get("id") if isinstance(w, dict) else w) == "notificationButton"), len(right))
+            right.insert(at, "swayVolume")
+        break
+    changed = True
+    open(marker, "w").close()
+# The settings are one click from the bar (the control center that used to lead to them is gone).
+marker = os.path.join(d, ".settings-button")
+if settings is not None and not os.path.exists(marker):
+    for bar in settings.get("barConfigs") or []:
+        right = bar.setdefault("rightWidgets", [])
+        ids = [(w.get("id") if isinstance(w, dict) else w) for w in right]
+        if "swaySettings" not in ids:
+            at = ids.index("powerMenuButton") if "powerMenuButton" in ids else len(right)
+            right.insert(at, "swaySettings")
+        break
+    changed = True
+    open(marker, "w").close()
+# The launcher: a grid of apps with one icon style (Papirus), without DMS's own utility entries (their icon is the DMS logo).
+marker = os.path.join(d, ".launcher-look")
+if settings is not None and not os.path.exists(marker):
+    if os.path.isdir("/usr/share/icons/Papirus-Dark"):
+        settings["iconThemeDark"] = "Papirus-Dark"
+        settings["iconThemeLight"] = "Papirus"
+    settings["spotlightSectionViewModes"] = {"apps": "grid"}
+    settings["appDrawerSectionViewModes"] = {"apps": "grid"}
+    builtin = settings.get("builtInPluginSettings") or {}
+    for name in ("dms_colorpicker", "dms_qr_generator", "dms_power", "dms_clipboard_search", "dms_sysmon", "dms_notepad", "dms_settings"):
+        builtin[name] = {"enabled": False}
+    settings["builtInPluginSettings"] = builtin
+    changed = True
+    open(marker, "w").close()
+# Apps in their own colours (Papirus-Dark): an account that was given the black and white theme goes back once.
+marker = os.path.join(d, ".natural-icons")
+if settings is not None and not os.path.exists(marker):
+    if settings.get("iconThemeDark") == "SwayRdp-Mono" and os.path.isdir("/usr/share/icons/Papirus-Dark"):
+        settings["iconThemeDark"] = "Papirus-Dark"
+        settings["iconThemeLight"] = "Papirus"
+        changed = True
+    open(marker, "w").close()
+# pcmanfm-qt draws the desktop (icons, folders) on the background layer. DMS's own wallpaper is on that layer too, and
+# whichever started last is on top: it would hide the icons after the shell restarts. DMS's own switch for this is "Disable
+# Built-in Wallpapers" (screenPreferences.wallpaper empty).
+marker = os.path.join(d, ".no-wallpaper")
+if settings is not None and not os.path.exists(marker):
+    prefs = settings.get("screenPreferences") or {}
+    prefs["wallpaper"] = []
+    settings["screenPreferences"] = prefs
+    changed = True
+    open(marker, "w").close()
+if changed:
+    with open(os.path.join(d, "settings.json"), "w") as f:
+        json.dump(settings, f, indent=2)
+PY
+fi
+# Technical entries stay out of the launcher (an account that wants one back deletes its file in ~/.local/share/applications).
+apps_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+if [ ! -e "$dms_dir/.hidden-entries" ]; then
+    mkdir -p "$apps_dir"
+    for id in foot-server footclient qterminal qterminal_drop qt6ct vim thunar-bulk-rename thunar-settings python3 org.quickshell com.danklinux.dms com.danklinux.dms.notepad dms-open; do
+        if [ -e "/usr/share/applications/$id.desktop" ] && [ ! -e "$apps_dir/$id.desktop" ]; then
+            printf '[Desktop Entry]\nType=Application\nName=%s\nNoDisplay=true\n' "$id" > "$apps_dir/$id.desktop"
+        fi
+    done
+    mkdir -p "$dms_dir" && : > "$dms_dir/.hidden-entries"
+fi
+# Accounts set up before QTerminal came: the stock entries give way to "Terminal" (waydesk-terminal), which has the shell's colours.
+if [ ! -e "$dms_dir/.hidden-qterminal" ]; then
+    mkdir -p "$apps_dir"
+    for id in qterminal qterminal_drop; do
+        if [ -e "/usr/share/applications/$id.desktop" ] && [ ! -e "$apps_dir/$id.desktop" ]; then
+            printf '[Desktop Entry]\nType=Application\nName=%s\nNoDisplay=true\n' "$id" > "$apps_dir/$id.desktop"
+        fi
+    done
+    mkdir -p "$dms_dir" && : > "$dms_dir/.hidden-qterminal"
+fi
+# GTK apps (Thunar, ...) in the colours of the shell: DMS writes the colours, a stylesheet of ours applies them (a gtk.css without
+# our first line is the account's own and stays), dark, with the icon theme of the launcher and one font.
+gtk_share=/usr/share/waydesk/gtk
+for gtk in gtk-3.0 gtk-4.0; do
+    gtk_dir="${XDG_CONFIG_HOME:-$HOME/.config}/$gtk"
+    mkdir -p "$gtk_dir"
+    if [ -r "$gtk_share/$gtk.css" ] && { [ ! -e "$gtk_dir/gtk.css" ] || head -n1 "$gtk_dir/gtk.css" | grep -q 'waydesk gtk'; }; then
+        cp "$gtk_share/$gtk.css" "$gtk_dir/gtk.css"
+    fi
+    ini="$gtk_dir/settings.ini"
+    [ -e "$ini" ] || printf '[Settings]\n' > "$ini"
+    sed -i '/^-e \[Settings\]/s/^-e //' "$ini"
+    grep -q '\[Settings\]' "$ini" || printf '[Settings]\n' >> "$ini"
+    for kv in gtk-application-prefer-dark-theme=1 gtk-font-name="Inter 10"; do
+        key="${kv%%=*}"
+        grep -q "^$key=" "$ini" || sed -i "/\[Settings\]/a $kv" "$ini"
+    done
+    if [ -d /usr/share/icons/Papirus-Dark ]; then
+        if grep -q '^gtk-icon-theme-name=' "$ini"; then
+            sed -i 's/^gtk-icon-theme-name=.*/gtk-icon-theme-name=Papirus-Dark/' "$ini"
+        else
+            sed -i '/\[Settings\]/a gtk-icon-theme-name=Papirus-Dark' "$ini"
+        fi
+    fi
+done
+# GTK reads the icon theme, the font and dark mode from gsettings before settings.ini. DMS writes its own values while it starts,
+# so they are set again once it is up.
+if command -v gsettings >/dev/null 2>&1; then
+    : "${DBUS_SESSION_BUS_ADDRESS:=unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}"
+    export DBUS_SESSION_BUS_ADDRESS
+    gs() { gsettings set org.gnome.desktop.interface "$@" 2>/dev/null; }
+    apply_gsettings() {
+        [ -d /usr/share/icons/Papirus-Dark ] && gs icon-theme Papirus-Dark
+        # GTK apps name their cursor theme themselves (the session sets XCURSOR_THEME for the rest): no pointer in the picture.
+        if [ "${WAYDESK_CURSOR:-client}" = server ]; then
+            gsettings reset org.gnome.desktop.interface cursor-theme 2>/dev/null
+        else
+            gs cursor-theme waydesk-blank
+        fi
+        gs color-scheme prefer-dark
+        gs font-name 'Inter 10'
+    }
+    apply_gsettings
+    ( sleep 10; apply_gsettings; sleep 20; apply_gsettings ) >/dev/null 2>&1 &
+fi
+# DMS does not offer a few things on sway, or offers what a remote desktop has no use for. The account runs DMS from a copy of the
+# shell made of links to the installed files, with the changes below. Each one is skipped when another DMS version does not match,
+# and the installed shell is used as it is when none applies.
+#  - The focused-window menu in the bar (right click) shows the PID and has "Kill Process", but DMS finds the PID only on niri,
+#    Hyprland and Mango; on sway it says "Unavailable". Ask sway for it (waydesk-focused-pid).
+#  - The launcher menu (right click on an app) says "Pin to Dock" and there is no dock: "Pin to desktop" puts the app on the
+#    desktop (waydesk-add-to-desktop).
+#  - The control center header of DMS 1.x has an edit button (rearranging its tiles) that has no setting to hide it.
+dms_src=/usr/share/quickshell/dms
+dms_copy="${XDG_CACHE_HOME:-$HOME/.cache}/waydesk/dms-shell"
+rm -rf "$dms_copy"
+systemctl --user unset-environment DMS_SHELL_DIR 2>/dev/null
+if [ -d "$dms_src" ] && command -v python3 >/dev/null 2>&1 && mkdir -p "$(dirname "$dms_copy")" && cp -rs "$dms_src" "$dms_copy" 2>/dev/null; then
+    patched=0
+    # DMS 1.x keeps the bar widgets in Modules/DankBar, DMS 2.x in Modules/DBar.
+    for rel in Modules/DankBar/Widgets/FocusedApp.qml Modules/DBar/Widgets/FocusedApp.qml; do
+        [ -f "$dms_src/$rel" ] || continue
+        python3 - "$dms_src/$rel" "$dms_copy/$rel" <<'PY' && patched=1
+import os, sys
+src, dst = sys.argv[1:]
+text = open(src).read()
+old1 = "    function resolveActiveWindowPid() {\n        if (!activeWindow)\n            return 0;\n"
+old2 = "        popout.processId = CompositorService.windowPid(activeWindow);\n"
+if "import Quickshell.Io" in text or (old1 not in text and old2 not in text):
+    sys.exit(1)
+add = '''    property int swayFocusedPid: 0
+    Process {
+        id: swayPidProcess
+        command: ["waydesk-focused-pid"]
+        stdout: StdioCollector {
+            onStreamFinished: root.swayFocusedPid = parseInt(text) || 0
+        }
+    }
+    Connections {
+        target: root
+        function onActiveWindowChanged() {
+            if (CompositorService.isSway)
+                swayPidProcess.running = true;
+        }
+    }
+
+'''
+text = text.replace("import Quickshell\n", "import Quickshell\nimport Quickshell.Io\n", 1)
+if old1 in text:
+    text = text.replace(old1, add + old1 + "        if (CompositorService.isSway)\n            return swayFocusedPid;\n", 1)
+else:
+    text = text.replace(old2, "        popout.processId = CompositorService.windowPid(activeWindow) || (CompositorService.isSway ? swayFocusedPid : 0);\n", 1)
+    text = text.replace("    function syncPopoutState() {", add + "    function syncPopoutState() {", 1)
+os.remove(dst)
+with open(dst, "w") as f:
+    f.write(text)
+PY
+    done
+    python3 - "$dms_src/Modals/DLauncherV2/LauncherContextMenu.qml" "$dms_copy/Modals/DLauncherV2/LauncherContextMenu.qml" <<'PY' && patched=1
+import os, sys
+src, dst = sys.argv[1:]
+text = open(src).read()
+old = '''        if (item?.type === "app" && pinDockId)
+            items.push({
+                type: "item",
+                icon: isPinned ? "keep_off" : "push_pin",
+                text: isPinned ? I18n.tr("Unpin from Dock") : I18n.tr("Pin to Dock"),
+                action: togglePin
+            });
+'''
+new = '''        if (isRegularApp && desktopEntry?.id)
+            items.push({
+                type: "item",
+                icon: "push_pin",
+                text: "Pin to desktop",
+                action: () => {
+                    Quickshell.execDetached(["waydesk-add-to-desktop", desktopEntry.id]);
+                    hide();
+                }
+            });
+'''
+if old not in text or "import Quickshell\n" in text:
+    sys.exit(1)
+text = text.replace("import QtQuick\n", "import QtQuick\nimport Quickshell\n", 1).replace(old, new, 1)
+os.remove(dst)
+with open(dst, "w") as f:
+    f.write(text)
+PY
+    header="$dms_copy/Modules/ControlCenter/Components/HeaderPane.qml"
+    if [ -f "$dms_src/Modules/ControlCenter/Components/HeaderPane.qml" ]; then
+        python3 - "$dms_src/Modules/ControlCenter/Components/HeaderPane.qml" "$header" <<'PY' && patched=1
+import os, sys
+src, dst = sys.argv[1:]
+text = open(src).read()
+needle = 'iconName: editMode ? "done" : "edit"'
+if needle not in text:
+    sys.exit(1)
+os.remove(dst)
+with open(dst, "w") as f:
+    f.write(text.replace(needle, "visible: false\n            " + needle, 1))
+PY
+    fi
+    if [ "$patched" = 1 ]; then
+        systemctl --user set-environment DMS_SHELL_DIR="$dms_copy"
+    else
+        rm -rf "$dms_copy"
+    fi
+fi
+# The account's user manager outlives its sessions and keeps what an older one pushed into it (dbus-update-activation-environment
+# below only adds): GSETTINGS_BACKEND=memory, set by a session that started before the user bus existed, kept the portal from
+# reading dconf, so Flatpak apps never saw the dark preference. This session has the bus, so drop it.
+[ -z "${GSETTINGS_BACKEND:-}" ] && systemctl --user unset-environment GSETTINGS_BACKEND 2>/dev/null
+dbus-update-activation-environment --systemd --all 2>/dev/null
+if command -v dms >/dev/null 2>&1 && systemctl --user start sway-session.target 2>/dev/null; then
+    exit 0
+fi
+swaymsg 'bar bar-0 mode dock' >/dev/null 2>&1

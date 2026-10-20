@@ -1,0 +1,38 @@
+[Unit]
+Description=waydesk (RDP for per-account sway desktops)
+Documentation=file:///usr/share/doc/waydesk/README.md
+After=network.target waydesk-helper.service
+Requires=waydesk-helper.service
+
+[Service]
+Type=simple
+User=waydesk
+Group=waydesk
+EnvironmentFile=-/etc/default/waydesk
+ExecStart=/usr/bin/waydesk-server --bind ${WAYDESK_BIND} --cert /etc/waydesk/cert.pem --key /etc/waydesk/key.pem --auth helper $WAYDESK_ARGS
+Restart=on-failure
+RestartSec=2
+# The network-facing part: no privileges, no files of the accounts, only the sockets it needs.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

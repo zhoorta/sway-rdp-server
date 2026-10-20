@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""Puts a shortcut of an installed app on the desktop (~/Desktop), ready to double-click.
+
+  waydesk-add-to-desktop              pick the app from a list (wmenu)
+  waydesk-add-to-desktop APP ...      APP is an app id (org.gnome.Calculator, firefox-esr) or the path of a .desktop file
+
+The shortcut is a copy of the app's .desktop file, made executable and marked as trusted: without that pcmanfm-qt asks
+"execute, open or cancel?" on every launcher it did not make itself.
+"""
+import os
+import shutil
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+DESKTOP = os.path.join(HOME, "Desktop")
+
+
+def app_dirs():
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local/share")
+    data_dirs = (os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":")
+    return [os.path.join(d, "applications") for d in [data_home] + [d for d in data_dirs if d]]
+
+
+def entry(path):
+    """Name, and whether the launcher shows it, from the [Desktop Entry] section."""
+    name, shown, in_entry = None, True, False
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("["):
+                    in_entry = line == "[Desktop Entry]"
+                elif in_entry and line.startswith("Name=") and name is None:
+                    name = line[5:]
+                elif in_entry and line in ("NoDisplay=true", "Hidden=true", "Type=Link", "Type=Directory"):
+                    shown = False
+    except OSError:
+        return None, False
+    return name, shown and name is not None
+
+
+def apps():
+    """{id: (name, path)} of the apps the launcher shows; the first folder in the search path wins, as in the spec."""
+    found = {}
+    for base in app_dirs():
+        for root, _, files in os.walk(base):
+            for f in files:
+                if not f.endswith(".desktop"):
+                    continue
+                path = os.path.join(root, f)
+                app_id = os.path.relpath(path, base)[: -len(".desktop")].replace(os.sep, "-")
+                if app_id not in found:
+                    name, shown = entry(path)
+                    found[app_id] = (name, path, shown)
+    return {k: (n, p) for k, (n, p, shown) in found.items() if shown}
+
+
+def resolve(arg, listing):
+    if arg.endswith(".desktop") and os.path.isfile(arg):
+        return arg
+    key = arg[: -len(".desktop")] if arg.endswith(".desktop") else arg
+    if key in listing:
+        return listing[key][1]
+    for base in app_dirs():  # hidden entries can still be asked for by id
+        path = os.path.join(base, key + ".desktop")
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def pick(listing):
+    rows = sorted(((n, i) for i, (n, _) in listing.items()), key=lambda r: r[0].lower())
+    menu = "\n".join(f"{n}  ({i})" for n, i in rows)
+    try:
+        out = subprocess.run(["wmenu", "-i", "-l", "15", "-p", "Add to desktop:"], input=menu, capture_output=True, text=True).stdout.strip()
+    except FileNotFoundError:
+        sys.exit("wmenu is not installed: give the app id instead (waydesk-add-to-desktop org.gnome.Calculator)")
+    if not out.endswith(")") or "(" not in out:
+        sys.exit(0)  # cancelled
+    return [out[out.rindex("(") + 1 : -1]]
+
+
+def add(path):
+    os.makedirs(DESKTOP, exist_ok=True)
+    dst = os.path.join(DESKTOP, os.path.basename(path))
+    if os.path.exists(dst):
+        print(f"already on the desktop: {dst}")
+        return True
+    shutil.copyfile(path, dst)
+    os.chmod(dst, 0o755)
+    trust = subprocess.run(["gio", "set", dst, "metadata::trust", "true"], capture_output=True, text=True)
+    if trust.returncode != 0:
+        print(f"added {dst}, but could not mark it trusted (is gvfs installed?): {trust.stderr.strip()}", file=sys.stderr)
+        return False
+    os.utime(dst)  # the file manager read the file before it was trusted: a change makes it look again
+    print(f"added {dst}")
+    return True
+
+
+def main():
+    listing = apps()
+    wanted = sys.argv[1:] or pick(listing)
+    ok = True
+    for arg in wanted:
+        path = resolve(arg, listing)
+        if path is None:
+            print(f"no app called {arg}", file=sys.stderr)
+            ok = False
+        else:
+            ok = add(path) and ok
+    sys.exit(0 if ok else 1)
+
+
+main()

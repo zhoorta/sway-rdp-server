@@ -91,7 +91,7 @@ struct Injector {
     start: Instant,
     /// Wheel amounts that do not make a whole notch yet (vertical, horizontal).
     scroll: [f64; 2],
-    /// Multiplies every wheel amount (`SWAY_RDP_SCROLL_SCALE`, 1 = a notch is a notch).
+    /// Multiplies every wheel amount (`WAYDESK_SCROLL_SCALE`, 1 = a notch is a notch).
     scroll_scale: f64,
 }
 
@@ -127,7 +127,7 @@ fn setup(want_output: Option<&str>, layout: &str) -> Result<Injector> {
         .with_context(|| format!("cannot compile an xkb keymap for layout {layout:?}"))?;
     let mut text = keymap.get_as_string(xkb::KEYMAP_FORMAT_TEXT_V1).into_bytes();
     text.push(0);
-    let raw = unsafe { libc::memfd_create(c"sway-rdp-server-keymap".as_ptr(), libc::MFD_CLOEXEC) };
+    let raw = unsafe { libc::memfd_create(c"waydesk-server-keymap".as_ptr(), libc::MFD_CLOEXEC) };
     anyhow::ensure!(raw >= 0, "memfd_create failed: {}", std::io::Error::last_os_error());
     let file = unsafe { std::fs::File::from_raw_fd(raw) };
     file.set_len(text.len() as u64)?;
@@ -141,7 +141,7 @@ fn setup(want_output: Option<&str>, layout: &str) -> Result<Injector> {
     let ptr = ptr_mgr.create_virtual_pointer_with_output(Some(&seat), Some(&output), &qh, ());
     queue.roundtrip(&mut state).context("roundtrip after creating virtual devices")?;
     let xkb_state = xkb::State::new(&keymap);
-    let scroll_scale = std::env::var("SWAY_RDP_SCROLL_SCALE").ok().and_then(|v| v.parse::<f64>().ok()).filter(|v| *v > 0.0).unwrap_or(1.0);
+    let scroll_scale = std::env::var("WAYDESK_SCROLL_SCALE").ok().and_then(|v| v.parse::<f64>().ok()).filter(|v| *v > 0.0).unwrap_or(1.0);
     Ok(Injector { conn, xkb_state, mods: (0, 0, 0, 0), vk, ptr, start: Instant::now(), scroll: [0.0; 2], scroll_scale })
 }
 

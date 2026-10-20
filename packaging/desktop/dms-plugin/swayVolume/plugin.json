@@ -3,7 +3,7 @@
     "name": "Volume",
     "description": "Speaker icon for the session's volume: click to mute, scroll to change it (no panel)",
     "version": "1.0.0",
-    "author": "sway-rdp",
+    "author": "waydesk",
     "type": "widget",
     "capabilities": ["volume"],
     "component": "./Volume.qml",

@@ -1,4 +1,4 @@
-# Build container for the sway-rdp package: Debian 13, same libraries as the target system.
+# Build container for the waydesk package: Debian 13, same libraries as the target system.
 FROM debian:13
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential pkg-config curl ca-certificates git cmake nasm \

@@ -1,2 +1,2 @@
-/etc/default/sway-rdp
-/etc/pam.d/sway-rdp-server
+/etc/default/waydesk
+/etc/pam.d/waydesk-server

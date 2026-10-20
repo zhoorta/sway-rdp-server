@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Terminal
+Comment=Command line, with tabs and splits
+Exec=waydesk-terminal
+Icon=utilities-terminal
+Categories=System;TerminalEmulator;
+Terminal=false
+StartupWMClass=qterminal

@@ -1,4 +1,4 @@
-/* sway-rdp gtk: GTK3 apps in the colours of the shell. DankMaterialShell writes dank-colors.css (from its theme); GTK3's own Adwaita
+/* waydesk gtk: GTK3 apps in the colours of the shell. DankMaterialShell writes dank-colors.css (from its theme); GTK3's own Adwaita
    does not use those names, so the widgets that matter are styled here. A file without this first line is the account's own and is left alone. */
 @import url("dank-colors.css");
 

@@ -33,8 +33,8 @@ sudo apt update && sudo apt install -y sway foot libopenh264-8 libpam0g pulseaud
 ## 3. Binary, certificate, login
 From the Mac, after `cargo build --release` in the build container (see `release/build-binaries.sh`):
 ```
-scp sway-rdp-server jose@SERVER:~/
-ssh jose@SERVER 'mkdir -p ~/swrdp && mv ~/sway-rdp-server ~/swrdp/ && cd ~/swrdp \
+scp waydesk-server jose@SERVER:~/
+ssh jose@SERVER 'mkdir -p ~/swrdp && mv ~/waydesk-server ~/swrdp/ && cd ~/swrdp \
   && openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -days 30 -subj "/CN=hetzner-test" \
   && chmod 600 key.pem && printf "jose:CHANGE-ME-LONG-RANDOM\n" > rdp.cred && chmod 600 rdp.cred'
 ```
@@ -44,7 +44,7 @@ Use `--auth pam` instead of `--credentials` if you prefer the account password (
 `~/.config/systemd/user/sway-headless.service`:
 ```
 [Unit]
-Description=Headless sway for sway-rdp
+Description=Headless sway for waydesk
 [Service]
 Environment=WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 WLR_RENDERER=pixman GSETTINGS_BACKEND=memory NO_AT_BRIDGE=1
 ExecStart=/usr/bin/sway
@@ -54,7 +54,7 @@ WantedBy=default.target
 ```
 `~/.config/sway/config` (start from `/etc/sway/config`) ends with the server, so it inherits `SWAYSOCK` and `WAYLAND_DISPLAY`:
 ```
-exec ~/swrdp/sway-rdp-server --bind 127.0.0.1:3389 --cert ~/swrdp/cert.pem --key ~/swrdp/key.pem \
+exec ~/swrdp/waydesk-server --bind 127.0.0.1:3389 --cert ~/swrdp/cert.pem --key ~/swrdp/key.pem \
      --credentials ~/swrdp/rdp.cred --bitrate 8000000
 ```
 ```

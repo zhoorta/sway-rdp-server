@@ -1,0 +1,4 @@
+# PAM service of waydesk: the password of the account that logs in over RDP. It follows the system's own login
+# rules (so account locking, password quality modules and the like apply).
+@include common-auth
+@include common-account

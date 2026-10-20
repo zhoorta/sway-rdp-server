@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds Debian's pcmanfm-qt with the patches next to this script (no "Hide Desktop Items", "Create Launcher", "Desktop Preferences"
 # or "Open in Terminal" in the menus, no underlined menu letters) in Docker (Debian 13). Usage: packaging/pcmanfm-qt/build.sh [arm64|amd64]   (default arm64)
-# Output: packaging/out/pcmanfm-qt_<debian version>+sway-rdp1_<arch>.deb. Install it over Debian's package: it has a higher version,
+# Output: packaging/out/pcmanfm-qt_<debian version>+waydesk1_<arch>.deb. Install it over Debian's package: it has a higher version,
 # and `apt-mark hold pcmanfm-qt` keeps Debian's own updates from replacing it (the patch must be checked against a new upstream).
 set -e
 cd "$(dirname "$0")/../.."
@@ -19,11 +19,11 @@ apt-get source --download-only pcmanfm-qt >/dev/null 2>&1
 dpkg-source -x pcmanfm-qt_*.dsc >/dev/null
 cd pcmanfm-qt-*/
 mk-build-deps -i -r -t "apt-get -y -qq --no-install-recommends" debian/control >/dev/null
-for p in sway-rdp-menus sway-rdp-no-mnemonics; do
+for p in waydesk-menus waydesk-no-mnemonics; do
     cp /patch/$p.patch debian/patches/
     echo $p.patch >> debian/patches/series
 done
-DEBFULLNAME="José Mendonça" DEBEMAIL=jmendonca@gmail.com dch --local +sway-rdp "Remove desktop menu entries and Open in Terminal (sway-rdp)."
+DEBFULLNAME="José Mendonça" DEBEMAIL=jmendonca@gmail.com dch --local +waydesk "Remove desktop menu entries and Open in Terminal (waydesk)."
 dpkg-buildpackage -b -uc -us >/dev/null
 cd ..
 cp pcmanfm-qt_*.deb /out/

@@ -1,0 +1,51 @@
+Description: waydesk: remove desktop-menu entries and "Open in Terminal"
+ Hide Desktop Items, Create Launcher and Desktop Preferences, and Open in Terminal in
+ folder menus: a remote desktop has no use for them (DMS does wallpaper and settings).
+Author: José Mendonça <jmendonca@gmail.com>
+Forwarded: not-needed
+
+--- a/pcmanfm/desktopwindow.cpp	2026-10-20 21:47:31
++++ b/pcmanfm/desktopwindow.cpp	2026-10-20 21:47:32
+@@ -1122,18 +1122,8 @@
+     }
+ }
+ 
+-void DesktopWindow::addDesktopActions(QMenu* menu) {
+-    QAction* action = menu->addAction(tr("Hide Desktop Items"));
+-    action->setCheckable(true);
+-    action->setChecked(desktopHideItems_);
+-    menu->addSeparator();
+-    connect(action, &QAction::triggered, this, &DesktopWindow::toggleDesktop);
+-    if(!desktopHideItems_) {
+-        action = menu->addAction(tr("Create Launcher"));
+-        connect(action, &QAction::triggered, this, &DesktopWindow::onCreatingShortcut);
+-    }
+-    action = menu->addAction(QIcon::fromTheme(QStringLiteral("preferences-desktop")), tr("Desktop Preferences"));
+-    connect(action, &QAction::triggered, this, &DesktopWindow::onDesktopPreferences);
++void DesktopWindow::addDesktopActions(QMenu* /*menu*/) {
++    // waydesk: no "Hide Desktop Items", "Create Launcher" or "Desktop Preferences" in the desktop menu
+ }
+ 
+ void DesktopWindow::toggleDesktop() {
+--- a/pcmanfm/view.cpp	2026-10-20 21:47:31
++++ b/pcmanfm/view.cpp	2026-10-20 21:47:32
+@@ -146,17 +146,8 @@
+     }
+ }
+ 
+-void View::prepareFolderMenu(Fm::FolderMenu* menu) {
+-    auto folder = folderInfo();
+-    if(folder && folder->isNative()) {
+-        QAction *action = new QAction(QIcon::fromTheme(QStringLiteral("utilities-terminal")), tr("Open in Termina&l"), menu);
+-        connect(action, &QAction::triggered, this, [folder] {
+-            Application* app = static_cast<Application*>(qApp);
+-            app->openFolderInTerminal(folder->path());
+-        });
+-        menu->insertAction(menu->createAction(), action);
+-        menu->insertSeparator(menu->createAction());
+-    }
++void View::prepareFolderMenu(Fm::FolderMenu* /*menu*/) {
++    // waydesk: no "Open in Terminal" in the folder menus
+ }
+ 
+ void View::updateFromSettings(Settings& settings) {

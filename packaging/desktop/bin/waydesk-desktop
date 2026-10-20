@@ -1,0 +1,86 @@
+#!/bin/sh
+# Icons on the desktop: pcmanfm-qt draws the contents of ~/Desktop on the background layer (right click: new folder,
+# create shortcut, paste; drag and drop). Qt apps take their colours from qt6ct, which DankMaterialShell keeps in step
+# with its theme, so a first start gives the account a qt6ct config that uses that palette (the account owns it after).
+export QT_QPA_PLATFORM=wayland QT_QPA_PLATFORMTHEME=qt6ct
+mkdir -p "$HOME/Desktop"
+qt_dir="${XDG_CONFIG_HOME:-$HOME/.config}/qt6ct"
+if [ ! -e "$qt_dir/qt6ct.conf" ]; then
+    icons=Papirus-Dark
+    mkdir -p "$qt_dir/colors" && cat > "$qt_dir/qt6ct.conf" <<EOC
+[Appearance]
+color_scheme_path=$qt_dir/colors/matugen.conf
+custom_palette=true
+icon_theme=$icons
+standard_dialogs=default
+style=Fusion
+
+[Fonts]
+fixed="Inter,10"
+general="Inter,10"
+EOC
+fi
+# The black and white icon theme is gone: the apps have their own colours again (the folders follow the accent, see below).
+[ -e "$qt_dir/qt6ct.conf" ] && sed -i 's/^icon_theme=SwayRdp-Mono$/icon_theme=Papirus-Dark/' "$qt_dir/qt6ct.conf"
+# A softer look for the Qt widgets in the shapes of DMS (a stylesheet of palette colours): added once to an account that
+# was set up before it existed; removing the line afterwards sticks.
+qss=/usr/share/waydesk/qt6ct/dms.qss
+if [ -e "$qss" ] && [ -e "$qt_dir/qt6ct.conf" ] && [ ! -e "$qt_dir/.dms-qss" ]; then
+    : > "$qt_dir/.dms-qss"
+    grep -q '^stylesheets=' "$qt_dir/qt6ct.conf" || printf '\n[Interface]\nstylesheets=%s\n' "$qss" >> "$qt_dir/qt6ct.conf"
+fi
+# Folders and places in the accent colour of the account's theme (a small overlay of the icon theme; the wallpaper script keeps it
+# up to date): before the desktop starts, so that it starts with them.
+waydesk-mkicons --user 2>/dev/null
+# The desktop is the whole screen and the shell's bar covers its top edge: keep the icons below it. The Qt font and
+# the terminal match the rest of the session. It does not mount drives by itself: that asks an administrator's password
+# in a session without a seat, before anyone asked for it.
+fm_dir="${XDG_CONFIG_HOME:-$HOME/.config}/pcmanfm-qt/default"
+if [ ! -e "$fm_dir/settings.conf" ]; then
+    mkdir -p "$fm_dir" && cat > "$fm_dir/settings.conf" <<'EOC'
+[Desktop]
+DesktopShortcuts=Home, Trash
+Font="Inter,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
+WorkAreaMargins=12, 56, 12, 12
+
+[System]
+Terminal=waydesk-terminal
+
+[Volume]
+AutoRun=false
+MountOnStartup=false
+MountRemovable=false
+
+[Window]
+FixedWidth=960
+FixedHeight=640
+LastWindowWidth=960
+LastWindowHeight=640
+SplitterPos=200
+EOC
+fi
+# A desktop that is not empty from the first start: Home and Trash (built into the file manager) and launchers of a few apps, made
+# once. An account that already set the built-in items up, or put things on its desktop, keeps what it has.
+seed_dir="${XDG_CONFIG_HOME:-$HOME/.config}/waydesk"
+if [ ! -e "$seed_dir/.desktop-seeded" ]; then
+    mkdir -p "$seed_dir" && : > "$seed_dir/.desktop-seeded"
+    [ -e "$fm_dir/settings.conf" ] && sed -i 's/^DesktopShortcuts=@Invalid()$/DesktopShortcuts=Home, Trash/' "$fm_dir/settings.conf"
+    if [ -z "$(ls -A "$HOME/Desktop" 2>/dev/null)" ]; then
+        # The launchers are marked trusted through gvfs, which needs the account's session bus.
+        : "${DBUS_SESSION_BUS_ADDRESS:=unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}"
+        export DBUS_SESSION_BUS_ADDRESS
+        waydesk-add-to-desktop waydesk-terminal firefox-esr org.gnome.Software >/dev/null 2>&1
+    fi
+fi
+# The session starts before its screen exists (the output is made when the RDP client arrives, and it may be gone while the
+# client is away) and pcmanfm-qt ends when it finds no screen: wait for one, as long as it takes, and start the desktop again
+# whenever it ends. The loop ends with the session.
+while :; do
+    until swaymsg -t get_outputs 2>/dev/null | grep -q '"active": true'; do
+        sleep 1
+    done
+    started=$(date +%s)
+    pcmanfm-qt --desktop
+    # Right when the output appears the clients do not see it yet and pcmanfm-qt ends at once: do not spin.
+    [ $(( $(date +%s) - started )) -ge 10 ] || sleep 2
+done

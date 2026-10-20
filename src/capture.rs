@@ -12,15 +12,15 @@ use wayland_client::{Connection, Dispatch, EventQueue, Proxy, QueueHandle, WEnum
 use wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_frame_v1::{self, ZwlrScreencopyFrameV1};
 use wayland_protocols_wlr::screencopy::v1::client::zwlr_screencopy_manager_v1::ZwlrScreencopyManagerV1;
 
-/// Whether the mouse cursor is in the picture (`SWAY_RDP_CURSOR=server`). By default it is not: the client draws its own
+/// Whether the mouse cursor is in the picture (`WAYDESK_CURSOR=server`). By default it is not: the client draws its own
 /// pointer, instantly and without a second one a network round trip behind (the Windows App on a Mac did not hide its own
 /// pointer when told to). A headless sway draws its cursor into every frame whatever screencopy is asked for, so in this
-/// mode the session gives it an invisible cursor theme (sway-rdp-blank, see session.rs). With `server` the cursor has the shape
+/// mode the session gives it an invisible cursor theme (waydesk-blank, see session.rs). With `server` the cursor has the shape
 /// the app asked for, and the client's own pointer is made invisible, which only some clients honour. Set in
-/// /etc/default/sway-rdp, which the daemon and the sessions both read.
+/// /etc/default/waydesk, which the daemon and the sessions both read.
 pub fn cursor_in_picture() -> bool {
     static MODE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *MODE.get_or_init(|| std::env::var("SWAY_RDP_CURSOR").is_ok_and(|v| v.eq_ignore_ascii_case("server")))
+    *MODE.get_or_init(|| std::env::var("WAYDESK_CURSOR").is_ok_and(|v| v.eq_ignore_ascii_case("server")))
 }
 
 
@@ -224,7 +224,7 @@ impl Capturer {
         if let Some(old) = self.pool.take() {
             old.pool.destroy();
         }
-        let raw = unsafe { libc::memfd_create(c"sway-rdp-server-shm".as_ptr(), libc::MFD_CLOEXEC) };
+        let raw = unsafe { libc::memfd_create(c"waydesk-server-shm".as_ptr(), libc::MFD_CLOEXEC) };
         if raw < 0 {
             bail!("memfd_create failed: {}", std::io::Error::last_os_error());
         }

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Users & Access: the panel for the accounts and sessions of the remote desktop (a small Quickshell window of its own, next to the
+# shell; it asks for an administrator's password through polkit when something is changed).
+export QT_QPA_PLATFORMTHEME=qt6ct QT_QUICK_CONTROLS_STYLE=Fusion
+exec quickshell -p /usr/share/waydesk/users-panel

@@ -6,14 +6,14 @@ import qs.Widgets
 import qs.Modules.Plugins
 
 // Window buttons for the focused window in the Mac style (red closes, yellow minimizes, green maximizes), on top of
-// sway-rdp-windows: sway's title bars have none. The small arrow opens the list of minimized windows.
+// waydesk-windows: sway's title bars have none. The small arrow opens the list of minimized windows.
 PluginComponent {
     id: root
 
     property var minimized: []
 
     function refresh() {
-        Proc.runCommand("swayWindowControls.list", ["sway-rdp-windows", "list"], function (out, code) {
+        Proc.runCommand("swayWindowControls.list", ["waydesk-windows", "list"], function (out, code) {
             if (code !== 0)
                 return;
             try {
@@ -25,7 +25,7 @@ PluginComponent {
     }
 
     function restore(id) {
-        Proc.runCommand("swayWindowControls.restore", ["sway-rdp-windows", "restore", String(id)], function () {
+        Proc.runCommand("swayWindowControls.restore", ["waydesk-windows", "restore", String(id)], function () {
             root.refresh();
         }, 0);
         root.closePopout();
@@ -44,7 +44,7 @@ PluginComponent {
         if (action === "close")
             Proc.runCommand("swayWindowControls.close", ["swaymsg", "kill"], function () {}, 0);
         else
-            Proc.runCommand("swayWindowControls." + action, ["sway-rdp-windows", action], function () {
+            Proc.runCommand("swayWindowControls." + action, ["waydesk-windows", action], function () {
                 root.refresh();
             }, 0);
     }

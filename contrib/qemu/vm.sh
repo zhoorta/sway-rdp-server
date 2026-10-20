@@ -1,5 +1,5 @@
 #!/bin/sh
-# The development VM of sway-rdp: Debian 13 arm64 from the official cloud image, run directly with QEMU (hypervisor.framework, so
+# The development VM of waydesk: Debian 13 arm64 from the official cloud image, run directly with QEMU (hypervisor.framework, so
 # at near native speed on Apple Silicon), headless. Set up on first boot by cloud-init (user-data.in: a user with the key of this
 # script, sudo, the guest agent).
 #

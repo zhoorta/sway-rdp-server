@@ -1,5 +1,5 @@
 //! Sound (RDPSND): whatever plays in the session goes to a virtual speaker (a PipeWire null sink named
-//! `sway-rdp-server`); its monitor is recorded with `parec` and streamed to the client as 20 ms PCM chunks.
+//! `waydesk-server`); its monitor is recorded with `parec` and streamed to the client as 20 ms PCM chunks.
 
 use std::io::{self, Read as _};
 use std::process::{Child, Command, Stdio};
@@ -15,7 +15,7 @@ use crate::link::Link;
 use crate::proto::Down;
 use crate::Slot;
 
-pub const SINK: &str = "sway-rdp-server";
+pub const SINK: &str = "waydesk-server";
 pub const RATE: u32 = 44_100;
 /// 20 ms of 16-bit stereo.
 pub const CHUNK: usize = (RATE as usize / 50) * 4;
@@ -92,7 +92,7 @@ pub fn pactl(args: &[&str]) -> io::Result<String> {
 /// The virtual speaker apps play into, made the default so the session's apps use it.
 pub fn ensure_sink() -> io::Result<()> {
     if !pactl(&["list", "short", "sinks"])?.lines().any(|l| l.split_whitespace().nth(1) == Some(SINK)) {
-        pactl(&["load-module", "module-null-sink", &format!("sink_name={SINK}"), "sink_properties=device.description=sway-rdp-server"])?;
+        pactl(&["load-module", "module-null-sink", &format!("sink_name={SINK}"), "sink_properties=device.description=waydesk-server"])?;
     }
     pactl(&["set-default-sink", SINK])?;
     Ok(())

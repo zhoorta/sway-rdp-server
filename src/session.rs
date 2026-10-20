@@ -13,7 +13,7 @@ use tracing::{error, info, warn};
 use crate::capture::{Capturer, Shared};
 use crate::input;
 
-/// Counts sessions so a hook can derive a unique port or name from `SWAY_RDP_INDEX` (0..99, then it wraps).
+/// Counts sessions so a hook can derive a unique port or name from `WAYDESK_INDEX` (0..99, then it wraps).
 static NEXT_INDEX: AtomicU32 = AtomicU32::new(0);
 
 /// Sessions are created one at a time, across all session processes: setting one up moves focus between outputs,
@@ -27,7 +27,7 @@ fn create_lock() -> Result<CreateLock> {
         .create(true)
         .truncate(false)
         .write(true)
-        .open(dir.join("sway-rdp-create.lock"))
+        .open(dir.join("waydesk-create.lock"))
         .context("creation lock file")?;
     if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } != 0 {
         bail!("cannot lock {}: {}", dir.display(), std::io::Error::last_os_error());
@@ -45,7 +45,7 @@ pub struct Options {
     /// Name of the workspace created on the session output.
     pub workspace: String,
     /// Program started when a session begins and stopped (SIGTERM to its process group) when it ends. It gets
-    /// `SWAY_RDP_OUTPUT`, `SWAY_RDP_WORKSPACE` and `SWAY_RDP_INDEX` in its environment.
+    /// `WAYDESK_OUTPUT`, `WAYDESK_WORKSPACE` and `WAYDESK_INDEX` in its environment.
     pub hook: Option<PathBuf>,
 }
 
@@ -86,9 +86,9 @@ fn output_names() -> Result<Vec<String>> {
 fn start_hook(hook: &std::path::Path, output: &str, workspace: &str, index: u32) -> Option<Child> {
     use std::os::unix::process::CommandExt;
     match Command::new(hook)
-        .env("SWAY_RDP_OUTPUT", output)
-        .env("SWAY_RDP_WORKSPACE", workspace)
-        .env("SWAY_RDP_INDEX", index.to_string())
+        .env("WAYDESK_OUTPUT", output)
+        .env("WAYDESK_WORKSPACE", workspace)
+        .env("WAYDESK_INDEX", index.to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .process_group(0)
@@ -209,7 +209,7 @@ impl Session {
         if !crate::capture::cursor_in_picture() {
             // A headless sway has no hardware cursor, so it draws the cursor into the picture whatever screencopy is asked
             // for: with the client's own pointer that makes two. Give sway a theme whose cursors have nothing in them.
-            let _ = swaymsg(&["seat", "*", "xcursor_theme", "sway-rdp-blank", "24"]);
+            let _ = swaymsg(&["seat", "*", "xcursor_theme", "waydesk-blank", "24"]);
         }
         // A workspace is created on the focused output, so focus the session output first.
         swaymsg(&["focus", "output", output])?;
@@ -218,7 +218,7 @@ impl Session {
         let _ = swaymsg(&["move", "workspace", "to", "output", output]);
         swaymsg(&["focus", "output", output])?;
         if opts.spawn_terminal {
-            swaymsg(&["exec", "foot -T sway-rdp-server-session"])?;
+            swaymsg(&["exec", "foot -T waydesk-server-session"])?;
         }
 
         let (shared, stop) = start_capture(output)?;

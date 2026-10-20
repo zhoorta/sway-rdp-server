@@ -2857,35 +2857,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
-name = "sway-rdp-server"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "ironrdp-cliprdr",
- "ironrdp-core",
- "ironrdp-displaycontrol",
- "ironrdp-dvc",
- "ironrdp-egfx",
- "ironrdp-pdu",
- "ironrdp-rdpsnd",
- "ironrdp-server",
- "ironrdp-svc",
- "libc",
- "memmap2",
- "openh264",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "wayland-client",
- "wayland-protocols-misc",
- "wayland-protocols-wlr",
- "xkbcommon",
- "yuv",
-]
-
-[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3385,6 +3356,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23f0c9c52aa7cd7d77769a4cfe2a9adb1b331f489a41d912ce14513d5ab995c6"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "waydesk-server"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "ironrdp-cliprdr",
+ "ironrdp-core",
+ "ironrdp-displaycontrol",
+ "ironrdp-dvc",
+ "ironrdp-egfx",
+ "ironrdp-pdu",
+ "ironrdp-rdpsnd",
+ "ironrdp-server",
+ "ironrdp-svc",
+ "libc",
+ "memmap2",
+ "openh264",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "wayland-client",
+ "wayland-protocols-misc",
+ "wayland-protocols-wlr",
+ "xkbcommon",
+ "yuv",
 ]
 
 [[package]]

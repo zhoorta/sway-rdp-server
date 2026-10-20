@@ -1,7 +1,7 @@
-# sway-rdp: multi-user design (draft, 2026-10-16)
+# waydesk: multi-user design (draft, 2026-10-16)
 
 Status: milestones 1 to 6 are built and tested in a VM (see section 8); milestone 7 has a first self-review in
-SECURITY-REVIEW.md (7 findings fixed, 10 open); nobody else has reviewed it. It describes where `sway-rdp-server` (one user, one client at a time,
+SECURITY-REVIEW.md (7 findings fixed, 10 open); nobody else has reviewed it. It describes where `waydesk-server` (one user, one client at a time,
 all sessions on one shared sway) goes to become an out-of-the-box multi-user remote desktop for Debian.
 Written from reading the current code (`main.rs`, `session.rs`, `auth.rs`, `input.rs`, `capture.rs`) and the
 vendored IronRDP patches. Statements about systemd, logind and PAM behaviour are from experience and have to be
@@ -9,7 +9,7 @@ tested on Debian 13 before they are relied on.
 
 ## 1. Goal and non-goals
 
-Goal: `apt install sway-rdp` on a Debian 13 server; users log in over RDP with their normal account password and get
+Goal: `apt install waydesk` on a Debian 13 server; users log in over RDP with their normal account password and get
 their own isolated Sway desktop; reconnecting returns to the same session.
 
 Non-goals (on purpose): drive, printer and smartcard redirection, RD Gateway, load balancing, other compositors,
@@ -28,11 +28,11 @@ GPU sharing, running exposed on the open internet without a VPN or tunnel.
 ## 3. Components
 
 ```
- client ──TLS/RDP──> sway-rdpd  (user sway-rdp, no login, hardened)
+ client ──TLS/RDP──> waydeskd  (user waydesk, no login, hardened)
                         │  unix socket, SO_PEERCRED checked
-                        ├──> sway-rdp-helper  (root, tiny, no network)   PAM + start/find session
+                        ├──> waydesk-helper  (root, tiny, no network)   PAM + start/find session
                         │
-                        └──> sway-rdp-session (as the real user, in its own logind session)
+                        └──> waydesk-session (as the real user, in its own logind session)
                                ├─ sway (headless, own XDG_RUNTIME_DIR 0700)
                                ├─ capture + H.264 encode, input injection, audio, clipboard
                                └─ shell hook (DMS, foot ...)
@@ -40,57 +40,57 @@ GPU sharing, running exposed on the open internet without a VPN or tunnel.
 
 | Part | Runs as | Does | Never does |
 |---|---|---|---|
-| `sway-rdpd` | `sway-rdp` | TLS, RDP protocol (IronRDP), EGFX/audio/clipboard channel framing, rate limiting per IP | touch user files, call PAM, hold passwords after the check |
-| `sway-rdp-helper` | root | `authenticate(user, password, source_ip)` through PAM; `ensure_session(uid)` | parse RDP or TLS, listen on the network |
-| `sway-rdp-session` | the user | runs the user's headless sway, capture, encoder, input, audio, clipboard, session hook | anything as another user |
+| `waydeskd` | `waydesk` | TLS, RDP protocol (IronRDP), EGFX/audio/clipboard channel framing, rate limiting per IP | touch user files, call PAM, hold passwords after the check |
+| `waydesk-helper` | root | `authenticate(user, password, source_ip)` through PAM; `ensure_session(uid)` | parse RDP or TLS, listen on the network |
+| `waydesk-session` | the user | runs the user's headless sway, capture, encoder, input, audio, clipboard, session hook | anything as another user |
 
-Today's `sway-rdp-server` code maps almost entirely to `sway-rdp-session` (`session.rs`, `capture.rs`, `input.rs`,
-`audio.rs`, `clipboard.rs`, the encoder half of `egfx.rs`) and to `sway-rdpd` (`main.rs`, the IronRDP side).
+Today's `waydesk-server` code maps almost entirely to `waydesk-session` (`session.rs`, `capture.rs`, `input.rs`,
+`audio.rs`, `clipboard.rs`, the encoder half of `egfx.rs`) and to `waydeskd` (`main.rs`, the IronRDP side).
 
 ## 4. Connection flow
 
-1. Client connects to `sway-rdpd`; TLS; RDP handshake up to the credentials (plain TLS login, as today with `--auth pam`).
-2. `sway-rdpd` sends `Authenticate{user, password, source_ip}` to the helper. The helper rate limits per user and per
+1. Client connects to `waydeskd`; TLS; RDP handshake up to the credentials (plain TLS login, as today with `--auth pam`).
+2. `waydeskd` sends `Authenticate{user, password, source_ip}` to the helper. The helper rate limits per user and per
    source IP (not globally), runs PAM (`pam_authenticate`, `pam_acct_mgmt`), answers `Ok{uid}` or `Fail`.
    Failures are delayed. The password is zeroed in both processes right after.
-3. On `Ok`, `sway-rdpd` sends `EnsureSession{uid, size, scale, layout}`.
-4. The helper looks for a running session of that uid (control socket `/run/user/<uid>/sway-rdp/control.sock`).
+3. On `Ok`, `waydeskd` sends `EnsureSession{uid, size, scale, layout}`.
+4. The helper looks for a running session of that uid (control socket `/run/user/<uid>/waydesk/control.sock`).
    - Found: returns its path. This is a reconnect.
-   - Not found: forks, `initgroups`/`setgid`/`setuid`, opens a PAM session through the `sway-rdp` PAM service (which
-     includes `pam_systemd`, so logind creates the session and `/run/user/<uid>`), then execs `sway-rdp-session`,
+   - Not found: forks, `initgroups`/`setgid`/`setuid`, opens a PAM session through the `waydesk` PAM service (which
+     includes `pam_systemd`, so logind creates the session and `/run/user/<uid>`), then execs `waydesk-session`,
      which starts the headless sway and the user's shell hook, and creates the control socket.
-5. `sway-rdpd` connects to the control socket and speaks the stream protocol (section 5). Only then does it tell
+5. `waydeskd` connects to the control socket and speaks the stream protocol (section 5). Only then does it tell
    the RDP client the connection is ready, and only now may it replace an older connection of the same user.
 
-## 5. Stream protocol (`sway-rdpd` <-> `sway-rdp-session`)
+## 5. Stream protocol (`waydeskd` <-> `waydesk-session`)
 
 Length-prefixed messages on a Unix stream socket. The socket is owned by the user, mode 0600, with an ACL
-(or a group) letting only `sway-rdp` connect, and the session checks `SO_PEERCRED` as well.
+(or a group) letting only `waydesk` connect, and the session checks `SO_PEERCRED` as well.
 
 - To the session: `Hello{width, height, scale, klid}`, `Resize`, `Key`, `Pointer`, `Wheel`, `ClipboardData`, `Bye`.
 - From the session: `Frame{rect, h264 | bitmap}`, `AudioChunk{pcm}`, `ClipboardData`, `Resized{w,h}`, `Bye`.
 
-The encoder runs in the session, so `sway-rdpd` relays encoded frames and never sees raw pixels. This needs `egfx.rs`
+The encoder runs in the session, so `waydeskd` relays encoded frames and never sees raw pixels. This needs `egfx.rs`
 to be split: encoding in the session, channel and surface bookkeeping in the daemon.
 
 ## 6. Session life
 
-- Disconnect: the session and its programs keep running; `sway-rdpd` just drops its stream. Setting
+- Disconnect: the session and its programs keep running; `waydeskd` just drops its stream. Setting
   `idle_timeout` (default 8 h) or `end_on_disconnect = true` ends it.
 - Reconnect: step 4 returns the existing control socket; the session sends a full frame.
 - Second client for the same user: replaces the first (after authentication succeeded).
 - Logout in the shell: `sway exit` ends the session, the control socket disappears, the helper cleans up.
-- The headless sway uses `WLR_BACKENDS=headless` and a config from `/etc/xdg/sway-rdp/sway.conf` plus an optional
-  `~/.config/sway-rdp/config`. The output is created at session start (replaces `create_output` on a shared sway);
+- The headless sway uses `WLR_BACKENDS=headless` and a config from `/etc/xdg/waydesk/sway.conf` plus an optional
+  `~/.config/waydesk/config`. The output is created at session start (replaces `create_output` on a shared sway);
   workspace and focus handling in `session.rs` mostly goes away, since the sway is the user's own.
 
 ## 7. Threat model
 
 | Threat | Mitigation |
 |---|---|
-| Bug in RDP/TLS parsing (pre-auth) | Runs as `sway-rdp`, not root. systemd: `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, `CapabilityBoundingSet=` empty, `SystemCallFilter=@system-service`, `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX`. Memory-safe language. |
-| Compromised `sway-rdpd` | Sees encoded streams of live sessions and can inject input as those users, but is not root and cannot read their files. This is weaker than sshd's model; it is accepted for now and written down (see 9). |
-| Bug in the helper | Small (a few hundred lines), no network, no RDP. Accepts only `sway-rdp`'s uid (`SO_PEERCRED`). Fuzz the message parser. |
+| Bug in RDP/TLS parsing (pre-auth) | Runs as `waydesk`, not root. systemd: `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, `CapabilityBoundingSet=` empty, `SystemCallFilter=@system-service`, `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX`. Memory-safe language. |
+| Compromised `waydeskd` | Sees encoded streams of live sessions and can inject input as those users, but is not root and cannot read their files. This is weaker than sshd's model; it is accepted for now and written down (see 9). |
+| Bug in the helper | Small (a few hundred lines), no network, no RDP. Accepts only `waydesk`'s uid (`SO_PEERCRED`). Fuzz the message parser. |
 | Password guessing | Per-user and per-IP counters in the helper, delay on failure, `pam_faillock` in the PAM stack, audit log. |
 | User enumeration | Same answer and same delay for "unknown user" and "wrong password". |
 | One user attacks another | Separate uids, separate sway, `XDG_RUNTIME_DIR` 0700, no shared Wayland socket or clipboard. |
@@ -106,12 +106,12 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
    through the socket.
 3. **Per-user sway.** The session starts its own headless sway and shell. Test: two different uids on one VM, neither can
    capture or type into the other (`grim` and `wtype` against the other's socket fail).
-4. **Helper and PAM for any user.** Root helper, dedicated `sway-rdp` user, systemd units, per-user and per-IP limits.
+4. **Helper and PAM for any user.** Root helper, dedicated `waydesk` user, systemd units, per-user and per-IP limits.
    Test: both users log in with their own password; wrong passwords are throttled per user, and one user's failures
    do not lock out the other.
 5. **Reconnect and session management.** Existing session found, replace-after-auth, idle timeout, logout cleanup.
    Test: drop the connection, reconnect, same windows.
-6. **Package and wizard.** `.deb` for `sway-rdp` with the units, PAM file and sway template; the installer wizard
+6. **Package and wizard.** `.deb` for `waydesk` with the units, PAM file and sway template; the installer wizard
    as an optional post-install step.
 7. **Review.** Threat-model walk-through with someone else before any non-VPN exposure is documented.
 
@@ -135,13 +135,13 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
   removes; sound is off in this mode (still in the daemon); the same account connecting twice gets two swaies
   (milestone 5 makes it one); the binary has to be readable by the accounts (installed to /usr/local/bin); a plain
   `sway` config is used (no DMS autostart, which needs the account's systemd user session).
-- 4 done: `sway-rdp-server --helper` (root) and `sway-rdp-server --auth helper` (the daemon, which now refuses to run
-  as root). The helper listens on a Unix socket (`/run/sway-rdp/helper.sock`, owned by the daemon's account, mode 0600,
+- 4 done: `waydesk-server --helper` (root) and `waydesk-server --auth helper` (the daemon, which now refuses to run
+  as root). The helper listens on a Unix socket (`/run/waydesk/helper.sock`, owned by the daemon's account, mode 0600,
   `SO_PEERCRED` checked) and answers two requests: `Authenticate` (PAM, any ordinary account, failures counted per
   account and per source address) and `StartSession`, which starts the session process as the account that
   authenticated *on that same connection* and passes the daemon its end of the socket (SCM_RIGHTS). The daemon sends
   no program, path or arguments: those are the helper's own configuration. Tested in the VM: daemon as the system
-  account `sway-rdp`, helper as root, two accounts logging in with sessions as their own uids; the daemon account
+  account `waydesk`, helper as root, two accounts logging in with sessions as their own uids; the daemon account
   cannot read `/home/alice`; another account cannot connect to the helper socket; a request for a session before
   or after failed logins is refused; root and wrong passwords are refused; nothing is left after disconnect.
   Gaps: the helper is the same binary as the daemon (a separate small binary or crate would shrink what root
@@ -149,7 +149,7 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
   `loginctl enable-linger`; the daemon's `--quality` must equal the helper's; no systemd units or hardening options
   yet (milestone 6); the password still passes through the daemon (plain TLS login), see section 7.
 - 5 done: sessions outlive connections. In helper mode the session process is persistent (`--register`): right after
-  it starts it connects to the helper's second socket, `/run/sway-rdp/sessions.sock` (any local account may open it;
+  it starts it connects to the helper's second socket, `/run/waydesk/sessions.sock` (any local account may open it;
   the kernel tells the helper which account is on the other end, so a session registers only as itself). Each client
   gets a fresh socket pair: one end goes to the session over its registration (SCM_RIGHTS), the other to the daemon.
   Design choice: the helper never connects to a path inside an account's directory (a planted symlink would point
@@ -164,12 +164,12 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
   sessions or resources yet (logind slice limits belong to milestone 6), no way for a user to log out of the
   RDP session other than quitting sway, keys held down when a client is replaced stay pressed, and the idle timer
   does not look at activity inside the session.
-- 6 done: `packaging/build-deb.sh` builds `sway-rdp_<version>_<arch>.deb` in Docker (arm64 tested; amd64 not built).
-  It installs `/usr/bin/sway-rdp-server`, the units `sway-rdp-helper.service` (root; `RuntimeDirectory=sway-rdp`,
-  `KillMode=control-group`, moderate hardening) and `sway-rdp.service` (account `sway-rdp`, empty capability set,
-  `ProtectSystem=strict`, `ProtectHome`, `PrivateDevices`, syscall filter, only inet/unix sockets), `/etc/default/sway-rdp`
-  (bind address, extra options), `/etc/pam.d/sway-rdp-server` (includes the system's `common-auth` and `common-account`),
-  and a postinst that creates the `sway-rdp` account, makes the self-signed certificate (fingerprint printed) and
+- 6 done: `packaging/build-deb.sh` builds `waydesk_<version>_<arch>.deb` in Docker (arm64 tested; amd64 not built).
+  It installs `/usr/bin/waydesk-server`, the units `waydesk-helper.service` (root; `RuntimeDirectory=waydesk`,
+  `KillMode=control-group`, moderate hardening) and `waydesk.service` (account `waydesk`, empty capability set,
+  `ProtectSystem=strict`, `ProtectHome`, `PrivateDevices`, syscall filter, only inet/unix sockets), `/etc/default/waydesk`
+  (bind address, extra options), `/etc/pam.d/waydesk-server` (includes the system's `common-auth` and `common-account`),
+  and a postinst that creates the `waydesk` account, makes the self-signed certificate (fingerprint printed) and
   enables and starts both services. The helper starts the account's systemd user manager when `/run/user/<uid>` is
   missing, so `enable-linger` is no longer needed. Tested in the VM: `apt install` (a conffile prompt for the PAM file
   I had written by hand, `--force-confnew` answered it), both services active, alice logged in under systemd
@@ -178,27 +178,27 @@ to be split: encoding in the session, channel and surface bookkeeping in the dae
   account's `user-<uid>.slice`, so there are no per-account memory or task limits (the planned logind-slice
   route needs `pam_systemd` or `systemd-run`); amd64 and a clean-VM install were not tested; no Lintian run; the
   unit hardening was not scored with `systemd-analyze security`; the DMS desktop and the app wizard are not part
-  of the package (a `sway-rdp-desktop` metapackage was the idea).
+  of the package (a `waydesk-desktop` metapackage was the idea).
 - The worker is spawned by the daemon in the single-account and `--per-user` forms, by the helper in the helper form.
 
 ### Desktop package (2026-10-16)
 
-`sway-rdp-desktop` (architecture `all`, built by the same script) is the "Windows-like desktop" layer on top of
-`sway-rdp`, not a distribution: it is Debian 13 plus these two packages. It ships `/etc/xdg/sway-rdp/sway.conf`
-(the worker starts the session's sway with `-c`: `~/.config/sway-rdp/config` first, then this file; it lives under
-`/etc/xdg` because `/etc/sway-rdp` is closed to the accounts, it holds the TLS key), `sway-rdp-shell`,
-`sway-rdp-launcher`, `sway-rdp-setup` (the app wizard from `~/Sites/burin/installer`, copied to `packaging/desktop/setup`),
+`waydesk-desktop` (architecture `all`, built by the same script) is the "Windows-like desktop" layer on top of
+`waydesk`, not a distribution: it is Debian 13 plus these two packages. It ships `/etc/xdg/waydesk/sway.conf`
+(the worker starts the session's sway with `-c`: `~/.config/waydesk/config` first, then this file; it lives under
+`/etc/xdg` because `/etc/waydesk` is closed to the accounts, it holds the TLS key), `waydesk-shell`,
+`waydesk-launcher`, `waydesk-setup` (the app wizard from `~/Sites/burin/installer`, copied to `packaging/desktop/setup`),
 `sway-session.target` for the user manager and a wants-link that starts `dms.service` with it. Tested in the VM: with
-DMS installed (by `sway-rdp-setup`'s `dms.sh`, from the DankLinux and DMS OBS repositories), alice's session showed the
+DMS installed (by `waydesk-setup`'s `dms.sh`, from the DankLinux and DMS OBS repositories), alice's session showed the
 DMS bar with launcher, task list, clock and tray, a floating terminal with a title bar and DMS's Spotlight search
-opened with `sway-rdp-launcher`. Known: DMS's first-run "Welcome" window opens tiny; the installer copy in
+opened with `waydesk-launcher`. Known: DMS's first-run "Welcome" window opens tiny; the installer copy in
 `packaging/desktop/setup` is not kept in sync with the original; without DMS the fallback is sway's own bar and
 `wmenu-run` (not tested); the Windows App was not tried.
 
 ## 9. Open questions
 
 - The listener sees all sessions' encoded streams and can inject input. The stronger design is RDP server
-  redirection (as gnome-remote-desktop does with its handover): `sway-rdpd` only authenticates, then redirects the
+  redirection (as gnome-remote-desktop does with its handover): `waydeskd` only authenticates, then redirects the
   client to a per-user endpoint. Worth a spike after milestone 5; it costs a second TLS handshake and a token scheme.
 - Does IronRDP's acceptor accept the client's monitor data in the handshake? Needed for multi-monitor, which is
   not in these milestones.

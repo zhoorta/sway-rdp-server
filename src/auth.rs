@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn root_and_system_accounts_never_log_in() {
         // Whoever runs the tests (root in the build container, an ordinary user elsewhere) the answer is the same.
-        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let policy = PamPolicy::new("waydesk-server", None, None).unwrap();
         assert!(policy.candidate("root").is_none());
         assert!(policy.candidate("nobody").is_none());
         assert!(policy.candidate("no such account").is_none());
@@ -383,9 +383,9 @@ mod tests {
     #[test]
     fn a_required_group_that_does_not_exist_lets_nobody_in() {
         assert_eq!(group_gid("root"), Some(0));
-        assert_eq!(group_gid("no-such-group-sway-rdp"), None);
+        assert_eq!(group_gid("no-such-group-waydesk"), None);
         assert_eq!(group_gid("a\0b"), None);
-        let policy = PamPolicy::new("sway-rdp-server", None, Some("no-such-group-sway-rdp".into())).unwrap();
+        let policy = PamPolicy::new("waydesk-server", None, Some("no-such-group-waydesk".into())).unwrap();
         let me = unsafe { libc::getuid() };
         let name = unsafe { std::ffi::CStr::from_ptr((*libc::getpwuid(me)).pw_name) }.to_string_lossy().into_owned();
         assert!(policy.candidate(&name).is_none(), "even the account running the tests");
@@ -406,7 +406,7 @@ mod tests {
 
     #[test]
     fn failures_are_counted_per_key_and_lock_out() {
-        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let policy = PamPolicy::new("waydesk-server", None, None).unwrap();
         let t0 = Instant::now();
         for _ in 0..5 {
             assert!(policy.begin_attempt_at("pair:x", 5, t0));
@@ -418,7 +418,7 @@ mod tests {
 
     #[test]
     fn every_lockout_of_a_key_lasts_longer_and_a_quiet_hour_starts_again() {
-        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let policy = PamPolicy::new("waydesk-server", None, None).unwrap();
         let mut now = Instant::now();
         let mut locked_for = Vec::new();
         for _ in 0..4 {
@@ -440,7 +440,7 @@ mod tests {
 
     #[test]
     fn a_stranger_cannot_lock_an_account_out_of_its_owners_address() {
-        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let policy = PamPolicy::new("waydesk-server", None, None).unwrap();
         let t0 = Instant::now();
         let stranger = format!("pair:{}:alice:203.0.113.9", "alice".len());
         let owner = format!("pair:{}:alice:198.51.100.7", "alice".len());
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn a_success_eases_an_address_by_one_failure_and_does_not_wipe_it() {
-        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let policy = PamPolicy::new("waydesk-server", None, None).unwrap();
         let t0 = Instant::now();
         for _ in 0..10 {
             assert!(policy.begin_attempt_at("ip:a", 20, t0));
@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn many_failures_of_one_account_are_noted_once_per_window() {
-        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
+        let policy = PamPolicy::new("waydesk-server", None, None).unwrap();
         let t0 = Instant::now();
         for _ in 0..30 {
             policy.note_failure("bob", t0);

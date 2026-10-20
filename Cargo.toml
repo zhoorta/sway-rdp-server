@@ -1,5 +1,5 @@
 [package]
-name = "sway-rdp-server"
+name = "waydesk-server"
 version = "0.0.1"
 edition = "2021"
 description = "RDP server for sway: one headless output per connection, H.264 over the graphics pipeline, keyboard, pointer and audio"
@@ -15,7 +15,7 @@ ironrdp-core = "0.2"
 ironrdp-dvc = "0.8"
 ironrdp-svc = "0.8"
 ironrdp-pdu = "0.9"
-# H.264 comes from the system's libopenh264 (Debian ships it) loaded at run time: sway-rdp-server ships no encoder code of its own.
+# H.264 comes from the system's libopenh264 (Debian ships it) loaded at run time: waydesk-server ships no encoder code of its own.
 openh264 = { version = "0.9", default-features = false, features = ["libloading"] }
 yuv = "0.8"
 anyhow = "1"

@@ -1,0 +1,19 @@
+Description: waydesk: no underlined mnemonic letters
+ The menus of the file manager show underlined letters (File, Edit...) that a remote
+ desktop in the look of DankMaterialShell does not want.
+Author: José Mendonça <jmendonca@gmail.com>
+Forwarded: not-needed
+
+--- a/pcmanfm/application.cpp	2026-10-20 21:47:31
++++ b/pcmanfm/application.cpp	2026-10-20 21:55:13
+@@ -65,6 +65,10 @@
+ static const char* ifaceName = "org.pcmanfm.Application";
+ 
+ int ProxyStyle::styleHint(StyleHint hint, const QStyleOption* option, const QWidget* widget, QStyleHintReturn* returnData) const {
++    // waydesk: no underlined mnemonic letters in the menus
++    if(hint == QStyle::SH_UnderlineShortcut) {
++        return 0;
++    }
+     Application* app = static_cast<Application*>(qApp);
+     if(hint == QStyle::SH_ItemView_ActivateItemOnSingleClick) {
+         if (app->settings().singleClick()) {

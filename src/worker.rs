@@ -1,4 +1,4 @@
-//! The session process (`sway-rdp-server --session-worker`): one user's output, capture, encoder and input.
+//! The session process (`waydesk-server --session-worker`): one user's output, capture, encoder and input.
 //! It talks to the network daemon over the socket it inherits as fd 3, using `proto`. It never touches the
 //! network: it encodes what the daemon has credits for and injects the input the daemon forwards.
 
@@ -479,9 +479,9 @@ impl OwnSway {
         let uid = unsafe { libc::getuid() };
         // The account's own config for these sessions wins, then the system's; without either, sway's usual lookup.
         let config = std::env::var_os("HOME")
-            .map(|h| std::path::PathBuf::from(h).join(".config/sway-rdp/config"))
+            .map(|h| std::path::PathBuf::from(h).join(".config/waydesk/config"))
             .filter(|p| p.is_file())
-            .or_else(|| Some(std::path::PathBuf::from("/etc/xdg/sway-rdp/sway.conf")).filter(|p| p.is_file()));
+            .or_else(|| Some(std::path::PathBuf::from("/etc/xdg/waydesk/sway.conf")).filter(|p| p.is_file()));
         let mut cmd = std::process::Command::new("sway");
         if let Some(path) = &config {
             cmd.arg("-c").arg(path);
@@ -494,7 +494,7 @@ impl OwnSway {
         }
         if !crate::capture::cursor_in_picture() {
             // The apps of the session load their cursors from this theme too (see session.rs): nothing of them in the picture.
-            cmd.env("XCURSOR_THEME", "sway-rdp-blank").env("XCURSOR_SIZE", "24");
+            cmd.env("XCURSOR_THEME", "waydesk-blank").env("XCURSOR_SIZE", "24");
         }
         let child = cmd
             .env("WLR_BACKENDS", "headless")
@@ -524,7 +524,7 @@ impl OwnSway {
         anyhow::ensure!(ipc.exists(), "sway has no IPC socket after 10 s");
 
         // The Wayland socket has an automatic name: ask sway to tell us what its children inherit.
-        let note = runtime.join(format!("sway-rdp-{}.wayland", me.child.id()));
+        let note = runtime.join(format!("waydesk-{}.wayland", me.child.id()));
         let out = std::process::Command::new("swaymsg")
             .arg("-s")
             .arg(&ipc)
