@@ -1,0 +1,48 @@
+/* sway-rdp gtk: GTK3 apps in the colours of the shell. DankMaterialShell writes dank-colors.css (from its theme); GTK3's own Adwaita
+   does not use those names, so the widgets that matter are styled here. A file without this first line is the account's own and is left alone. */
+@import url("dank-colors.css");
+
+@define-color theme_bg_color @window_bg_color;
+@define-color theme_fg_color @window_fg_color;
+@define-color theme_base_color @view_bg_color;
+@define-color theme_text_color @view_fg_color;
+@define-color theme_selected_bg_color @accent_bg_color;
+@define-color theme_selected_fg_color @accent_fg_color;
+@define-color borders alpha(@window_fg_color, 0.12);
+
+window, dialog, .background { background-color: @window_bg_color; color: @window_fg_color; }
+headerbar, .titlebar, toolbar, .toolbar, menubar, .menubar, actionbar, statusbar, .inline-toolbar {
+    background-image: none; background-color: @headerbar_bg_color; color: @headerbar_fg_color; box-shadow: none; border-color: alpha(@window_fg_color, 0.08);
+}
+.sidebar, placessidebar, placessidebar .sidebar, paned > separator { background-color: @sidebar_bg_color; color: @sidebar_fg_color; }
+placessidebar row { border-radius: 8px; margin: 1px 6px; }
+placessidebar row:selected, row:selected, iconview:selected, treeview.view:selected, .view:selected, .view text:selected, selection {
+    background-color: alpha(@accent_bg_color, 0.85); color: @accent_fg_color;
+}
+.view, iconview, treeview.view, textview, textview text, list, scrolledwindow { background-color: @view_bg_color; color: @view_fg_color; }
+treeview.view header button { background-image: none; background-color: @view_bg_color; color: alpha(@view_fg_color, 0.7); border-color: alpha(@window_fg_color, 0.08); border-radius: 0; box-shadow: none; }
+entry, spinbutton, combobox button.combo {
+    background-image: none; background-color: @card_bg_color; color: @view_fg_color; border: 1px solid alpha(@window_fg_color, 0.12); border-radius: 8px; box-shadow: none;
+}
+entry:focus, spinbutton:focus { border-color: @accent_bg_color; }
+button, button.flat:hover, button.text-button {
+    background-image: none; background-color: @card_bg_color; color: @window_fg_color; border: 1px solid alpha(@window_fg_color, 0.12); border-radius: 8px; box-shadow: none; text-shadow: none;
+}
+button.flat, toolbar button, headerbar button { background-color: transparent; border-color: transparent; }
+button:hover, toolbar button:hover, headerbar button:hover { background-color: alpha(@window_fg_color, 0.1); }
+button:active, button:checked { background-color: alpha(@window_fg_color, 0.18); }
+button.suggested-action, button.suggested-action:hover { background-color: @accent_bg_color; color: @accent_fg_color; }
+button.destructive-action { background-color: @destructive_bg_color; color: @destructive_fg_color; }
+menu, .menu, .popup, popover, popover.background, tooltip, .csd menu {
+    background-image: none; background-color: @popover_bg_color; color: @popover_fg_color; border: 1px solid alpha(@window_fg_color, 0.12); border-radius: 10px; box-shadow: none;
+}
+menuitem { border-radius: 6px; margin: 1px 4px; }
+menuitem:hover, modelbutton:hover { background-color: alpha(@window_fg_color, 0.12); }
+separator, .sidebar separator { background-color: alpha(@window_fg_color, 0.1); }
+scrollbar { background-color: transparent; }
+scrollbar slider { background-color: alpha(@window_fg_color, 0.3); border-radius: 6px; min-width: 6px; min-height: 6px; }
+scrollbar slider:hover { background-color: alpha(@window_fg_color, 0.5); }
+progressbar progress, scale highlight { background-color: @accent_bg_color; }
+scale trough, progressbar trough { background-color: alpha(@window_fg_color, 0.15); }
+notebook > header { background-color: @headerbar_bg_color; box-shadow: none; }
+notebook > header tab:checked { background-color: alpha(@window_fg_color, 0.1); }

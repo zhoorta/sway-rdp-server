@@ -143,6 +143,13 @@ if settings is not None and not os.path.exists(marker):
     settings["builtInPluginSettings"] = builtin
     changed = True
     open(marker, "w").close()
+# Black and white icons (made by sway-rdp-mkicons from Papirus).
+marker = os.path.join(d, ".mono-icons")
+if settings is not None and not os.path.exists(marker) and os.path.isdir("/usr/share/icons/SwayRdp-Mono"):
+    settings["iconThemeDark"] = "SwayRdp-Mono"
+    settings["iconThemeLight"] = "SwayRdp-Mono"
+    changed = True
+    open(marker, "w").close()
 if changed:
     with open(os.path.join(d, "settings.json"), "w") as f:
         json.dump(settings, f, indent=2)
@@ -159,13 +166,45 @@ if [ ! -e "$dms_dir/.hidden-entries" ]; then
     done
     mkdir -p "$dms_dir" && : > "$dms_dir/.hidden-entries"
 fi
-# One font for GTK apps as well (DMS itself uses its own Inter).
+# GTK apps (Thunar, ...) in the colours of the shell: DMS writes the colours, a stylesheet of ours applies them (a gtk.css without
+# our first line is the account's own and stays), dark, with the icon theme of the launcher and one font.
+gtk_share=/usr/share/sway-rdp/gtk
 for gtk in gtk-3.0 gtk-4.0; do
-    ini="${XDG_CONFIG_HOME:-$HOME/.config}/$gtk/settings.ini"
-    if [ -e "$ini" ] && ! grep -q '^gtk-font-name' "$ini" && [ ! -e "$dms_dir/.gtk-font" ]; then
-        grep -q '\[Settings\]' "$ini" && sed -i '/\[Settings\]/a gtk-font-name=Inter 10' "$ini" && : > "$dms_dir/.gtk-font"
+    gtk_dir="${XDG_CONFIG_HOME:-$HOME/.config}/$gtk"
+    mkdir -p "$gtk_dir"
+    if [ -r "$gtk_share/$gtk.css" ] && { [ ! -e "$gtk_dir/gtk.css" ] || head -n1 "$gtk_dir/gtk.css" | grep -q 'sway-rdp gtk'; }; then
+        cp "$gtk_share/$gtk.css" "$gtk_dir/gtk.css"
+    fi
+    ini="$gtk_dir/settings.ini"
+    [ -e "$ini" ] || printf '[Settings]\n' > "$ini"
+    sed -i '/^-e \[Settings\]/s/^-e //' "$ini"
+    grep -q '\[Settings\]' "$ini" || printf '[Settings]\n' >> "$ini"
+    for kv in gtk-application-prefer-dark-theme=1 gtk-font-name="Inter 10"; do
+        key="${kv%%=*}"
+        grep -q "^$key=" "$ini" || sed -i "/\[Settings\]/a $kv" "$ini"
+    done
+    if [ -d /usr/share/icons/SwayRdp-Mono ]; then
+        if grep -q '^gtk-icon-theme-name=' "$ini"; then
+            sed -i 's/^gtk-icon-theme-name=.*/gtk-icon-theme-name=SwayRdp-Mono/' "$ini"
+        else
+            sed -i '/\[Settings\]/a gtk-icon-theme-name=SwayRdp-Mono' "$ini"
+        fi
     fi
 done
+# GTK reads the icon theme, the font and dark mode from gsettings before settings.ini. DMS writes its own values while it starts,
+# so they are set again once it is up.
+if command -v gsettings >/dev/null 2>&1; then
+    : "${DBUS_SESSION_BUS_ADDRESS:=unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}"
+    export DBUS_SESSION_BUS_ADDRESS
+    gs() { gsettings set org.gnome.desktop.interface "$@" 2>/dev/null; }
+    apply_gsettings() {
+        [ -d /usr/share/icons/SwayRdp-Mono ] && gs icon-theme SwayRdp-Mono
+        gs color-scheme prefer-dark
+        gs font-name 'Inter 10'
+    }
+    apply_gsettings
+    ( sleep 10; apply_gsettings; sleep 20; apply_gsettings ) >/dev/null 2>&1 &
+fi
 # The control center header has an edit button (rearranging its tiles) that has no setting to hide it. The account runs DMS from
 # a copy of the shell made of links to the installed files, with that one button hidden. Without a match (another DMS version)
 # the installed shell is used as it is.

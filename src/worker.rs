@@ -483,13 +483,17 @@ impl OwnSway {
             cmd.arg("-c").arg(path);
             info!(config = %path.display(), "sway config");
         }
+        // GTK apps keep their settings (icon theme, dark mode, font) in dconf, which needs the account's session bus; without one
+        // they would wait for it, so the settings then stay in memory.
+        if !runtime.join("bus").exists() {
+            cmd.env("GSETTINGS_BACKEND", "memory");
+        }
         let child = cmd
             .env("WLR_BACKENDS", "headless")
             .env("WLR_LIBINPUT_NO_DEVICES", "1")
             // No default output: the session creates its own, at the client's size.
             .env("WLR_HEADLESS_OUTPUTS", "0")
             .env("WLR_RENDERER", "pixman")
-            .env("GSETTINGS_BACKEND", "memory")
             .env("NO_AT_BRIDGE", "1")
             .env_remove("WAYLAND_DISPLAY")
             .env_remove("SWAYSOCK")
