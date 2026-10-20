@@ -2,12 +2,15 @@
    flat, rounded, the accent colour for what is selected. Colours come from the palette (qt6ct keeps it in step with DMS),
    so nothing here names a colour. */
 QMenuBar { background: palette(window); border: none; padding: 2px 4px; }
-QMenuBar::item { background: transparent; padding: 4px 10px; border-radius: 8px; }
+QMenuBar::item { background: transparent; padding: 6px 12px; margin: 2px 1px; border-radius: 10px; }
 QMenuBar::item:selected { background: palette(mid); }
-QMenu { background: palette(base); border: 1px solid palette(mid); border-radius: 12px; padding: 6px; }
-QMenu::item { padding: 6px 18px; border-radius: 8px; }
+QMenu { background: palette(base); border: 1px solid palette(mid); border-radius: 14px; padding: 8px; }
+QMenu::item { padding: 8px 22px 8px 12px; margin: 1px 0; border-radius: 10px; min-height: 20px; }
+QMenu::item:disabled { color: palette(placeholder-text); }
+QMenu::icon { padding-left: 6px; }
+QMenu::right-arrow { margin-right: 8px; }
 QMenu::item:selected { background: palette(highlight); color: palette(highlighted-text); }
-QMenu::separator { height: 1px; background: palette(mid); margin: 4px 10px; }
+QMenu::separator { height: 1px; background: palette(mid); margin: 6px 12px; }
 QTabWidget::pane { border: none; }
 QTabBar { background: palette(window); qproperty-drawBase: 0; }
 QTabBar::tab { background: transparent; color: palette(window-text); padding: 6px 14px; margin: 4px 2px 4px 2px; border-radius: 10px; }
@@ -29,10 +32,14 @@ QLineEdit, QSpinBox, QComboBox, QPlainTextEdit, QTextEdit { background: palette(
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border: 1px solid palette(highlight); }
 QComboBox::drop-down { border: none; width: 22px; }
 QToolBar { background: palette(window); border: none; spacing: 4px; padding: 4px; }
-QStatusBar { background: palette(window); }
+QStatusBar { background: palette(window); padding: 4px 8px; }
+QStatusBar::item { border: none; }
 QToolTip { background: palette(base); color: palette(text); border: 1px solid palette(mid); border-radius: 8px; padding: 4px 8px; }
 QHeaderView::section { background: palette(window); border: none; padding: 4px 8px; }
 QListView, QTreeView { border: none; }
-QListView::item, QTreeView::item { border-radius: 8px; padding: 2px; }
+QListView::item, QTreeView::item { border-radius: 10px; padding: 4px; }
+QTreeView::item { padding: 6px 4px; }
+QTreeView::branch { background: transparent; }
+QAbstractItemView { outline: none; }
 QListView::item:selected, QTreeView::item:selected { background: palette(highlight); color: palette(highlighted-text); }
 QSplitter::handle { background: transparent; }
