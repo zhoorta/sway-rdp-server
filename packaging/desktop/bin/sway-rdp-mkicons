@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Builds the icon theme "SwayRdp-Mono" (black and white) from Papirus-Dark: the same icons with every colour turned into its grey.
+"""Builds the icon theme "SwayRdp-Mono" from Papirus-Dark: the same icons with every colour turned into its grey, except
+the folders and other places, which take the accent colour of the shell (the default primary of DankMaterialShell).
 
   sway-rdp-mkicons           build /usr/share/icons/SwayRdp-Mono (root), skipped when it is newer than Papirus-Dark
   sway-rdp-mkicons DIR       build it in DIR instead
 """
 import os
+import colorsys
 import re
 import shutil
 import sys
 
 SRC = "/usr/share/icons/Papirus-Dark"
 NAME = "SwayRdp-Mono"
-VERSION = "3"  # changes with the way the theme is made, so that an older theme is made again
+VERSION = "5"  # changes with the way the theme is made, so that an older theme is made again
 dst = sys.argv[1] if len(sys.argv) > 1 else f"/usr/share/icons/{NAME}"
 
 # Colours in fill, stroke, stop-color ... (attributes and style properties), not element ids such as url(#abc).
@@ -27,6 +29,24 @@ def grey(m):
     return f"{m.group(1)}#{y:02x}{y:02x}{y:02x}"
 
 
+# DankMaterialShell's default primary colour. Folders keep their light "paper" greys and shadows; every coloured part
+# takes this hue, with the lightness it had (a flat set of greys looks like a missing theme, a bright one shouts).
+ACCENT = (0xd0, 0xbc, 0xff)
+ACCENT_HUE = colorsys.rgb_to_hls(*(c / 255 for c in ACCENT))[0]
+
+
+def accent(m):
+    h = m.group(2)
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    hue, light, sat = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+    if sat < 0.12:  # greys, white and black stay as they are
+        return grey(m)
+    r, g, b = (round(c * 255) for c in colorsys.hls_to_rgb(ACCENT_HUE, min(0.78, light + 0.12), min(sat, 0.6)))
+    return f"{m.group(1)}#{r:02x}{g:02x}{b:02x}"
+
+
 if not os.path.isdir(SRC):
     sys.exit(f"{SRC} not found")
 stamp = os.path.join(dst, ".sway-rdp-version")
@@ -35,6 +55,8 @@ if len(sys.argv) < 2 and os.path.exists(stamp) and open(stamp).read() == VERSION
 tmp = dst + ".new"
 shutil.rmtree(tmp, ignore_errors=True)
 def replace_copy(src, dst, **kw):
+    if os.path.islink(src) and os.path.isdir(dst) and not os.path.islink(dst):
+        return  # a link to a folder of Papirus, where the folder is already a copy
     if os.path.lexists(dst):
         os.remove(dst)
     if os.path.islink(src):
@@ -66,6 +88,17 @@ for entry in os.listdir(SRC):
         shutil.copytree(os.path.realpath(path), target, symlinks=True)
     else:
         shutil.copy2(path, target)
+# Inside a size folder most folders of Papirus-Dark are links into Papirus too (24x24/places -> ../../Papirus/24x24/places):
+# copy those as well, or the recolouring below never reaches them and those sizes stay coloured. (Links within the same
+# folder, such as categories -> apps, stay links.)
+for entry in SIZES:
+    base = os.path.join(tmp, entry)
+    for name in os.listdir(base) if os.path.isdir(base) else []:
+        path = os.path.join(base, name)
+        if os.path.islink(path) and os.sep in os.readlink(path) and os.path.isdir(path):
+            target = os.path.realpath(path)
+            os.remove(path)
+            shutil.copytree(target, path, symlinks=True)
 # Papirus-Dark's own files go over the ones of Papirus.
 for entry in SIZES:
     path = os.path.join(SRC, entry)
@@ -78,7 +111,7 @@ for root, _, files in os.walk(tmp):
         if f.endswith(".svg") and not os.path.islink(path):
             with open(path, encoding="utf-8", errors="surrogateescape") as fh:
                 text = fh.read()
-            new = COLOR.sub(grey, text)
+            new = COLOR.sub(accent if "/places/" in path else grey, text)
             if new != text:
                 with open(path, "w", encoding="utf-8", errors="surrogateescape") as fh:
                     fh.write(new)
@@ -104,4 +137,4 @@ with open(os.path.join(tmp, ".sway-rdp-version"), "w") as fh:
 shutil.rmtree(dst, ignore_errors=True)
 os.rename(tmp, dst)
 os.system(f"gtk-update-icon-cache -q -f '{dst}' 2>/dev/null")
-print(f"{NAME}: {done} icons turned grey")
+print(f"{NAME}: {done} icons recoloured")
