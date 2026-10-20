@@ -15,6 +15,14 @@ PNG versions are in `png/`, with transparent backgrounds: `deskwire-logo.png` an
 Colours: ink `#14171d`, paper `#f2eee8`, copper `#c4661a` (`#f29a4c` on dark). The wordmark is outlined from Outfit, one weight for both words
 (SIL Open Font License 1.1), so no font is needed to show the files. Deskwire is a working name: no trademark clearance has been done.
 
+## Other layouts of the wordmark
+
+- `two-lines/`: "desk" over "wire" beside the mark. Compact, for narrow places such as a sidebar or a header.
+- `joined/`: "desk—wire", a copper wire with a node joining the two words, no mark. Suits a banner, a tagline or a place where the
+  mark would be repeated. It can also be read as hyphenated, so the D logo stays the main one.
+
+Each has SVG files for light and dark backgrounds and transparent PNGs (`png/`, 8x size).
+
 ## Alternative: the monitor
 
 `alternatives/` has a second direction: a monitor whose screen is crossed by a wire in the shape of a W, with the same wordmark and colours
