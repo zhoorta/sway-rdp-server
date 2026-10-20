@@ -31,15 +31,17 @@ DMS_TESTED=2.0.0db1
 DMS_WANT="${SWAY_RDP_DMS_VERSION:-$DMS_TESTED}"
 $SUDO apt-get install -y qt6-wayland
 if [ -n "${SWAY_RDP_DMS_UPDATE:-}" ]; then
-  $SUDO apt-mark unhold dms >/dev/null 2>&1 || true
+  $SUDO apt-mark unhold dms quickshell >/dev/null 2>&1 || true
   $SUDO apt-get install -y dms
+  $SUDO apt-get install -y -t trixie-backports quickshell
 elif dpkg -s dms >/dev/null 2>&1; then
   echo "DMS $(dpkg-query -W -f='${Version}' dms) is installed and held (SWAY_RDP_DMS_UPDATE=1 to update)."
 elif ! $SUDO apt-get install -y "dms=$DMS_WANT"; then
   echo "warning: DMS $DMS_WANT is not in the repository any more: installing the newest, which the shell patches may not match." >&2
   $SUDO apt-get install -y dms
 fi
-$SUDO apt-mark hold dms >/dev/null
+# quickshell (from trixie-backports) is what DMS runs on: held too, so it only changes together with DMS.
+$SUDO apt-mark hold dms quickshell >/dev/null
 
 # With sway-rdp-desktop the system config (/etc/xdg/sway-rdp/sway.conf) starts DMS through sway-session.target. Without it,
 # set that up in the account's own sway config, as the DMS docs ask for sway.
