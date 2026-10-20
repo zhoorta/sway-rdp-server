@@ -49,3 +49,17 @@ Fm--SidePane, Fm--PlacesView { background: palette(window); border: none; }
 Fm--PlacesView { padding: 4px; }
 QMainWindow Fm--FolderView QAbstractItemView { background: palette(light); border: none; border-radius: 14px; padding: 6px; }
 Fm--PathBar { background: transparent; }
+/* file manager: side pane switch, toolbar and path bar as pills, the way DMS draws its buttons */
+Fm--SidePane QComboBox { background: palette(light); border: none; border-radius: 10px; padding: 5px 10px; margin: 2px 4px; }
+Fm--SidePane QComboBox:hover { background: palette(mid); }
+QToolButton:checked { background: palette(mid); }
+Fm--PathBar QToolButton, Fm--PathBar QPushButton { border-radius: 10px; padding: 3px 9px; }
+Fm--PathBar QToolButton:checked { background: palette(highlight); color: palette(highlighted-text); }
+/* dialogs: copy progress, properties, preferences */
+QDialog { background: palette(window); }
+QProgressBar { background: palette(light); border: none; border-radius: 7px; min-height: 14px; max-height: 14px; text-align: center; }
+QProgressBar::chunk { background: palette(highlight); border-radius: 7px; }
+QGroupBox { border: 1px solid palette(mid); border-radius: 12px; margin-top: 12px; padding: 10px; }
+QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }
+QCheckBox, QRadioButton { spacing: 8px; padding: 2px; }
+QDialogButtonBox QPushButton { min-width: 72px; }
