@@ -233,6 +233,39 @@ dms_copy="${XDG_CACHE_HOME:-$HOME/.cache}/sway-rdp/dms-shell"
 rm -rf "$dms_copy"
 systemctl --user unset-environment DMS_SHELL_DIR 2>/dev/null
 if [ -d "$dms_src" ] && command -v python3 >/dev/null 2>&1 && mkdir -p "$(dirname "$dms_copy")" && cp -rs "$dms_src" "$dms_copy" 2>/dev/null; then
+    # The focused-window menu in the bar (right click) shows the window's PID and has "Kill Process", but DMS finds the PID only on
+    # niri, Hyprland and Mango; on sway it says "Unavailable" and the button is off. Ask sway for it (sway-rdp-focused-pid).
+    # Without a match (another DMS version) the widget stays as it is.
+    python3 - "$dms_src/Modules/DankBar/Widgets/FocusedApp.qml" "$dms_copy/Modules/DankBar/Widgets/FocusedApp.qml" <<'PY' || true
+import os, sys
+src, dst = sys.argv[1:]
+text = open(src).read()
+needle = "    function resolveActiveWindowPid() {\n        if (!activeWindow)\n            return 0;\n"
+if needle not in text or "import Quickshell.Io" in text:
+    sys.exit(1)
+add = '''    property int swayFocusedPid: 0
+    Process {
+        id: swayPidProcess
+        command: ["sway-rdp-focused-pid"]
+        stdout: StdioCollector {
+            onStreamFinished: root.swayFocusedPid = parseInt(text) || 0
+        }
+    }
+    Connections {
+        target: root
+        function onActiveWindowChanged() {
+            if (CompositorService.isSway)
+                swayPidProcess.running = true;
+        }
+    }
+
+'''
+text = text.replace("import Quickshell\n", "import Quickshell\nimport Quickshell.Io\n", 1)
+text = text.replace(needle, add + needle + "        if (CompositorService.isSway)\n            return swayFocusedPid;\n", 1)
+os.remove(dst)
+with open(dst, "w") as f:
+    f.write(text)
+PY
     header="$dms_copy/Modules/ControlCenter/Components/HeaderPane.qml"
     if python3 - "$dms_src/Modules/ControlCenter/Components/HeaderPane.qml" "$header" <<'PY'
 import os, sys
