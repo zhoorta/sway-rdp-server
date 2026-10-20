@@ -13,6 +13,7 @@ set -e
 cd /src && cargo build --release
 P=/tmp/pkg; rm -rf $P; mkdir -p $P/DEBIAN $P/usr/bin $P/lib/systemd/system $P/etc/default $P/etc/pam.d $P/usr/share/doc/sway-rdp
 install -m 755 /tmp/target/release/sway-rdp-server $P/usr/bin/sway-rdp-server
+install -m 755 /tmp/target/release/sway-rdp-admin $P/usr/bin/sway-rdp-admin
 install -m 644 packaging/systemd/*.service $P/lib/systemd/system/   # includes sway-rdp-session@.service
 install -m 644 packaging/default-sway-rdp $P/etc/default/sway-rdp
 install -m 644 packaging/pam-sway-rdp-server $P/etc/pam.d/sway-rdp-server

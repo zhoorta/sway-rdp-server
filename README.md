@@ -88,3 +88,21 @@ Members of the group `sway-rdp-users` (the package makes it, and on a first inst
 `adduser ACCOUNT sway-rdp-users`. The account also needs a login shell listed in `/etc/shells`. To let every ordinary account in, put
 `SWAY_RDP_HELPER_ARGS=` (nothing after the equals sign) in `/etc/default/sway-rdp` and restart `sway-rdp-helper`; for another group,
 `SWAY_RDP_HELPER_ARGS=--require-group NAME`. Root is never let in.
+
+## Managing accounts: `sway-rdp-admin`
+
+```
+sway-rdp-admin users list [--json]                      who may log in, who may install Flatpaks, who has a session
+sudo sway-rdp-admin users add NAME [--admin] [--sudo] [--no-rdp]    makes the account and shows a temporary password once
+sudo sway-rdp-admin users passwd NAME [--stdin]         a new random password (shown once), or one read from stdin
+sudo sway-rdp-admin users enable NAME | disable NAME    log in over RDP or not (disable ends the session too; --keep-session)
+sudo sway-rdp-admin users admin NAME on|off             Flatpak installs without a password (group sway-rdp-admins)
+sudo sway-rdp-admin users sudo NAME on|off
+sudo sway-rdp-admin users remove NAME [--delete-home]
+sway-rdp-admin sessions list [--json]       |   sudo sway-rdp-admin sessions end NAME
+```
+
+Listing is open to everybody; everything else needs root. A new account's password does not expire: RDP cannot ask for a new one, so
+the account changes it with `passwd` in a terminal on the desktop. The tool never touches root or accounts below uid 1000, and refuses to
+remove or demote the account that runs it or the last administrator. Passwords go to `chpasswd` over a pipe, never as arguments.
+
