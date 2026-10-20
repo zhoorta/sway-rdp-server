@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""Builds the icon theme "SwayRdp-Mono" from Papirus-Dark: the same icons with every colour turned into its grey, except
-the folders and other places, which take the accent colour of the shell (the default primary of DankMaterialShell).
+"""Folders and places in the accent colour of the shell: sway-rdp-mkicons --user
 
-  sway-rdp-mkicons           build /usr/share/icons/SwayRdp-Mono (root), skipped when it is newer than Papirus-Dark
-  sway-rdp-mkicons DIR       build it in DIR instead
-  sway-rdp-mkicons --user    as an account: the folders and places in the accent colour of that account's DMS theme, as a
-                             small overlay in ~/.local/share/icons/SwayRdp-Mono (Qt and GTK merge themes of one name, so
-                             everything else comes from the system theme); no DMS colours: the system theme's accent stays
+The icons of the desktop are Papirus-Dark, apps in their own colours. Its folders are blue, though, which clashes with any
+accent: this makes a small overlay of that theme for the account, only the folders and places, in the hue of the primary colour of
+its DankMaterialShell theme (the default lavender while DMS has not made its palette yet). The overlay lives in
+~/.local/share/icons/Papirus-Dark; Qt and GTK merge themes of one name, so everything else comes from the system theme.
 """
 import colorsys
 import json
@@ -15,76 +13,56 @@ import re
 import shutil
 import sys
 
-SRC = "/usr/share/icons/Papirus-Dark"
-NAME = "SwayRdp-Mono"
-VERSION = "5"  # changes with the way the theme is made, so that an older theme is made again
-user_mode = "--user" in sys.argv
-dst = sys.argv[1] if len(sys.argv) > 1 and not user_mode else f"/usr/share/icons/{NAME}"
+THEME = "Papirus-Dark"
+PARENT = "Papirus"  # where most of the icons of Papirus-Dark really are (its size folders are links into it)
+SIZES = ("16x16", "22x22", "24x24", "32x32", "48x48", "64x64")
+DEFAULT_ACCENT = "d0bcff"  # the default primary of DankMaterialShell
+VERSION = "1"  # changes with the way the overlay is made, so that an older one is made again
 
 # Colours in fill, stroke, stop-color ... (attributes and style properties), not element ids such as url(#abc).
 COLOR = re.compile(r'((?:fill|stroke|stop-color|flood-color|lighting-color|color)(?:=["\']|:\s*))#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-zA-Z_-])')
 
-
-def grey(m):
-    h = m.group(2)
-    if len(h) == 3:
-        h = "".join(c * 2 for c in h)
-    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
-    y = round(0.299 * r + 0.587 * g + 0.114 * b)
-    return f"{m.group(1)}#{y:02x}{y:02x}{y:02x}"
-
-
-# DankMaterialShell's default primary colour. Folders keep their light "paper" greys and shadows; every coloured part
-# takes this hue, with the lightness it had (a flat set of greys looks like a missing theme, a bright one shouts).
-ACCENT = (0xd0, 0xbc, 0xff)
-ACCENT_HUE = colorsys.rgb_to_hls(*(c / 255 for c in ACCENT))[0]
-
-
-def accent(m):
-    h = m.group(2)
-    if len(h) == 3:
-        h = "".join(c * 2 for c in h)
-    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
-    hue, light, sat = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
-    if sat < 0.12:  # greys, white and black stay as they are
-        return grey(m)
-    r, g, b = (round(c * 255) for c in colorsys.hls_to_rgb(ACCENT_HUE, min(0.78, light + 0.12), min(sat, 0.6)))
-    return f"{m.group(1)}#{r:02x}{g:02x}{b:02x}"
-
-
-# The folder icons a file manager asks for; the rest of folder-* stays with the system theme.
+# The folder icons a file manager asks for; the rest of folder-* (two thousand colour and brand variants) stays with the system theme.
 USER_FOLDERS = {"documents", "download", "downloads", "music", "pictures", "videos", "templates", "publicshare", "desktop", "remote", "network",
                 "home", "recent", "saved-search", "drag-accept", "visiting", "new", "favorites", "important", "development", "games", "code",
                 "activities", "backup", "books", "cloud", "projects", "public", "script", "steam"}
 
 
-def make_user_overlay():
-    """The folders and places of this account in the hue of its DMS accent, as an overlay of the system theme."""
-    system = f"/usr/share/icons/{NAME}"
+def accent_hue():
     cache = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
-    target = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "icons", NAME)
+    primary = DEFAULT_ACCENT
     try:
         with open(os.path.join(cache, "DankMaterialShell/dms-colors.json")) as f:
             data = json.load(f)
         mode = data.get("mode") if data.get("mode") in data.get("colors", {}) else "dark"
         primary = data["colors"][mode]["primary"].lstrip("#")
-        hue = colorsys.rgb_to_hls(*(int(primary[i:i + 2], 16) / 255 for i in (0, 2, 4)))[0]
     except (OSError, ValueError, KeyError):
-        shutil.rmtree(target, ignore_errors=True)  # nothing to follow: the system theme's accent stays
+        pass
+    return colorsys.rgb_to_hls(*(int(primary[i:i + 2], 16) / 255 for i in (0, 2, 4)))[0]
+
+
+def main():
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    target = os.path.join(data_home, "icons", THEME)
+    system = f"/usr/share/icons/{THEME}"
+    if not os.path.isfile(os.path.join(system, "index.theme")):
+        shutil.rmtree(target, ignore_errors=True)  # no such theme here: nothing to lay over
         return
+    hue = accent_hue()
     stamp = os.path.join(target, ".hue")
-    if os.path.exists(stamp) and open(stamp).read() == f"{hue:.4f}":
+    wanted = f"{VERSION}:{hue:.4f}"
+    if os.path.exists(stamp) and open(stamp).read() == wanted:
         return
 
-    def retint(m):  # the system theme is already tinted, with the right lightness: only the hue moves
+    def tint(m):
         h = m.group(2)
         if len(h) == 3:
             h = "".join(c * 2 for c in h)
         r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
         _, light, sat = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
-        if sat < 0.12:
+        if sat < 0.12:  # greys, white and black stay as they are
             return m.group(0)
-        r, g, b = (round(c * 255) for c in colorsys.hls_to_rgb(hue, light, sat))
+        r, g, b = (round(c * 255) for c in colorsys.hls_to_rgb(hue, min(0.78, light + 0.12), min(sat, 0.6)))
         return f"{m.group(1)}#{r:02x}{g:02x}{b:02x}"
 
     tmp = target + ".new"
@@ -92,128 +70,49 @@ def make_user_overlay():
     os.makedirs(tmp)
     shutil.copy2(os.path.join(system, "index.theme"), os.path.join(tmp, "index.theme"))
     for size in SIZES:
-        src = os.path.join(system, size, "places")
-        if not os.path.isdir(src):
+        # The folders of this size, in the order of the theme's own lookup: Papirus-Dark first, then Papirus (the links of
+        # Papirus-Dark lead there).
+        sources = []
+        for theme in (THEME, PARENT):
+            path = os.path.realpath(f"/usr/share/icons/{theme}/{size}/places")
+            if os.path.isdir(path) and path not in sources:
+                sources.append(path)
+        if not sources:
             continue
-        out = os.path.join(tmp, size, "places")
-        os.makedirs(out)
-        # What to take: the icons asked for, and what their links point to (folder.svg is a link to folder-blue.svg).
-        keep, todo = set(), [n for n in os.listdir(src) if not (n.startswith("folder-") and n[7:].rsplit(".", 1)[0].removesuffix("-open") not in USER_FOLDERS)]
-        while todo:
+
+        def find(name):
+            return next((os.path.join(d, name) for d in sources if os.path.lexists(os.path.join(d, name))), None)
+
+        names = {n for d in sources for n in os.listdir(d)}
+        keep, todo = set(), [n for n in names if not (n.startswith("folder-") and n[7:].rsplit(".", 1)[0].removesuffix("-open") not in USER_FOLDERS)]
+        while todo:  # what is asked for, and what its links point to (folder.svg is a link to folder-blue.svg)
             name = todo.pop()
             if name in keep:
                 continue
             keep.add(name)
-            path = os.path.join(src, name)
-            if os.path.islink(path) and "/" not in os.readlink(path):
+            path = find(name)
+            if path and os.path.islink(path) and "/" not in os.readlink(path):
                 todo.append(os.readlink(path))
+        out = os.path.join(tmp, size, "places")
+        os.makedirs(out)
         for name in keep:
-            path = os.path.join(src, name)
+            path = find(name)
+            if path is None:
+                continue
             if os.path.islink(path):
                 if "/" not in os.readlink(path):  # a link inside the folder stays one, its target is copied too
                     os.symlink(os.readlink(path), os.path.join(out, name))
-            elif name.endswith(".svg") and os.path.isfile(path):
+            elif name.endswith(".svg"):
                 with open(path, encoding="utf-8", errors="surrogateescape") as fh:
                     text = fh.read()
                 with open(os.path.join(out, name), "w", encoding="utf-8", errors="surrogateescape") as fh:
-                    fh.write(COLOR.sub(retint, text))
+                    fh.write(COLOR.sub(tint, text))
     with open(os.path.join(tmp, ".hue"), "w") as fh:
-        fh.write(f"{hue:.4f}")
+        fh.write(wanted)
     shutil.rmtree(target, ignore_errors=True)
     os.rename(tmp, target)
 
 
-if not os.path.isdir(SRC):
-    sys.exit(f"{SRC} not found")
-stamp = os.path.join(dst, ".sway-rdp-version")
-if len(sys.argv) < 2 and os.path.exists(stamp) and open(stamp).read() == VERSION and os.path.getmtime(stamp) > os.path.getmtime(SRC):
-    sys.exit(0)
-tmp = dst + ".new"
-shutil.rmtree(tmp, ignore_errors=True)
-def replace_copy(src, dst, **kw):
-    if os.path.islink(src) and os.path.isdir(dst) and not os.path.islink(dst):
-        return  # a link to a folder of Papirus, where the folder is already a copy
-    if os.path.lexists(dst):
-        os.remove(dst)
-    if os.path.islink(src):
-        os.symlink(os.readlink(src), dst)
-    else:
-        shutil.copy2(src, dst)
-
-
-# Sizes the shell, the launcher and the apps ask for; the rest comes from Papirus-Dark through Inherits.
-SIZES = ("16x16", "22x22", "24x24", "32x32", "48x48", "64x64")
-if user_mode:
-    make_user_overlay()
-    sys.exit(0)
-
-
-def overlay(src, dst):
-    for root, dirs, files in os.walk(src):
-        out = os.path.join(dst, os.path.relpath(root, src))
-        os.makedirs(out, exist_ok=True)
-        for name in files + [d for d in dirs if os.path.islink(os.path.join(root, d))]:
-            replace_copy(os.path.join(root, name), os.path.join(out, name))
-
-
-# The size folders of Papirus-Dark are links into Papirus: copy what they point to, so the copy does not lead back to the colours.
-os.makedirs(tmp)
-for entry in os.listdir(SRC):
-    path = os.path.join(SRC, entry)
-    target = os.path.join(tmp, entry)
-    if os.path.isdir(path) and entry not in SIZES:
-        continue
-    if os.path.isdir(path):
-        shutil.copytree(os.path.realpath(path), target, symlinks=True)
-    else:
-        shutil.copy2(path, target)
-# Inside a size folder most folders of Papirus-Dark are links into Papirus too (24x24/places -> ../../Papirus/24x24/places):
-# copy those as well, or the recolouring below never reaches them and those sizes stay coloured. (Links within the same
-# folder, such as categories -> apps, stay links.)
-for entry in SIZES:
-    base = os.path.join(tmp, entry)
-    for name in os.listdir(base) if os.path.isdir(base) else []:
-        path = os.path.join(base, name)
-        if os.path.islink(path) and os.sep in os.readlink(path) and os.path.isdir(path):
-            target = os.path.realpath(path)
-            os.remove(path)
-            shutil.copytree(target, path, symlinks=True)
-# Papirus-Dark's own files go over the ones of Papirus.
-for entry in SIZES:
-    path = os.path.join(SRC, entry)
-    if os.path.isdir(path) and not os.path.islink(path):
-        overlay(path, os.path.join(tmp, entry))
-done = 0
-for root, _, files in os.walk(tmp):
-    for f in files:
-        path = os.path.join(root, f)
-        if f.endswith(".svg") and not os.path.islink(path):
-            with open(path, encoding="utf-8", errors="surrogateescape") as fh:
-                text = fh.read()
-            new = COLOR.sub(accent if "/places/" in path else grey, text)
-            if new != text:
-                with open(path, "w", encoding="utf-8", errors="surrogateescape") as fh:
-                    fh.write(new)
-                done += 1
-index = os.path.join(tmp, "index.theme")
-with open(index) as fh:
-    text = fh.read()
-have = [d for d in re.findall(r"^Directories=(.*)$", text, flags=re.M)[0].split(",") if os.path.isdir(os.path.join(tmp, d))]
-text = re.sub(r"^Directories=.*$", "Directories=" + ",".join(have), text, count=1, flags=re.M)
-text = re.sub(r"^ScaledDirectories=.*\n", "", text, flags=re.M)
-sections = re.split(r"(?m)^(?=\[)", text)
-text = "".join(sec for sec in sections if not sec.startswith("[") or sec.startswith("[Icon Theme]") or sec.split("]")[0][1:] in have)
-text = re.sub(r"^Name=.*$", f"Name={NAME}", text, count=1, flags=re.M)
-text = re.sub(r"^Inherits=.*$", "Inherits=Papirus-Dark,hicolor", text, count=1, flags=re.M)
-with open(index, "w") as fh:
-    fh.write(text)
-for stale in ("icon-theme.cache",):
-    p = os.path.join(tmp, stale)
-    if os.path.exists(p):
-        os.remove(p)
-with open(os.path.join(tmp, ".sway-rdp-version"), "w") as fh:
-    fh.write(VERSION)
-shutil.rmtree(dst, ignore_errors=True)
-os.rename(tmp, dst)
-os.system(f"gtk-update-icon-cache -q -f '{dst}' 2>/dev/null")
-print(f"{NAME}: {done} icons recoloured")
+if "--user" not in sys.argv:
+    sys.exit(__doc__)
+main()

@@ -7,7 +7,6 @@ mkdir -p "$HOME/Desktop"
 qt_dir="${XDG_CONFIG_HOME:-$HOME/.config}/qt6ct"
 if [ ! -e "$qt_dir/qt6ct.conf" ]; then
     icons=Papirus-Dark
-    [ -d /usr/share/icons/SwayRdp-Mono ] && icons=SwayRdp-Mono
     mkdir -p "$qt_dir/colors" && cat > "$qt_dir/qt6ct.conf" <<EOC
 [Appearance]
 color_scheme_path=$qt_dir/colors/matugen.conf
@@ -21,6 +20,8 @@ fixed="Inter,10"
 general="Inter,10"
 EOC
 fi
+# The black and white icon theme is gone: the apps have their own colours again (the folders follow the accent, see below).
+[ -e "$qt_dir/qt6ct.conf" ] && sed -i 's/^icon_theme=SwayRdp-Mono$/icon_theme=Papirus-Dark/' "$qt_dir/qt6ct.conf"
 # A softer look for the Qt widgets in the shapes of DMS (a stylesheet of palette colours): added once to an account that
 # was set up before it existed; removing the line afterwards sticks.
 qss=/usr/share/sway-rdp/qt6ct/dms.qss

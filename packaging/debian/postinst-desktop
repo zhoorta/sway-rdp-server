@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
-# The black and white icon theme is made from the Papirus on this machine.
-if [ "$1" = configure ] && [ -x /usr/bin/sway-rdp-mkicons ]; then
-    /usr/bin/sway-rdp-mkicons || echo "sway-rdp-desktop: could not make the SwayRdp-Mono icon theme" >&2
+# The black and white icon theme of earlier versions is not used any more.
+if [ "$1" = configure ]; then
+    rm -rf /usr/share/icons/SwayRdp-Mono
 fi
 # DMS only watches app folders that exist when it starts; Flatpak makes this one on the first install, so the first
 # Flatpak app would not show up in the launcher until DMS restarts.

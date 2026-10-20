@@ -156,12 +156,13 @@ if settings is not None and not os.path.exists(marker):
     settings["builtInPluginSettings"] = builtin
     changed = True
     open(marker, "w").close()
-# Black and white icons (made by sway-rdp-mkicons from Papirus).
-marker = os.path.join(d, ".mono-icons")
-if settings is not None and not os.path.exists(marker) and os.path.isdir("/usr/share/icons/SwayRdp-Mono"):
-    settings["iconThemeDark"] = "SwayRdp-Mono"
-    settings["iconThemeLight"] = "SwayRdp-Mono"
-    changed = True
+# Apps in their own colours (Papirus-Dark): an account that was given the black and white theme goes back once.
+marker = os.path.join(d, ".natural-icons")
+if settings is not None and not os.path.exists(marker):
+    if settings.get("iconThemeDark") == "SwayRdp-Mono" and os.path.isdir("/usr/share/icons/Papirus-Dark"):
+        settings["iconThemeDark"] = "Papirus-Dark"
+        settings["iconThemeLight"] = "Papirus"
+        changed = True
     open(marker, "w").close()
 # pcmanfm-qt draws the desktop (icons, folders) on the background layer. DMS's own wallpaper is on that layer too, and
 # whichever started last is on top: it would hide the icons after the shell restarts. DMS's own switch for this is "Disable
@@ -216,11 +217,11 @@ for gtk in gtk-3.0 gtk-4.0; do
         key="${kv%%=*}"
         grep -q "^$key=" "$ini" || sed -i "/\[Settings\]/a $kv" "$ini"
     done
-    if [ -d /usr/share/icons/SwayRdp-Mono ]; then
+    if [ -d /usr/share/icons/Papirus-Dark ]; then
         if grep -q '^gtk-icon-theme-name=' "$ini"; then
-            sed -i 's/^gtk-icon-theme-name=.*/gtk-icon-theme-name=SwayRdp-Mono/' "$ini"
+            sed -i 's/^gtk-icon-theme-name=.*/gtk-icon-theme-name=Papirus-Dark/' "$ini"
         else
-            sed -i '/\[Settings\]/a gtk-icon-theme-name=SwayRdp-Mono' "$ini"
+            sed -i '/\[Settings\]/a gtk-icon-theme-name=Papirus-Dark' "$ini"
         fi
     fi
 done
@@ -231,7 +232,7 @@ if command -v gsettings >/dev/null 2>&1; then
     export DBUS_SESSION_BUS_ADDRESS
     gs() { gsettings set org.gnome.desktop.interface "$@" 2>/dev/null; }
     apply_gsettings() {
-        [ -d /usr/share/icons/SwayRdp-Mono ] && gs icon-theme SwayRdp-Mono
+        [ -d /usr/share/icons/Papirus-Dark ] && gs icon-theme Papirus-Dark
         gs color-scheme prefer-dark
         gs font-name 'Inter 10'
     }
