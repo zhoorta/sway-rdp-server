@@ -40,4 +40,18 @@ MountOnStartup=false
 MountRemovable=false
 EOC
 fi
-exec pcmanfm-qt --desktop
+# The session starts before its screen exists (the output is made when the RDP client arrives) and pcmanfm-qt ends when it
+# finds no screen: wait for one, for up to a minute.
+n=0
+while [ "$n" -lt 200 ] && ! swaymsg -t get_outputs 2>/dev/null | grep -q '"active": true'; do
+    sleep 0.3
+    n=$((n + 1))
+done
+# Right when the output appears the clients do not see it yet and pcmanfm-qt ends again at once: try again a few times
+# (a run of ten seconds or more counts as started).
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    started=$(date +%s)
+    pcmanfm-qt --desktop
+    [ $(( $(date +%s) - started )) -ge 10 ] && break
+    sleep 1
+done
