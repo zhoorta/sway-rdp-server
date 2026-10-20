@@ -1,0 +1,38 @@
+/* A softer look for Qt apps (QTerminal, pcmanfm-qt, ...) on top of the Fusion style, in the shapes of DankMaterialShell:
+   flat, rounded, the accent colour for what is selected. Colours come from the palette (qt6ct keeps it in step with DMS),
+   so nothing here names a colour. */
+QMenuBar { background: palette(window); border: none; padding: 2px 4px; }
+QMenuBar::item { background: transparent; padding: 4px 10px; border-radius: 8px; }
+QMenuBar::item:selected { background: palette(mid); }
+QMenu { background: palette(base); border: 1px solid palette(mid); border-radius: 12px; padding: 6px; }
+QMenu::item { padding: 6px 18px; border-radius: 8px; }
+QMenu::item:selected { background: palette(highlight); color: palette(highlighted-text); }
+QMenu::separator { height: 1px; background: palette(mid); margin: 4px 10px; }
+QTabWidget::pane { border: none; }
+QTabBar { background: palette(window); qproperty-drawBase: 0; }
+QTabBar::tab { background: transparent; color: palette(window-text); padding: 6px 14px; margin: 4px 2px 4px 2px; border-radius: 10px; }
+QTabBar::tab:selected { background: palette(highlight); color: palette(highlighted-text); }
+QTabBar::tab:hover:!selected { background: palette(mid); }
+QTabBar::close-button { image: url(/usr/share/sway-rdp/qt6ct/close.svg); subcontrol-position: right; border-radius: 8px; margin: 2px; }
+QTabBar::close-button:hover { background: palette(mid); }
+QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }
+QScrollBar:horizontal { background: transparent; height: 10px; margin: 0; }
+QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: palette(mid); border-radius: 5px; min-height: 30px; min-width: 30px; }
+QScrollBar::handle:hover { background: palette(midlight); }
+QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; background: none; border: none; }
+QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
+QPushButton, QToolButton { background: palette(button); border: 1px solid transparent; border-radius: 10px; padding: 5px 14px; }
+QToolButton { padding: 4px 6px; }
+QPushButton:hover, QToolButton:hover { background: palette(mid); }
+QPushButton:default, QPushButton:pressed { background: palette(highlight); color: palette(highlighted-text); }
+QLineEdit, QSpinBox, QComboBox, QPlainTextEdit, QTextEdit { background: palette(base); border: 1px solid palette(mid); border-radius: 10px; padding: 4px 8px; selection-background-color: palette(highlight); }
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border: 1px solid palette(highlight); }
+QComboBox::drop-down { border: none; width: 22px; }
+QToolBar { background: palette(window); border: none; spacing: 4px; padding: 4px; }
+QStatusBar { background: palette(window); }
+QToolTip { background: palette(base); color: palette(text); border: 1px solid palette(mid); border-radius: 8px; padding: 4px 8px; }
+QHeaderView::section { background: palette(window); border: none; padding: 4px 8px; }
+QListView, QTreeView { border: none; background: palette(base); }
+QListView::item, QTreeView::item { border-radius: 8px; padding: 2px; }
+QListView::item:selected, QTreeView::item:selected { background: palette(highlight); color: palette(highlighted-text); }
+QSplitter::handle { background: transparent; }

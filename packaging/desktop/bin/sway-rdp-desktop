@@ -21,6 +21,13 @@ fixed="Inter,10"
 general="Inter,10"
 EOC
 fi
+# A softer look for the Qt widgets in the shapes of DMS (a stylesheet of palette colours): added once to an account that
+# was set up before it existed; removing the line afterwards sticks.
+qss=/usr/share/sway-rdp/qt6ct/dms.qss
+if [ -e "$qss" ] && [ -e "$qt_dir/qt6ct.conf" ] && [ ! -e "$qt_dir/.dms-qss" ]; then
+    : > "$qt_dir/.dms-qss"
+    grep -q '^stylesheets=' "$qt_dir/qt6ct.conf" || printf '\n[Interface]\nstylesheets=%s\n' "$qss" >> "$qt_dir/qt6ct.conf"
+fi
 # The desktop is the whole screen and the shell's bar covers its top edge: keep the icons below it. The Qt font and
 # the terminal match the rest of the session. It does not mount drives by itself: that asks an administrator's password
 # in a session without a seat, before anyone asked for it.
@@ -32,7 +39,7 @@ Font="Inter,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
 WorkAreaMargins=12, 56, 12, 12
 
 [System]
-Terminal=foot
+Terminal=sway-rdp-terminal
 
 [Volume]
 AutoRun=false
