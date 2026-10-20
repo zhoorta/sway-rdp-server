@@ -5,6 +5,13 @@ export XDG_CURRENT_DESKTOP=sway XDG_SESSION_TYPE=wayland
 # The shell only watches app folders that exist when it starts: make the account's Flatpak one now, or its first
 # Flatpak app stays out of the launcher until the shell restarts.
 mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/flatpak/exports/share/applications"
+# The user manager (which started before this session) had its XDG_DATA_DIRS made by Flatpak's environment generator when the
+# folder above did not exist yet, so the account's own Flatpak apps were missing from it. Ask Flatpak again; the shell gets
+# this through dbus-update-activation-environment below.
+if command -v flatpak >/dev/null 2>&1; then
+    flatpak_dirs=$(flatpak --print-updated-env 2>/dev/null | sed -n 's/^XDG_DATA_DIRS=//p')
+    [ -n "$flatpak_dirs" ] && export XDG_DATA_DIRS="$flatpak_dirs"
+fi
 # First start of an account: DankMaterialShell without animations. Every animation frame is drawn in software and then
 # sent over the network; on a VM without a GPU they cost about three times the CPU of the rest of the session. The
 # account can turn them back on in the shell's settings (which then own the file).
