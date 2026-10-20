@@ -17,3 +17,8 @@ SWAY_RDP_SESSION_ARGS=
 # cursor theme with nothing in it, sway-rdp-blank); "server" = in the picture, with the shape the app asked for (text cursor,
 # resize arrows), but a network round trip behind, and only for clients that make their own pointer invisible when told to.
 #SWAY_RDP_CURSOR=client
+
+# Who may log in: members of the group sway-rdp-users (the package makes it and, on a first install, adds the account that ran the
+# installation). Add accounts with: adduser ACCOUNT sway-rdp-users. To let every ordinary account with a login shell in, as
+# before, put the line below WITH nothing after the equals sign; another group: SWAY_RDP_HELPER_ARGS=--require-group NAME
+#SWAY_RDP_HELPER_ARGS=--require-group sway-rdp-users

@@ -469,6 +469,7 @@ async fn main() -> anyhow::Result<()> {
     // One sway per logged-in account, started as that account (needs --auth pam, and root for other accounts).
     let mut per_user = false;
     let mut allow_users: Option<Vec<String>> = None;
+    let mut require_group: Option<String> = None;
     // The root helper (`--helper`), or the daemon using one (`--auth helper`).
     let mut run_helper = false;
     let mut helper_socket = PathBuf::from("/run/sway-rdp/helper.sock");
@@ -500,6 +501,7 @@ async fn main() -> anyhow::Result<()> {
             "--helper-socket" => helper_socket = PathBuf::from(args.next().context("--helper-socket needs a path")?),
             "--daemon-user" => daemon_user = args.next().context("--daemon-user needs an account name")?,
             "--per-user" => per_user = true,
+            "--require-group" => require_group = Some(args.next().context("--require-group needs a group name")?),
             "--allow-users" => allow_users = Some(args.next().context("--allow-users needs a comma separated list")?.split(',').map(str::to_owned).collect()),
             // A new connection ends the open one. It does so before the new client has logged in, so use
             // it only where reaching the port already means trust (loopback, SSH tunnel, VPN).
@@ -541,7 +543,7 @@ async fn main() -> anyhow::Result<()> {
     }
     if run_helper {
         let exe = std::env::current_exe().context("path of this program")?;
-        return helper::run(helper::Config { socket: helper_socket, daemon_user, allow_users, exe, worker_args, workspace, systemd_sessions });
+        return helper::run(helper::Config { socket: helper_socket, daemon_user, allow_users, require_group, exe, worker_args, workspace, systemd_sessions });
     }
     anyhow::ensure!(matches!(auth_mode.as_str(), "file" | "pam" | "helper"), "--auth must be file, pam or helper");
     anyhow::ensure!(!per_user || auth_mode == "pam", "--per-user needs --auth pam (the account comes from the login)");
@@ -568,7 +570,7 @@ async fn main() -> anyhow::Result<()> {
         acceptor,
         pub_key: identity.pub_key,
         tls_only,
-        pam: if pam { Some(auth::PamPolicy::new("sway-rdp-server", allow_users)?) } else { None },
+        pam: if pam { Some(auth::PamPolicy::new("sway-rdp-server", allow_users, require_group)?) } else { None },
         credentials: (username, password),
         helper_socket: via_helper.then_some(helper_socket),
         egfx: (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 }),

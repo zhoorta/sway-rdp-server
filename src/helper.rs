@@ -36,6 +36,8 @@ pub struct Config {
     /// The only account that may connect.
     pub daemon_user: String,
     pub allow_users: Option<Vec<String>>,
+    /// A group every account that logs in has to be in.
+    pub require_group: Option<String>,
     pub exe: PathBuf,
     pub worker_args: Vec<String>,
     pub workspace: String,
@@ -99,7 +101,7 @@ pub fn run(cfg: Config) -> Result<()> {
     ensure!(unsafe { libc::geteuid() } == 0, "the helper has to run as root");
     let daemon = lookup_user(&cfg.daemon_user).with_context(|| format!("no account named {}", cfg.daemon_user))?;
     ensure!(daemon.uid != 0, "the daemon must not be root");
-    let policy = PamPolicy::new("sway-rdp-server", cfg.allow_users.clone())?;
+    let policy = PamPolicy::new("sway-rdp-server", cfg.allow_users.clone(), cfg.require_group.clone())?;
 
     let dir = cfg.socket.parent().context("--helper-socket needs a directory")?.to_path_buf();
     std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;

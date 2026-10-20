@@ -145,6 +145,16 @@ fn shell_allows_login(shell: &str, listed: &str) -> bool {
     listed.lines().map(str::trim).any(|l| !l.starts_with('#') && l == shell)
 }
 
+/// The id of the group called `name`.
+fn group_gid(name: &str) -> Option<u32> {
+    let cname = CString::new(name).ok()?;
+    let mut grp: libc::group = unsafe { std::mem::zeroed() };
+    let mut buf = vec![0u8; 16384];
+    let mut res: *mut libc::group = std::ptr::null_mut();
+    let rc = unsafe { libc::getgrnam_r(cname.as_ptr(), &mut grp, buf.as_mut_ptr() as *mut c_char, buf.len(), &mut res) };
+    (rc == 0 && !res.is_null()).then_some(grp.gr_gid)
+}
+
 /// Who may log in and how failures are counted. One per server.
 pub struct PamPolicy {
     service: String,
@@ -153,6 +163,8 @@ pub struct PamPolicy {
     root: bool,
     /// Names allowed besides the running user (as root); None = every ordinary account.
     allow: Option<Vec<String>>,
+    /// A group every account has to be in (None = no such rule). A group that does not exist lets nobody in.
+    require_group: Option<String>,
     guards: Mutex<HashMap<String, Guard>>,
 }
 
@@ -165,7 +177,12 @@ const LOCKOUT: Duration = Duration::from_secs(60);
 const MAX_TRACKED: usize = 4096;
 
 impl PamPolicy {
-    pub fn new(service: &str, allow: Option<Vec<String>>) -> anyhow::Result<Arc<Self>> {
+    pub fn new(service: &str, allow: Option<Vec<String>>, require_group: Option<String>) -> anyhow::Result<Arc<Self>> {
+        if let Some(group) = &require_group {
+            if group_gid(group).is_none() {
+                warn!(group = ?group, "the group that logins require does not exist: nobody can log in until it is made");
+            }
+        }
         let uid = unsafe { libc::getuid() };
         let name = unsafe {
             let pw = libc::getpwuid(uid);
@@ -173,7 +190,7 @@ impl PamPolicy {
         };
         let name = name.ok_or_else(|| anyhow::anyhow!("cannot find the name of the user running the server"))?;
         let running = lookup_user(&name).ok_or_else(|| anyhow::anyhow!("cannot look up {name}"))?;
-        Ok(Arc::new(Self { service: service.to_owned(), running, root: uid == 0, allow, guards: Mutex::new(HashMap::new()) }))
+        Ok(Arc::new(Self { service: service.to_owned(), running, root: uid == 0, allow, require_group, guards: Mutex::new(HashMap::new()) }))
     }
 
     pub fn running_user(&self) -> &str {
@@ -193,6 +210,12 @@ impl PamPolicy {
         }
         if !shell_allows_login(&info.shell, &std::fs::read_to_string("/etc/shells").unwrap_or_default()) {
             return None;
+        }
+        if let Some(group) = &self.require_group {
+            // `info.groups` has every group of the account (the primary one and the others).
+            if !group_gid(group).is_some_and(|gid| info.groups.contains(&gid)) {
+                return None;
+            }
         }
         if info.uid == self.running.uid {
             return Some(info);
@@ -291,12 +314,23 @@ mod tests {
     #[test]
     fn root_and_system_accounts_never_log_in() {
         // Whoever runs the tests (root in the build container, an ordinary user elsewhere) the answer is the same.
-        let policy = PamPolicy::new("sway-rdp-server", None).unwrap();
+        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
         assert!(policy.candidate("root").is_none());
         assert!(policy.candidate("nobody").is_none());
         assert!(policy.candidate("no such account").is_none());
         assert!(policy.candidate("").is_none());
         assert!(policy.candidate("a\0b").is_none());
+    }
+
+    #[test]
+    fn a_required_group_that_does_not_exist_lets_nobody_in() {
+        assert_eq!(group_gid("root"), Some(0));
+        assert_eq!(group_gid("no-such-group-sway-rdp"), None);
+        assert_eq!(group_gid("a\0b"), None);
+        let policy = PamPolicy::new("sway-rdp-server", None, Some("no-such-group-sway-rdp".into())).unwrap();
+        let me = unsafe { libc::getuid() };
+        let name = unsafe { std::ffi::CStr::from_ptr((*libc::getpwuid(me)).pw_name) }.to_string_lossy().into_owned();
+        assert!(policy.candidate(&name).is_none(), "even the account running the tests");
     }
 
     #[test]
@@ -314,7 +348,7 @@ mod tests {
 
     #[test]
     fn failures_are_counted_per_key_and_lock_out() {
-        let policy = PamPolicy::new("sway-rdp-server", None).unwrap();
+        let policy = PamPolicy::new("sway-rdp-server", None, None).unwrap();
         for _ in 0..5 {
             assert!(policy.begin_attempt("user:x", 5));
         }

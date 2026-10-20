@@ -81,3 +81,10 @@ per-account resource limits yet). See docs/MULTIUSER-DESIGN.md.
 
 Dual-licensed under either of [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option. `patches/ironrdp-server` is a
 modified copy of IronRDP's `ironrdp-server` crate and stays under its own licence (MIT or Apache-2.0, files included there).
+
+## Who may log in
+
+Members of the group `sway-rdp-users` (the package makes it, and on a first install adds the account that ran the installation):
+`adduser ACCOUNT sway-rdp-users`. The account also needs a login shell listed in `/etc/shells`. To let every ordinary account in, put
+`SWAY_RDP_HELPER_ARGS=` (nothing after the equals sign) in `/etc/default/sway-rdp` and restart `sway-rdp-helper`; for another group,
+`SWAY_RDP_HELPER_ARGS=--require-group NAME`. Root is never let in.

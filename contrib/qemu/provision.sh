@@ -54,6 +54,9 @@ for acct in rdptest rdptest2; do
     useradd -m -s /bin/bash "$acct"
     if [ "$acct" = rdptest ]; then echo "$acct:$PW1" | chpasswd; else echo "$acct:$PW2" | chpasswd; usermod -aG sudo,sway-rdp-admins "$acct"; fi
 done
+# Who may log in over RDP: the accounts of this VM (the group is made by the package).
+for acct in rdptest rdptest2 rdptest3; do id "$acct" >/dev/null 2>&1 && usermod -aG sway-rdp-users "$acct"; done
+systemctl restart sway-rdp-helper.service sway-rdp.service
 systemctl is-active sway-rdp-helper.service sway-rdp.service
 ss -ltn | grep ':3389 ' || true
 REMOTE

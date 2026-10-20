@@ -79,6 +79,7 @@ VM. Nothing here changes the stated deployment: loopback, an SSH tunnel or a VPN
 | 10 | **Names from the network were logged as typed**, so a name with a line break could look like a second log line. | The account name and source address are logged with `Debug` formatting (quoted and escaped). | Journal lines now read `user="rdptest3" source="10.0.2.2"`. |
 | 11 | **The root helper kept more than it needs**: network access, devices, the clock, the kernel log, writable homes, writable and executable memory, all capabilities. | `sway-rdp-helper.service`: `RestrictAddressFamilies=AF_UNIX`, `IPAddressDeny=any`, `PrivateDevices`, `ProtectClock`, `ProtectHostname`, `ProtectHome=read-only`, `ProtectKernelLogs`, `MemoryDenyWriteExecute`, and a capability bound of `CAP_CHOWN CAP_DAC_READ_SEARCH CAP_AUDIT_WRITE CAP_SETUID CAP_SETGID`. | `systemd-analyze security`: **7.2 MEDIUM to 4.0 OK** (the daemon stays at 1.8). After the change a login works and the helper starts a new session unit. |
 | 12 | **The Flatpak polkit rule was wide**: members of `sudo` could run every system Flatpak action without a password in an active remote session, including sideloading bundles and changing remotes; weaker than `sudo` asking for a password. | `40-sway-rdp-flatpak.rules`: only members of the new group `sway-rdp-admins` (empty at first, made by the package; `adduser ACCOUNT sway-rdp-admins`), and only install, update, uninstall and metadata actions. Sideloading, remotes and configuration always ask. | `pkcheck` inside active sessions: a member of the group gets `app-install` without a password and still a password for `modify-repo` and `install-bundle`; a `sudo` member outside the group and an ordinary account get a password for all three. |
+| 13 | **Every ordinary account with a login shell could log in**: the set of accounts that get a desktop was "whoever has an account", and an upgrade or a new account widened it without anyone deciding. | `--require-group NAME` for the helper (and `--auth pam`): the account must be in that group, and a group that does not exist lets nobody in (with a warning at start). The packaged unit defaults to the group `sway-rdp-users`, made by the package; a first install adds the account that ran it. `/etc/default/sway-rdp` can clear or change it (`SWAY_RDP_HELPER_ARGS=`). | Unit tests; in the VM a member was accepted and a valid account outside the group refused; with the setting cleared the outsider was accepted, with it restored refused again. |
 
 ## Checked again against the current code
 
@@ -94,8 +95,7 @@ have size limits and strict decoding. The daemon unit is sandboxed (no capabilit
    for a whole office), so the limits protect passwords but can also keep a real user out for a minute at a time. Options:
    count per (account, source) pair as well as per account, back off longer after repeated lockouts, and add `pam_faillock` to the
    PAM stack of the service. Needs a decision on what to protect first: availability or guessing.
-2. **Every ordinary account with a login shell may log in.** An opt-in group (for example `sway-rdp-users`) as the default would
-   make the set of accounts explicit; `--allow-users` exists but is a list of names.
+2. (Closed: see finding 13.)
 3. (Closed: see finding 12.)
 4. **The helper unit can go further**: a system call filter and a narrower capability set, checked with a real PAM stack. A PAM stack
    that needs the network by itself (`pam_ldap`, not `sssd`) needs `IPAddressDeny=any` and `RestrictAddressFamilies` lifted in a drop-in.

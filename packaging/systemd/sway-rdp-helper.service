@@ -6,8 +6,11 @@ Before=sway-rdp.service
 
 [Service]
 Type=simple
+# Only members of this group may log in. It is the default here so that an upgrade cannot open the server to every ordinary
+# account; /etc/default/sway-rdp overrides it (SWAY_RDP_HELPER_ARGS= with nothing after it lets every ordinary account in).
+Environment="SWAY_RDP_HELPER_ARGS=--require-group sway-rdp-users"
 EnvironmentFile=-/etc/default/sway-rdp
-ExecStart=/usr/bin/sway-rdp-server --helper --daemon-user sway-rdp --systemd-sessions
+ExecStart=/usr/bin/sway-rdp-server --helper --daemon-user sway-rdp --systemd-sessions $SWAY_RDP_HELPER_ARGS
 Restart=on-failure
 RestartSec=2
 # The helper's runtime directory holds its two sockets.
