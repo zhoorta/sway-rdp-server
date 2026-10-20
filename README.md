@@ -89,6 +89,13 @@ Members of the group `sway-rdp-users` (the package makes it, and on a first inst
 `SWAY_RDP_HELPER_ARGS=` (nothing after the equals sign) in `/etc/default/sway-rdp` and restart `sway-rdp-helper`; for another group,
 `SWAY_RDP_HELPER_ARGS=--require-group NAME`. Root is never let in.
 
+## File manager menus
+
+The desktop and file manager are Debian's pcmanfm-qt. `packaging/pcmanfm-qt/build.sh [arm64|amd64]` rebuilds it with a small patch that
+removes Desktop Preferences, Hide Desktop Items, Create Launcher and Open in Terminal from the menus (DMS does wallpaper and settings).
+Install the resulting `pcmanfm-qt_*+sway-rdp1_*.deb` over Debian's and `apt-mark hold pcmanfm-qt`, so Debian's updates do not replace it;
+check the patch again when upstream changes. Without it everything works, with the stock menus.
+
 ## Managing accounts: `sway-rdp-admin`
 
 ```

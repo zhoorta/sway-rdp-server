@@ -18,6 +18,7 @@ ACCOUNTS="${VM_DIR:-$HOME/vm/$NAME}/accounts.txt"
 
 BASE=$(ls -t "$OUT"/sway-rdp_*_arm64.deb 2>/dev/null | head -1)
 DESKTOP=$(ls -t "$OUT"/sway-rdp-desktop_*_all.deb 2>/dev/null | head -1)
+FM=$(ls -t "$OUT"/pcmanfm-qt_*sway-rdp*_arm64.deb 2>/dev/null | head -1)   # optional: packaging/pcmanfm-qt/build.sh arm64
 [ -n "$BASE" ] && [ -n "$DESKTOP" ] || { echo "no packages in $OUT: run packaging/build-deb.sh arm64" >&2; exit 1; }
 "$VM" status | grep -q running || { echo "the VM is not running: $VM start" >&2; exit 1; }
 
@@ -31,7 +32,7 @@ PW2=$(sed -n 's/^rdptest2 //p' "$ACCOUNTS")
 
 echo "pushing $(basename "$BASE") and $(basename "$DESKTOP")"
 "$VM" ssh 'rm -rf ~/provision && mkdir -p ~/provision'
-tar cf - -C "$OUT" "$(basename "$BASE")" "$(basename "$DESKTOP")" -C "$REPO/packaging/desktop/setup" dms.sh | "$VM" ssh 'tar xf - -C ~/provision'
+tar cf - -C "$OUT" "$(basename "$BASE")" "$(basename "$DESKTOP")" ${FM:+"$(basename "$FM")"} -C "$REPO/packaging/desktop/setup" dms.sh | "$VM" ssh 'tar xf - -C ~/provision'
 
 {
     printf "PW1='%s'\nPW2='%s'\n" "$PW1" "$PW2"
@@ -44,6 +45,12 @@ apt-get update -qq
 # that matter are named here: audio, the clipboard, the picker of "Add app to desktop", the wallpaper, Flatpak, a browser.
 apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold flatpak ./sway-rdp_*.deb ./sway-rdp-desktop_*.deb \
     pipewire pipewire-pulse pulseaudio-utils wireplumber wl-clipboard wmenu whiptail swaybg firefox-esr
+# The patched file manager (menus without Desktop Preferences, Create Launcher, Open in Terminal), when it was built; held so that
+# Debian's own pcmanfm-qt does not replace it.
+if ls ./pcmanfm-qt_*.deb >/dev/null 2>&1; then
+    apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold ./pcmanfm-qt_*.deb
+    apt-mark hold pcmanfm-qt
+fi
 bash ./dms.sh
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 # Only the forward of the Mac (127.0.0.1) reaches this address: listen on every interface, not on the loopback of the VM only.
