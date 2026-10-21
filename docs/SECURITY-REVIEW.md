@@ -110,3 +110,38 @@ have size limits and strict decoding. The daemon unit is sandboxed (no capabilit
    for daemon and helper, no second factor, no deadline for slow clients after login, no fuzzing of the RDP side, amd64 untested, and
    no review by someone else. An independent review is the next real step: it should be given `src/helper.rs`, `src/auth.rs`,
    `src/link.rs`, `src/proto.rs` and `packaging/systemd/*.service`.
+
+---
+
+# Third pass (2026-10-21)
+
+Who wrote it: the author of the code, with an AI assistant, reading what the first two passes did not: `waydesk-admin` and its
+polkit action, the Users & Access panel, both sides of the clipboard, the three units, `postinst`, the PAM files, the Flatpak
+rule and the dev VM files. **Still not an independent review**, and no active testing: code reading only. Nothing here changes
+the stated deployment (loopback, an SSH tunnel or a VPN).
+
+## Fixed in this pass
+
+| # | Finding | Fix | Checked |
+|---|---|---|---|
+| 17 | **Clipboard texts from a session were limited in size but not in number.** Each one is announced to the client, so a session copying in a loop could flood the client and use daemon time that belongs to everybody (memory stays bounded: only the last text is kept). | `ClipboardGate` in `link.rs`: at most 10 texts a second, each at most `MAX_CLIPBOARD`; the rest are dropped. | Unit test `clipboard_texts_of_a_session_are_limited_in_size_and_speed`. **Not run yet**: the Mac's Cargo (1.76) cannot read the v4 lock file; run `cargo test link` in the VM. |
+
+## Checked and found as intended
+
+- `waydesk-admin`: every name is validated (nothing that could be an option or a path), tools are started by absolute path with
+  no shell, passwords only travel over a pipe to `chpasswd`, root and uid below 1000 are never touched, one cannot remove or
+  demote oneself or the last `sudo` member. The panel passes its arguments to `pkexec` as an array, and the tool validates
+  them again. The polkit action is pinned to `/usr/bin/waydesk-admin`, `auth_admin`, no GUI.
+- The first-install private key is not exposed: `openssl req -keyout` creates it with mode 0600.
+- The units match what the first two passes say of them.
+
+## Noted, not changed
+
+1. A client that sends clipboard announcements during the first 5 seconds of a connection makes a sleeping thread for each
+   (`on_remote_copy`). Only an authenticated client can, and it ends after 5 s.
+2. `user-.slice.d/50-waydesk.conf` (`MemoryMax=90%`, `TasksMax=8192`) applies to every account, root's and administrators'
+   SSH sessions too. An operational trade-off; worth a line in the README.
+3. `waydesk-admin users add` gives the account a real random password, so with `PasswordAuthentication yes` in sshd it can
+   also log in over SSH from the start. By design; the command's output could say so.
+4. Still open from before: plain TLS login, unpinned third-party apt keys, no second factor, no fuzzing of the RDP side,
+   amd64 untested, no review by someone else.

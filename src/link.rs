@@ -84,6 +84,34 @@ impl AudioGate {
     }
 }
 
+/// The most clipboard texts a session may announce in a second. People copy a few times a second at most.
+const MAX_CLIPBOARD_PER_SECOND: u32 = 10;
+
+/// Decides which clipboard texts of a session are passed on: each one is announced to the client, so a session that
+/// copies in a loop would flood the client and take daemon time that belongs to everybody.
+struct ClipboardGate {
+    window: std::time::Instant,
+    count: u32,
+}
+
+impl ClipboardGate {
+    fn new(now: std::time::Instant) -> Self {
+        Self { window: now, count: 0 }
+    }
+
+    fn allow(&mut self, now: std::time::Instant, len: usize) -> bool {
+        if now.duration_since(self.window) >= Duration::from_secs(1) {
+            self.window = now;
+            self.count = 0;
+        }
+        if len > proto::MAX_CLIPBOARD {
+            return false;
+        }
+        self.count += 1;
+        self.count <= MAX_CLIPBOARD_PER_SECOND
+    }
+}
+
 pub enum Event {
     Frame { x: u16, y: u16, w: u16, h: u16, kind: FrameKind, data: Vec<u8> },
     /// The picture has a new size from now on; frames before this message have the old one.
@@ -168,6 +196,7 @@ impl Link {
         let reader = link.clone();
         tokio::spawn(async move {
             let mut audio_gate = AudioGate::new(std::time::Instant::now());
+            let mut clipboard_gate = ClipboardGate::new(std::time::Instant::now());
             loop {
                 let body = match proto::read_frame_async(&mut rd).await {
                     Ok(Some(b)) => b,
@@ -200,8 +229,8 @@ impl Link {
                         }
                     }
                     Ok(Up::Clipboard { data }) => {
-                        // Untrusted like everything from the session: bounded here, and only text is made of it.
-                        if data.len() <= proto::MAX_CLIPBOARD {
+                        // Untrusted like everything from the session: bounded in size and speed (see `ClipboardGate`), and only text is made of it.
+                        if clipboard_gate.allow(std::time::Instant::now(), data.len()) {
                             if let Some(sink) = reader.clipboard.lock().unwrap().as_ref() {
                                 sink(data);
                             }
@@ -310,6 +339,18 @@ mod tests {
         }
         assert!(!gate.allow(t0, crate::audio::CHUNK), "more than the limit in one second");
         assert!(gate.allow(t0 + Duration::from_millis(1100), crate::audio::CHUNK), "a new second starts again");
+    }
+
+    #[test]
+    fn clipboard_texts_of_a_session_are_limited_in_size_and_speed() {
+        let t0 = std::time::Instant::now();
+        let mut gate = ClipboardGate::new(t0);
+        assert!(!gate.allow(t0, proto::MAX_CLIPBOARD + 1), "a text that is too long");
+        for _ in 0..MAX_CLIPBOARD_PER_SECOND {
+            assert!(gate.allow(t0, 5));
+        }
+        assert!(!gate.allow(t0, 5), "more than the limit in one second");
+        assert!(gate.allow(t0 + Duration::from_millis(1100), proto::MAX_CLIPBOARD), "a new second starts again");
     }
 
     #[test]
