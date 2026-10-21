@@ -2,7 +2,7 @@
 """QTerminal in the colours of the shell: waydesk-terminal [qterminal options]
 
 DankMaterialShell keeps ~/.config/foot/dank-colors.ini in step with its theme. This turns those colours into a colour scheme
-for QTerminal each time it starts, and gives a new account a quiet setup (no accent border around the terminal, the terminal font). Settings the account changed afterwards stay as they are.
+for QTerminal each time it starts, and gives a new account a quiet setup (no accent border around the terminal, the terminal font; the window keeps its title bar). Settings the account changed afterwards stay as they are.
 """
 import configparser
 import os
@@ -51,13 +51,23 @@ def settings():
         ini["General"] = {}
     g = ini["General"]
     if "colorScheme" in g:  # set up before: the account owns the file now
+        # Except for one thing we got wrong: "Borderless" asks for a window without a frame, so sway draws no title bar (and the
+        # window buttons) and the terminal cannot be moved or closed. Once, an account that still has our value gets the frame.
+        marker = os.path.join(CONFIG, "waydesk/.terminal-frame")
+        if not os.path.exists(marker):
+            os.makedirs(os.path.dirname(marker), exist_ok=True)
+            open(marker, "w").close()
+            if g.get("Borderless") == "true":
+                g["Borderless"] = "false"
+                with open(path, "w") as f:
+                    ini.write(f, space_around_delimiters=False)
         return
     g.update({
         "colorScheme": SCHEME,
         "fontFamily": "JetBrains Mono",
         "fontSize": "10",
         "MenuVisible": "true",
-        "Borderless": "true",
+        "Borderless": "false",
         "HideTabBarWithOneTab": "false",
         "highlightCurrentTerminal": "false",
         "TerminalMargin": "8",
