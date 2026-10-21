@@ -22,7 +22,9 @@ repo danklinux     https://download.opensuse.org/repositories/home:/AvengeMedia:
 repo avengemedia-dms https://download.opensuse.org/repositories/home:/AvengeMedia:/dms/Debian_13/
 
 $SUDO apt-get update
-$SUDO apt-get install -y -t trixie-backports quickshell
+# Only when it is missing: an installed quickshell is held with DMS (below) and moves with it (WAYDESK_DMS_UPDATE=1); asking for the
+# newest one of trixie-backports on every run failed once backports had a newer build that needs other new libraries.
+dpkg -s quickshell >/dev/null 2>&1 || $SUDO apt-get install -y -t trixie-backports quickshell
 # qt6-wayland: without it the shell opens as plain windows instead of a bar and wallpaper
 # DMS is pinned: its repository is not versioned by us and a new major release moves files the shell patches (waydesk-shell) and
 # the plugins rely on, which broke running sessions once (1.6.3 -> 2.0.0). The tested version is installed and held; WAYDESK_DMS_UPDATE=1

@@ -160,3 +160,11 @@ the kernel's out-of-memory killer with five accounts logged in; a user (or a han
 Noted: `waydesk-admin status` and the account list are open to every local account, like `/proc` is: they show the names of the programs and the memory of the other accounts
 (not their files or what is in them). `users limit` and `users limit ... reset` need root; sizes, weights and task numbers are checked before they reach `systemctl`
 (unit tests: no option, unit or shell syntax gets through). A refused login is only a failed login for the RDP client; nothing tells it why, which is also nothing for an attacker to learn.
+
+Correction to finding 12 (second pass), found on 2026-10-21 when an administrator of the group `waydesk-admins` was asked for a password in the middle of installing an app: the
+passwordless rule left out `org.freedesktop.Flatpak.modify-repo`, and the second pass described that action as "changing remotes". It is not: Flatpak's system helper asks for it
+for the housekeeping of its own local repository during every install, update and uninstall (`EnsureRepo`, `GetRevokefsFd`, `RunTriggers`, `PruneLocalRepo`, `RemoveLocalRef`,
+`CancelPull`; changing a remote is `configure-remote`). It is now in the rule (`40-waydesk-flatpak.rules`). Still asking for a password: `configure-remote`, `configure`,
+`install-bundle`, and the parental-controls actions. The privilege of a member does not grow in a way that matters: a member could already deploy any app of the configured
+remotes system-wide without a password, which is the larger power. Checked on the VM: an install of Sublime Text (and its runtime) from the member's own session finished
+without a prompt (`flatpak install --noninteractive`, exit 0), where before it failed with "GetRevokefsFd not allowed for user".
