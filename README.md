@@ -30,7 +30,7 @@ install time and its fingerprint is printed.
 
 `waydesk-desktop` (second package, same build) makes those sessions a Windows-like desktop: a system sway config
 (`/etc/xdg/waydesk/sway.conf`: floating windows with title bars, Alt+Tab, Alt+F4, `Super+d` launcher, screenshots;
-an account's `~/.config/waydesk/config` replaces it), the glue that starts [DankMaterialShell](https://danklinux.com)
+an account's `~/.config/waydesk/config` replaces it), the glue that starts [DankMaterialShell](https://duxlabs.dev)
 through the account's systemd user session when it is installed (it is not in Debian), and `waydesk-setup`, a
 whiptail wizard for DMS and developer, creative and AI apps. Design, threat model and what is not done yet:
 [docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
