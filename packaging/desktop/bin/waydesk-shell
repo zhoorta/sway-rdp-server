@@ -181,6 +181,19 @@ if settings is not None and not os.path.exists(marker):
     settings["screenPreferences"] = prefs
     changed = True
     open(marker, "w").close()
+# A dock at the bottom with the pinned and the running apps, on from the start. An account that set up a dock of its own keeps it;
+# one that only has the switched off dock DMS writes when it first saves its settings is given this one.
+# Compact, small icons and tight spacing, without the launcher button (the bar has the launcher); the rest is DMS's default.
+marker = os.path.join(d, ".dock-default")
+if settings is not None and not os.path.exists(marker):
+    ours = {"id": "dock", "name": "Dock", "enabled": True, "position": 1, "iconSize": 40, "spacing": 4, "itemSpacing": 4,
+            "margin": 0, "launcherEnabled": False, "launcherLogoMode": "apps"}
+    docks = settings.get("dockConfigs")
+    untouched = (len(docks) == 1 and docks[0].get("id") == "dock" and not docks[0].get("enabled")) if docks else True
+    if untouched:
+        settings["dockConfigs"] = [dict(docks[0], **ours)] if docks else [ours]
+        changed = True
+    open(marker, "w").close()
 if changed:
     with open(os.path.join(d, "settings.json"), "w") as f:
         json.dump(settings, f, indent=2)
@@ -279,10 +292,10 @@ fi
 # and the installed shell is used as it is when none applies.
 #  - The focused-window menu in the bar (right click) shows the PID and has "Kill Process", but DMS finds the PID only on niri,
 #    Hyprland and Mango; on sway it says "Unavailable". Ask sway for it (waydesk-focused-pid).
-#  - The launcher menu (right click on an app) says "Pin to Dock" and there is no dock: "Pin to desktop" puts the app on the
-#    desktop (waydesk-add-to-desktop).
+#  - The launcher menu (right click on an app) gets "Pin to desktop" next to "Pin to Dock": it puts the app on the desktop
+#    (waydesk-add-to-desktop).
 #  - The control center header of DMS 1.x has an edit button (rearranging its tiles) that has no setting to hide it.
-#  - Settings pages with nothing to set on a remote desktop are left out of the sidebar (dock, displays, network, power, input,
+#  - Settings pages with nothing to set on a remote desktop are left out of the sidebar (displays, network, power, input,
 #    users, lock screen, plugins ...), and so are the "Material" wallpapers: they are drawn by the shell's own wallpaper layer,
 #    which is off (the file manager draws the desktop), so choosing one changes nothing. An image or a colour does (waydesk-wallpaper).
 dms_src=/usr/share/quickshell/dms
@@ -355,7 +368,7 @@ new = '''        if (isRegularApp && desktopEntry?.id)
 '''
 if old not in text or "import Quickshell\n" in text:
     sys.exit(1)
-text = text.replace("import QtQuick\n", "import QtQuick\nimport Quickshell\n", 1).replace(old, new, 1)
+text = text.replace("import QtQuick\n", "import QtQuick\nimport Quickshell\n", 1).replace(old, old + new, 1)
 os.remove(dst)
 with open(dst, "w") as f:
     f.write(text)
@@ -384,7 +397,6 @@ needle = "    function isVisible(entry) {\n        if (!entry)\n            retu
 if needle not in text:
     sys.exit(1)
 hidden = [
-    "dock", "dock_general", "dock_widgets", "dock_appearance", "dock_advanced",
     "desktop_widgets", "desktop_widget", "wellbeing",
     "displays", "display_config", "display_gamma", "display_widgets",
     "input", "keybinds", "keyboard", "mouse_touchpad",

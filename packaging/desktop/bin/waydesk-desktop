@@ -41,7 +41,7 @@ if [ ! -e "$fm_dir/settings.conf" ]; then
 [Desktop]
 DesktopShortcuts=Home, Trash
 Font="Inter,10,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
-WorkAreaMargins=12, 56, 12, 12
+WorkAreaMargins=12, 56, 12, 60
 
 [System]
 Terminal=waydesk-terminal
@@ -67,6 +67,12 @@ spacing_marker="${XDG_CONFIG_HOME:-$HOME/.config}/waydesk/.fm-spacing"
 if [ ! -e "$spacing_marker" ]; then
     mkdir -p "$(dirname "$spacing_marker")" && : > "$spacing_marker"
     [ -e "$fm_dir/settings.conf" ] && sed -i 's/^FolderViewCellMargins=@Size(3 3)$/FolderViewCellMargins=@Size(8 8)/' "$fm_dir/settings.conf"
+fi
+# The dock takes 48 px at the bottom: the icons stay above it (once, and only for a margin nobody has changed).
+dock_marker="${XDG_CONFIG_HOME:-$HOME/.config}/waydesk/.dock-margin"
+if [ ! -e "$dock_marker" ]; then
+    mkdir -p "$(dirname "$dock_marker")" && : > "$dock_marker"
+    [ -e "$fm_dir/settings.conf" ] && sed -i 's/^WorkAreaMargins=12, 56, 12, 12$/WorkAreaMargins=12, 56, 12, 60/' "$fm_dir/settings.conf"
 fi
 # A desktop that is not empty from the first start: Home and Trash (built into the file manager) and a launcher of the browser, made
 # once. An account that already set the built-in items up, or put things on its desktop, keeps what it has.
