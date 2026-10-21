@@ -1,3 +1,10 @@
 #!/bin/sh
 # Task Manager: the shell's System Monitor (processes, CPU, memory, network, disks) opened or closed; a terminal with btop when the shell is not running.
+# For administrators (the group sudo), like Users & Access; the others do not get it from the launcher either. (The shell's own widgets
+# and `ps` show the same /proc: this is not a barrier, see the README.)
+if ! id -nG "$(id -un)" | tr ' ' '\n' | grep -qx sudo; then
+    echo "The Task Manager is for administrators." >&2
+    notify-send "Task Manager" "Only administrators can open the Task Manager." 2>/dev/null
+    exit 1
+fi
 dms ipc call processlist focusOrToggle >/dev/null 2>&1 || exec waydesk-terminal -e btop

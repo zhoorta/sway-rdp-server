@@ -268,15 +268,17 @@ if [ ! -e "$desktop_entry" ] || grep -q '^# waydesk:' "$desktop_entry"; then
     mkdir -p "$apps_dir"
     printf '# waydesk: opens the wallpaper settings of the shell\n[Desktop Entry]\nType=Application\nName=Desktop\nGenericName=Desktop Settings\nComment=Wallpaper and look of the desktop\nExec=waydesk-desktop-settings\nIcon=user-desktop\nCategories=Settings;\nStartupNotify=true\n' > "$desktop_entry"
 fi
-# Users & Access is for administrators (the group sudo, which is who polkit asks for a password): the others do not see it in the
-# launcher. Looked up in the account database, so a change shows at the next start of the shell.
-users_entry="$apps_dir/waydesk-users.desktop"
-if id -nG "$(id -un)" | tr ' ' '\n' | grep -qx sudo; then
-    grep -qs '^# waydesk:' "$users_entry" && rm -f "$users_entry"
-elif [ ! -e "$users_entry" ] || grep -q '^# waydesk:' "$users_entry"; then
-    mkdir -p "$apps_dir"
-    printf '# waydesk: Users & Access is for administrators\n[Desktop Entry]\nType=Application\nName=Users & Access\nNoDisplay=true\n' > "$users_entry"
-fi
+# Users & Access and the Task Manager are for administrators (the group sudo, which is who polkit asks for a password): the others do
+# not see them in the launcher. Looked up in the account database, so a change shows at the next start of the shell.
+for admin_entry in "waydesk-users:Users & Access" "waydesk-taskmanager:Task Manager"; do
+    entry_file="$apps_dir/${admin_entry%%:*}.desktop"
+    if id -nG "$(id -un)" | tr ' ' '\n' | grep -qx sudo; then
+        grep -qs '^# waydesk:' "$entry_file" && rm -f "$entry_file"
+    elif [ ! -e "$entry_file" ] || grep -q '^# waydesk:' "$entry_file"; then
+        mkdir -p "$apps_dir"
+        printf '# waydesk: %s is for administrators\n[Desktop Entry]\nType=Application\nName=%s\nNoDisplay=true\n' "${admin_entry#*:}" "${admin_entry#*:}" > "$entry_file"
+    fi
+done
 # GTK apps (Thunar, ...) in the colours of the shell: DMS writes the colours, a stylesheet of ours applies them (a gtk.css without
 # our first line is the account's own and stays), dark, with the icon theme of the launcher and one font.
 gtk_share=/usr/share/waydesk/gtk

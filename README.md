@@ -43,8 +43,9 @@ whiptail wizard for DMS and developer, creative and AI apps. Design, threat mode
 [docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
 exists (run the binary inside your own sway).
 
-**Task Manager** (the launcher, or `Ctrl+Shift+Esc`) opens the shell's System Monitor: processes (search, sort by CPU or memory, end one), CPU, memory and swap, network speeds,
-disks and system information, for the account's own session. It shows what any account can see in `/proc` (the processes of the others too, see "Running out of memory");
+**Task Manager** (the launcher, or `Ctrl+Shift+Esc`; administrators only, like Users & Access) opens the shell's System Monitor: processes (search, sort by CPU or memory, end one), CPU, memory and swap, network speeds,
+disks and system information, for the machine's processes, as `/proc` shows them. It is hidden and refused for accounts outside the group `sudo`, but that is a convenience, not a barrier:
+`ps` shows the same to every account, and so do the CPU and memory widgets the shell offers for its bar (the kernel's `hidepid`, see "Look at it", is the real one);
 `waydesk-admin status` and the Users & Access panel are the administrator's view of every session.
 
 Workspaces (virtual desktops): the first is called Remote, others are made on demand and go away when their last window does (four at most). With the mouse: the
