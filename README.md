@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="branding/waydesk-logo-dark.svg">
+    <img src="branding/waydesk-logo.svg" alt="Waydesk" height="64">
+  </picture>
+</p>
+
 # Waydesk (waydesk-server)
 
 An RDP server for [sway](https://swaywm.org). Every client gets a headless sway output sized and scaled from what the
