@@ -6,7 +6,7 @@ desktop (pcmanfm-qt) is started again to show it, once no file manager window is
 
 Soft glows of the DankMaterialShell palette (the accent and its companions) on the surface colour, made as a PNG with no
 image library and handed to pcmanfm-qt, which draws the desktop. It is made again when the account changes the theme
-colour (DMS rewrites ~/.cache/DankMaterialShell/dms-colors.json). An account that picked a wallpaper of its own in the
+colour (DMS rewrites ~/.cache/dms/dms-colors.json). An account that picked a wallpaper of its own in the
 desktop settings keeps it: this only replaces what it made itself.
 """
 import colorsys
@@ -23,7 +23,17 @@ import zlib
 
 HOME = os.path.expanduser("~")
 CACHE = os.environ.get("XDG_CACHE_HOME") or os.path.join(HOME, ".cache")
-COLORS = os.path.join(CACHE, "DankMaterialShell/dms-colors.json")
+
+
+def colors_path():
+    """DMS 2.0 keeps its palette in ~/.cache/dms; before that it was ~/.cache/DankMaterialShell."""
+    for folder in ("dms", "DankMaterialShell"):
+        path = os.path.join(CACHE, folder, "dms-colors.json")
+        if os.path.exists(path):
+            return path
+    return os.path.join(CACHE, "dms/dms-colors.json")
+
+
 OUT_DIR = os.path.join(CACHE, "waydesk")
 FM_SETTINGS = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "pcmanfm-qt/default/settings.conf")
 W, H = 960, 540  # smooth gradients: pcmanfm-qt scales it to the screen
@@ -35,7 +45,7 @@ def rgb(h):
 
 
 def palette():
-    with open(COLORS) as f:
+    with open(colors_path()) as f:
         data = json.load(f)
     mode = data.get("mode") if data.get("mode") in data.get("colors", {}) else "dark"
     c = data["colors"][mode]
@@ -163,7 +173,7 @@ def main():
     restart_desktop = False
     while True:
         try:
-            stamp = os.path.getmtime(COLORS)
+            stamp = os.path.getmtime(colors_path())
         except OSError:
             stamp = None
         if stamp is not None and stamp != last:

@@ -31,8 +31,10 @@ USER_FOLDERS = {"documents", "download", "downloads", "music", "pictures", "vide
 def accent_hue():
     cache = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     primary = DEFAULT_ACCENT
+    # DMS 2.0 keeps its palette in ~/.cache/dms; before that it was ~/.cache/DankMaterialShell.
+    colors = next((p for p in (os.path.join(cache, d, "dms-colors.json") for d in ("dms", "DankMaterialShell")) if os.path.exists(p)), "")
     try:
-        with open(os.path.join(cache, "DankMaterialShell/dms-colors.json")) as f:
+        with open(colors) as f:
             data = json.load(f)
         mode = data.get("mode") if data.get("mode") in data.get("colors", {}) else "dark"
         primary = data["colors"][mode]["primary"].lstrip("#")
