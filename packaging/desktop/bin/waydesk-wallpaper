@@ -8,6 +8,10 @@ Soft glows of the DankMaterialShell palette (the accent and its companions) on t
 image library and handed to pcmanfm-qt, which draws the desktop. It is made again when the account changes the theme
 colour (DMS rewrites ~/.cache/dms/dms-colors.json). An account that picked a wallpaper of its own in the
 desktop settings keeps it: this only replaces what it made itself.
+
+A wallpaper picked in the shell's settings (DMS keeps it in ~/.local/state/dms/session.json) is handed to pcmanfm-qt too, with
+its fill mode, because pcmanfm-qt draws the desktop and the shell's own wallpaper layer is off; cleared again, the generated
+background comes back. Solid colours, a wallpaper per monitor and a light and a dark one are not followed (the shared path is).
 """
 import colorsys
 import hashlib
@@ -35,6 +39,11 @@ def colors_path():
 
 
 OUT_DIR = os.path.join(CACHE, "waydesk")
+MIRRORED = os.path.join(OUT_DIR, ".mirrored")  # the image of the shell's settings that pcmanfm-qt was given
+STATE = os.environ.get("XDG_STATE_HOME") or os.path.join(HOME, ".local/state")
+CONFIG = os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config")
+# DMS fill modes as pcmanfm-qt calls them (anything else: fill)
+FILL_MODES = {"Stretch": "stretch", "Fit": "fit", "Fill": "zoom", "Scrolling": "zoom", "Tile": "tile", "TileVertically": "tile", "TileHorizontally": "tile", "Pad": "center"}
 FM_SETTINGS = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "pcmanfm-qt/default/settings.conf")
 W, H = 960, 540  # smooth gradients: pcmanfm-qt scales it to the screen
 
@@ -114,17 +123,61 @@ def render(p):
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(bytes(raw), 6)) + chunk(b"IEND", b"")
 
 
+def read_json(*paths):
+    for path in paths:
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            continue
+    return {}
+
+
+def dms_wallpaper():
+    """(image path, pcmanfm-qt fill mode) of the wallpaper picked in the shell's settings, or None (not set, or a colour)."""
+    session = read_json(*(os.path.join(STATE, d, "session.json") for d in ("dms", "DankMaterialShell")))
+    path = session.get("wallpaperPath")
+    if not isinstance(path, str):
+        return None
+    path = path[len("file://"):] if path.startswith("file://") else path
+    if not path.startswith("/") or not os.path.isfile(path):
+        return None
+    settings = read_json(*(os.path.join(CONFIG, d, "settings.json") for d in ("dms", "DankMaterialShell")))
+    return path, FILL_MODES.get(settings.get("wallpaperFillMode"), "zoom")
+
+
+def mirrored():
+    try:
+        with open(MIRRORED) as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
 def account_has_its_own():
-    """True when the desktop settings name a wallpaper that this script did not make."""
+    """True when the desktop settings name a wallpaper that neither this script made nor it took from the shell's settings."""
     try:
         with open(FM_SETTINGS) as f:
             for line in f:
                 if line.startswith("Wallpaper="):
                     path = line.split("=", 1)[1].strip()
-                    return bool(path) and not path.startswith(OUT_DIR + os.sep)
+                    return bool(path) and not path.startswith(OUT_DIR + os.sep) and path != mirrored()
     except OSError:
         pass
     return False
+
+
+def set_wallpaper(path, mode):
+    env = dict(os.environ, QT_QPA_PLATFORM="wayland", QT_QPA_PLATFORMTHEME="qt6ct")
+    subprocess.run(["pcmanfm-qt", f"--set-wallpaper={path}", f"--wallpaper-mode={mode}"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def mirror(image):
+    path, mode = image
+    os.makedirs(OUT_DIR, exist_ok=True)
+    with open(MIRRORED, "w") as f:
+        f.write(path + "\n")
+    set_wallpaper(path, mode)
 
 
 def apply(p):
@@ -136,8 +189,11 @@ def apply(p):
         with open(path + ".new", "wb") as f:
             f.write(data)
         os.replace(path + ".new", path)
-    env = dict(os.environ, QT_QPA_PLATFORM="wayland", QT_QPA_PLATFORMTHEME="qt6ct")
-    subprocess.run(["pcmanfm-qt", f"--set-wallpaper={path}", "--wallpaper-mode=zoom"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    set_wallpaper(path, "zoom")
+    try:
+        os.remove(MIRRORED)
+    except OSError:
+        pass
     for name in os.listdir(OUT_DIR):  # earlier ones of this script
         if name.startswith("wallpaper-") and name.endswith(".png") and os.path.join(OUT_DIR, name) != path:
             os.remove(os.path.join(OUT_DIR, name))
@@ -169,23 +225,36 @@ def file_manager_windows():
 
 def main():
     once = "--once" in sys.argv
-    last = None
+    unset = object()
+    last_image, last_colors = unset, None
     restart_desktop = False
     while True:
         try:
             stamp = os.path.getmtime(colors_path())
         except OSError:
             stamp = None
-        if stamp is not None and stamp != last:
+        image = dms_wallpaper()
+        image_changed, colors_changed = image != last_image, stamp is not None and stamp != last_colors
+        if image_changed or colors_changed:
             # pcmanfm-qt may not be there yet (the desktop waits for the screen): --set-wallpaper then starts nothing useful
             if subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "pcmanfm-qt"], stdout=subprocess.DEVNULL).returncode == 0:
-                if account_has_its_own():
+                own = account_has_its_own()
+                if image is not None:
+                    # A wallpaper picked in the shell's settings wins, except that one the account's own choice in the file
+                    # manager is not replaced by an old setting of the shell at the start of the session.
+                    if image_changed and not (last_image is unset and own):
+                        mirror(image)
+                elif own:
                     return
-                apply(palette())
-                before = icon_hue()
-                subprocess.run(["waydesk-mkicons", "--user"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                restart_desktop = restart_desktop or icon_hue() != before
-                last = stamp
+                elif stamp is not None:
+                    apply(palette())
+                if colors_changed:
+                    before = icon_hue()
+                    subprocess.run(["waydesk-mkicons", "--user"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    restart_desktop = restart_desktop or icon_hue() != before
+                last_image = image
+                if stamp is not None:
+                    last_colors = stamp
         # A running pcmanfm-qt keeps the icons it has: it has to start again to show the new ones. The desktop script
         # (waydesk-desktop) starts it again by itself.
         if restart_desktop and not file_manager_windows():

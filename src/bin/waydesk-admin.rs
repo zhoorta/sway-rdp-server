@@ -169,6 +169,15 @@ fn end_session(a: &Account) {
     // The unit is the headless sway and what runs in it; terminating the account's login as well leaves nothing of it behind.
     let _ = run_tool("/usr/bin/systemctl", &["stop", &session_unit(a.uid)]);
     let _ = run_tool("/usr/bin/loginctl", &["terminate-user", &a.name]);
+    // terminate-user returns at once and logind finishes in the background. A login in that window starts the account's user
+    // manager while logind is still stopping the old runtime directory; the two collide and the new start hangs until it times
+    // out (about 90 s). So return only when logind has let go of the account.
+    for _ in 0..60 {
+        if run_tool("/usr/bin/loginctl", &["show-user", &a.name]).is_err() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
 }
 
 // ---- commands ----
