@@ -45,7 +45,8 @@ exists (run the binary inside your own sway).
 
 Window buttons (red closes, yellow minimizes, green maximizes) in the title bar of every window need a patched sway, because sway's title
 bars are text only: `packaging/sway/build.sh [arm64|amd64]` builds Debian's sway 1.10 with `packaging/sway/waydesk-titlebar-buttons.patch`
-(a new command, `titlebar_button close|minimize|maximize COMMAND`, set by `waydesk-titlebar-buttons`). Install the `.deb` over Debian's
+(a new command, `titlebar_button close|minimize|maximize COMMAND`, set by `waydesk-titlebar-buttons`; a double click on a title bar runs the
+maximize command). Install the `.deb` over Debian's
 package and `apt-mark hold sway`; the patch has to be checked against each new Debian sway. With Debian's own sway nothing breaks: the
 shell's bar shows the same three buttons for the focused window instead.
 

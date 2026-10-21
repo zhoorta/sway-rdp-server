@@ -119,8 +119,13 @@
  	free(config->swaynag_command);
  	free((char *)config->current_config_path);
 --- sway-1.10.1/sway/input/seatop_default.c	2025-01-26 13:43:46
-+++ work/sway/input/seatop_default.c	2026-10-21 16:56:56
-@@ -5,6 +5,7 @@
++++ work/sway/input/seatop_default.c	2026-10-21 18:39:20
+@@ -1,10 +1,12 @@
+ #include <float.h>
++#include <math.h>
+ #include <libevdev/libevdev.h>
+ #include <wlr/types/wlr_cursor.h>
+ #include <wlr/types/wlr_subcompositor.h>
  #include <wlr/types/wlr_tablet_v2.h>
  #include <wlr/types/wlr_xcursor_manager.h>
  #include "gesture.h"
@@ -128,7 +133,29 @@
  #include "sway/desktop/transaction.h"
  #include "sway/input/cursor.h"
  #include "sway/input/seat.h"
-@@ -354,6 +355,28 @@
+@@ -328,6 +330,21 @@
+ 	return false;
+ }
+ 
++static void run_titlebar_command(struct sway_seat *seat, struct sway_container *cont,
++		const char *command) {
++	seat_set_focus(seat, &cont->node);
++	char *copy = strdup(command);
++	if (copy) {
++		list_t *res_list = execute_command(copy, seat, cont);
++		for (int i = 0; i < res_list->length; ++i) {
++			free_cmd_results(res_list->items[i]);
++		}
++		list_free(res_list);
++		free(copy);
++	}
++	transaction_commit_dirty();
++}
++
+ static void handle_button(struct sway_seat *seat, uint32_t time_msec,
+ 		struct wlr_input_device *device, uint32_t button,
+ 		enum wl_pointer_button_state state) {
+@@ -354,6 +371,38 @@
  
  	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat->wlr_seat);
  	uint32_t modifiers = keyboard ? wlr_keyboard_get_modifiers(keyboard) : 0;
@@ -139,18 +166,28 @@
 +			cursor->cursor->x - cont->pending.x, cursor->cursor->y - cont->pending.y);
 +		if (which >= 0) {
 +			if (state == WL_POINTER_BUTTON_STATE_PRESSED && config->titlebar_buttons[which]) {
-+				seat_set_focus(seat, &cont->node);
-+				char *command = strdup(config->titlebar_buttons[which]);
-+				if (command) {
-+					list_t *res_list = execute_command(command, seat, cont);
-+					for (int i = 0; i < res_list->length; ++i) {
-+						free_cmd_results(res_list->items[i]);
-+					}
-+					list_free(res_list);
-+					free(command);
-+				}
-+				transaction_commit_dirty();
++				run_titlebar_command(seat, cont, config->titlebar_buttons[which]);
 +			}
++			return;
++		}
++	}
++
++	// A double click on a title bar runs the maximize command of titlebar_button (a second press within 400 ms, close to the first).
++	if (cont && cont->view && !surface && !on_border && button == BTN_LEFT &&
++			state == WL_POINTER_BUTTON_STATE_PRESSED && config->titlebar_buttons[2] &&
++			!cont->pending.fullscreen_mode &&
++			cursor->cursor->y - cont->pending.y < (int)container_titlebar_height()) {
++		static struct sway_container *last_cont = NULL;
++		static uint32_t last_time = 0;
++		static double last_x = 0, last_y = 0;
++		bool again = last_cont == cont && time_msec - last_time <= 400 &&
++			fabs(cursor->cursor->x - last_x) <= 8 && fabs(cursor->cursor->y - last_y) <= 8;
++		last_cont = again ? NULL : cont;
++		last_time = time_msec;
++		last_x = cursor->cursor->x;
++		last_y = cursor->cursor->y;
++		if (again) {
++			run_titlebar_command(seat, cont, config->titlebar_buttons[2]);
 +			return;
 +		}
 +	}
