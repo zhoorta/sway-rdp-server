@@ -21,6 +21,7 @@ BASE=$(ls -t "$OUT"/waydesk-server_*_$ARCH.deb 2>/dev/null | head -1)
 DESKTOP=$(ls -t "$OUT"/waydesk-desktop_*_all.deb 2>/dev/null | head -1)
 META=$(ls -t "$OUT"/waydesk_*_all.deb 2>/dev/null | head -1)   # the metapackage: optional
 FM=$(ls -t "$OUT"/pcmanfm-qt_*waydesk*_$ARCH.deb 2>/dev/null | head -1)   # optional: packaging/pcmanfm-qt/build.sh arm64
+SWAY=$(ls -t "$OUT"/sway_*waydesk*_$ARCH.deb 2>/dev/null | head -1)   # optional: packaging/sway/build.sh arm64
 [ -n "$BASE" ] && [ -n "$DESKTOP" ] || { echo "no packages in $OUT: run packaging/build-deb.sh arm64" >&2; exit 1; }
 "$VM" status | grep -q running || { echo "the VM is not running: $VM start" >&2; exit 1; }
 
@@ -34,7 +35,7 @@ PW2=$(sed -n 's/^rdptest2 //p' "$ACCOUNTS")
 
 echo "pushing $(basename "$BASE") and $(basename "$DESKTOP")"
 "$VM" ssh 'rm -rf ~/provision && mkdir -p ~/provision'
-tar cf - -C "$OUT" "$(basename "$BASE")" "$(basename "$DESKTOP")" ${META:+"$(basename "$META")"} ${FM:+"$(basename "$FM")"} -C "$REPO/packaging/desktop/setup" dms.sh | "$VM" ssh 'tar xf - -C ~/provision'
+tar cf - -C "$OUT" "$(basename "$BASE")" "$(basename "$DESKTOP")" ${META:+"$(basename "$META")"} ${FM:+"$(basename "$FM")"} ${SWAY:+"$(basename "$SWAY")"} -C "$REPO/packaging/desktop/setup" dms.sh | "$VM" ssh 'tar xf - -C ~/provision'
 
 {
     printf "PW1='%s'\nPW2='%s'\n" "$PW1" "$PW2"
@@ -53,6 +54,12 @@ if ls ./pcmanfm-qt_*.deb >/dev/null 2>&1; then
     apt-mark unhold pcmanfm-qt >/dev/null 2>&1 || true
     apt-get install -y --reinstall --allow-downgrades --no-install-recommends -o Dpkg::Options::=--force-confold ./pcmanfm-qt_*.deb
     apt-mark hold pcmanfm-qt
+fi
+# The patched sway (window buttons in the title bar), held like the file manager. Sessions that run keep the sway they started with.
+if ls ./sway_*.deb >/dev/null 2>&1; then
+    apt-mark unhold sway >/dev/null 2>&1 || true
+    apt-get install -y --reinstall --allow-downgrades --no-install-recommends -o Dpkg::Options::=--force-confold ./sway_*.deb
+    apt-mark hold sway
 fi
 bash ./dms.sh
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo

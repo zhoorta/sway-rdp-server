@@ -6,13 +6,21 @@ import qs.Widgets
 import qs.Modules.Plugins
 
 // Window buttons for the focused window in the Mac style (red closes, yellow minimizes, green maximizes), on top of
-// waydesk-windows: sway's title bars have none. The small arrow opens the list of minimized windows.
+// waydesk-windows: Debian's sway has none on its title bars. With the patched sway the title bars have them (waydesk-titlebar-buttons
+// says so) and only the small arrow stays, when something is minimized: it opens the list of minimized windows.
 PluginComponent {
     id: root
 
     property var minimized: []
+    // The title bars have their own buttons.
+    property bool ownButtons: false
+    // Nothing to show: no buttons of its own and nothing minimized.
+    visible: !ownButtons || minimized.length > 0
 
     function refresh() {
+        Proc.runCommand("swayWindowControls.ownButtons", ["sh", "-c", "test -e \"$XDG_RUNTIME_DIR/waydesk-titlebar-buttons\" && echo yes"], function (out, code) {
+            root.ownButtons = out.trim() === "yes";
+        }, 0);
         Proc.runCommand("swayWindowControls.list", ["waydesk-windows", "list"], function (out, code) {
             if (code !== 0)
                 return;
@@ -60,7 +68,7 @@ PluginComponent {
             spacing: Theme.spacingS
 
             Repeater {
-                model: root.buttons
+                model: root.ownButtons ? [] : root.buttons
 
                 Rectangle {
                     required property var modelData

@@ -36,6 +36,12 @@ whiptail wizard for DMS and developer, creative and AI apps. Design, threat mode
 [docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
 exists (run the binary inside your own sway).
 
+Window buttons (red closes, yellow minimizes, green maximizes) in the title bar of every window need a patched sway, because sway's title
+bars are text only: `packaging/sway/build.sh [arm64|amd64]` builds Debian's sway 1.10 with `packaging/sway/waydesk-titlebar-buttons.patch`
+(a new command, `titlebar_button close|minimize|maximize COMMAND`, set by `waydesk-titlebar-buttons`). Install the `.deb` over Debian's
+package and `apt-mark hold sway`; the patch has to be checked against each new Debian sway. With Debian's own sway nothing breaks: the
+shell's bar shows the same three buttons for the focused window instead.
+
 - Capture: `wlr-screencopy` (frame diff). The pointer is drawn by the RDP client, and sway gets an invisible cursor theme (`WAYDESK_CURSOR=server` keeps the cursor in the picture instead, with the shapes of the apps, for clients that hide their own pointer).
 - Video: H.264 (AVC420) over the RDP graphics pipeline; plain bitmaps as fallback. The encoder is the system's
   `libopenh264` (Debian: package `libopenh264-8`) loaded at run time; waydesk-server contains no encoder code.

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Round window buttons in the title bars (red closes, yellow minimizes, green maximizes). Needs the patched sway of
+# packaging/sway: with Debian's own sway the command is unknown and nothing happens (the buttons of the shell's bar stay).
+# The shell's bar shows its own buttons for the focused window unless this file says the title bars have them.
+marker="${XDG_RUNTIME_DIR:-/tmp}/waydesk-titlebar-buttons"
+rm -f "$marker"
+swaymsg -q titlebar_button close kill || exit 0
+swaymsg -q titlebar_button minimize exec waydesk-windows minimize
+swaymsg -q titlebar_button maximize exec waydesk-windows maximize
+: > "$marker"

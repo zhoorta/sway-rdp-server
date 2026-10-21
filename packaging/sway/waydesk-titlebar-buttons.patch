@@ -1,0 +1,287 @@
+--- a/include/sway/commands.h
++++ b/include/sway/commands.h
+@@ -190,6 +190,7 @@
+ sway_cmd cmd_title_align;
+ sway_cmd cmd_title_format;
+ sway_cmd cmd_titlebar_border_thickness;
++sway_cmd cmd_titlebar_button;
+ sway_cmd cmd_titlebar_padding;
+ sway_cmd cmd_unbindcode;
+ sway_cmd cmd_unbindswitch;
+--- a/include/sway/config.h
++++ b/include/sway/config.h
+@@ -539,6 +539,8 @@
+ 	bool auto_back_and_forth;
+ 	bool show_marks;
+ 	enum alignment title_align;
++	// Window buttons in the title bar: commands for close, minimize and maximize (NULL: no button).
++	char *titlebar_buttons[3];
+ 	bool primary_selection;
+ 
+ 	bool tiling_drag;
+--- sway-1.10.1/include/sway/tree/container.h	2025-01-26 13:43:46
++++ work/include/sway/tree/container.h	2026-10-21 16:56:56
+@@ -79,6 +79,8 @@
+ 
+ 		struct sway_text_node *title_text;
+ 		struct sway_text_node *marks_text;
++		// close, minimize, maximize (see titlebar_button)
++		struct sway_text_node *buttons[3];
+ 	} title_bar;
+ 
+ 	struct {
+@@ -360,6 +362,12 @@
+ int container_squash(struct sway_container *con);
+ 
+ void container_arrange_title_bar(struct sway_container *con);
++
++/**
++ * The title bar button (0 close, 1 minimize, 2 maximize) at the position (lx, ly) relative to the
++ * container, or -1.
++ */
++int container_titlebar_button_at(struct sway_container *con, double lx, double ly);
+ 
+ void container_update(struct sway_container *con);
+ 
+--- sway-1.10.1/sway/commands/titlebar_button.c	1970-01-01 01:00:00
++++ work/sway/commands/titlebar_button.c	2026-10-21 16:56:56
+@@ -0,0 +1,50 @@
++#include <string.h>
++#include "sway/commands.h"
++#include "sway/config.h"
++#include "sway/tree/container.h"
++#include "sway/tree/root.h"
++#include "util.h"
++
++static void update_title_bar_iterator(struct sway_container *con, void *data) {
++	if (con->view) {
++		container_update_title_bar(con);
++	}
++}
++
++// titlebar_button close|minimize|maximize <command>
++// titlebar_button none
++struct cmd_results *cmd_titlebar_button(int argc, char **argv) {
++	struct cmd_results *error = NULL;
++	if ((error = checkarg(argc, "titlebar_button", EXPECTED_AT_LEAST, 1))) {
++		return error;
++	}
++
++	if (argc == 1 && strcmp(argv[0], "none") == 0) {
++		for (int i = 0; i < 3; i++) {
++			free(config->titlebar_buttons[i]);
++			config->titlebar_buttons[i] = NULL;
++		}
++	} else {
++		int which;
++		if (strcmp(argv[0], "close") == 0) {
++			which = 0;
++		} else if (strcmp(argv[0], "minimize") == 0) {
++			which = 1;
++		} else if (strcmp(argv[0], "maximize") == 0) {
++			which = 2;
++		} else {
++			return cmd_results_new(CMD_INVALID,
++					"Expected 'titlebar_button close|minimize|maximize <command>' or 'titlebar_button none'");
++		}
++		if ((error = checkarg(argc, "titlebar_button", EXPECTED_AT_LEAST, 2))) {
++			return error;
++		}
++		char *command = join_args(argv + 1, argc - 1);
++		free(config->titlebar_buttons[which]);
++		config->titlebar_buttons[which] = command;
++	}
++
++	root_for_each_container(update_title_bar_iterator, NULL);
++
++	return cmd_results_new(CMD_SUCCESS, NULL);
++}
+--- a/sway/commands.c
++++ b/sway/commands.c
+@@ -90,6 +90,7 @@
+ 	{ "tiling_drag_threshold", cmd_tiling_drag_threshold },
+ 	{ "title_align", cmd_title_align },
+ 	{ "titlebar_border_thickness", cmd_titlebar_border_thickness },
++	{ "titlebar_button", cmd_titlebar_button },
+ 	{ "titlebar_padding", cmd_titlebar_padding },
+ 	{ "unbindcode", cmd_unbindcode },
+ 	{ "unbindgesture", cmd_unbindgesture },
+--- a/sway/config.c
++++ b/sway/config.c
+@@ -174,6 +174,9 @@
+ 	free(config->floating_scroll_left_cmd);
+ 	free(config->floating_scroll_right_cmd);
+ 	free(config->font);
++	for (int i = 0; i < 3; i++) {
++		free(config->titlebar_buttons[i]);
++	}
+ 	free(config->swaybg_command);
+ 	free(config->swaynag_command);
+ 	free((char *)config->current_config_path);
+--- sway-1.10.1/sway/input/seatop_default.c	2025-01-26 13:43:46
++++ work/sway/input/seatop_default.c	2026-10-21 16:56:56
+@@ -5,6 +5,7 @@
+ #include <wlr/types/wlr_tablet_v2.h>
+ #include <wlr/types/wlr_xcursor_manager.h>
+ #include "gesture.h"
++#include "sway/commands.h"
+ #include "sway/desktop/transaction.h"
+ #include "sway/input/cursor.h"
+ #include "sway/input/seat.h"
+@@ -354,6 +355,28 @@
+ 
+ 	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat->wlr_seat);
+ 	uint32_t modifiers = keyboard ? wlr_keyboard_get_modifiers(keyboard) : 0;
++
++	// The window buttons of a title bar (see titlebar_button): they act on the press and take the release.
++	if (cont && !surface && button == BTN_LEFT) {
++		int which = container_titlebar_button_at(cont,
++			cursor->cursor->x - cont->pending.x, cursor->cursor->y - cont->pending.y);
++		if (which >= 0) {
++			if (state == WL_POINTER_BUTTON_STATE_PRESSED && config->titlebar_buttons[which]) {
++				seat_set_focus(seat, &cont->node);
++				char *command = strdup(config->titlebar_buttons[which]);
++				if (command) {
++					list_t *res_list = execute_command(command, seat, cont);
++					for (int i = 0; i < res_list->length; ++i) {
++						free_cmd_results(res_list->items[i]);
++					}
++					list_free(res_list);
++					free(command);
++				}
++				transaction_commit_dirty();
++			}
++			return;
++		}
++	}
+ 
+ 	// Handle mouse bindings
+ 	if (trigger_pointer_button_binding(seat, device, button, state, modifiers,
+--- a/sway/meson.build
++++ b/sway/meson.build
+@@ -117,6 +117,7 @@
+ 	'commands/title_align.c',
+ 	'commands/title_format.c',
+ 	'commands/titlebar_border_thickness.c',
++	'commands/titlebar_button.c',
+ 	'commands/titlebar_padding.c',
+ 	'commands/unmark.c',
+ 	'commands/urgent.c',
+--- sway-1.10.1/sway/tree/container.c	2025-01-26 13:43:46
++++ work/sway/tree/container.c	2026-10-21 16:57:15
+@@ -296,6 +296,28 @@
+ 		sway_text_node_set_color(con->title_bar.marks_text, colors->text);
+ 		sway_text_node_set_background(con->title_bar.marks_text, colors->background);
+ 	}
++
++	// Red, yellow and green on the focused window, in the colour of the text, dimmed, on the others.
++	static const float button_colors[3][4] = {
++		{0.996f, 0.373f, 0.341f, 1.0f},
++		{0.996f, 0.737f, 0.180f, 1.0f},
++		{0.157f, 0.784f, 0.251f, 1.0f},
++	};
++	bool focused = colors == &config->border_colors.focused;
++	for (int i = 0; i < 3; i++) {
++		if (!con->title_bar.buttons[i]) {
++			continue;
++		}
++		float color[4];
++		if (focused) {
++			memcpy(color, button_colors[i], sizeof(color));
++		} else {
++			memcpy(color, colors->text, sizeof(color));
++			color[3] *= 0.4f;
++		}
++		sway_text_node_set_color(con->title_bar.buttons[i], color);
++		sway_text_node_set_background(con->title_bar.buttons[i], colors->background);
++	}
+ }
+ 
+ void container_update_itself_and_parents(struct sway_container *con) {
+@@ -338,6 +360,27 @@
+ 	pixman_region32_t text_area;
+ 	pixman_region32_init(&text_area);
+ 
++	// The window buttons come first, on the left; the title starts after them.
++	int left = config->titlebar_h_padding;
++	int button_gap = 6;
++	int buttons_end = 0;
++	for (int i = 0; i < 3; i++) {
++		struct sway_text_node *node = con->title_bar.buttons[i];
++		if (!node) {
++			continue;
++		}
++		bool fits = width >= left + buttons_end + (int)node->width + config->titlebar_h_padding * 2;
++		wlr_scene_node_set_enabled(node->node, fits);
++		if (!fits) {
++			continue;
++		}
++		wlr_scene_node_set_position(node->node, left + buttons_end, (height - node->height) >> 1);
++		pixman_region32_union_rect(&text_area, &text_area,
++			node->node->x, node->node->y, node->width, node->height);
++		buttons_end += node->width + button_gap;
++	}
++	int title_min = left + buttons_end;
++
+ 	if (con->title_bar.marks_text) {
+ 		struct sway_text_node *node = con->title_bar.marks_text;
+ 		marks_buffer_width = node->width;
+@@ -372,10 +415,10 @@
+ 		} else if (title_align == ALIGN_CENTER) {
+ 			h_padding = ((int)width - marks_buffer_width - node->width) >> 1;
+ 		} else {
+-			h_padding = config->titlebar_h_padding;
++			h_padding = title_min;
+ 		}
+ 
+-		h_padding = MAX(h_padding, config->titlebar_h_padding);
++		h_padding = MAX(h_padding, title_min);
+ 
+ 		int alloc_width = MIN((int) node->width,
+ 			width - h_padding - config->titlebar_h_padding);
+@@ -416,6 +459,26 @@
+ 	container_update(con);
+ }
+ 
++int container_titlebar_button_at(struct sway_container *con, double lx, double ly) {
++	if (!con->view || !con->title_bar.tree->node.enabled || con->pending.fullscreen_mode) {
++		return -1;
++	}
++	if (ly < 0 || ly >= container_titlebar_height()) {
++		return -1;
++	}
++	for (int i = 0; i < 3; i++) {
++		struct sway_text_node *node = con->title_bar.buttons[i];
++		if (!node || !node->node->enabled) {
++			continue;
++		}
++		if (lx >= node->node->x && lx < node->node->x + (int)node->width &&
++				ly >= node->node->y && ly < node->node->y + (int)node->height) {
++			return i;
++		}
++	}
++	return -1;
++}
++
+ void container_update_marks(struct sway_container *con) {
+ 	char *buffer = NULL;
+ 
+@@ -477,6 +540,18 @@
+ 
+ 	con->title_bar.title_text = sway_text_node_create(con->title_bar.tree,
+ 		con->formatted_title, colors->text, config->pango_markup);
++
++	// Made again with the title: a font change changes their size too.
++	for (int i = 0; i < 3; i++) {
++		if (con->title_bar.buttons[i]) {
++			wlr_scene_node_destroy(con->title_bar.buttons[i]->node);
++			con->title_bar.buttons[i] = NULL;
++		}
++		if (con->view && config->titlebar_buttons[i]) {
++			con->title_bar.buttons[i] = sway_text_node_create(con->title_bar.tree,
++				"\u25cf", colors->text, false);
++		}
++	}
+ 
+ 	// we always have to remake these text buffers completely for text font
+ 	// changes etc...
