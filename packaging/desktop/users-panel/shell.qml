@@ -141,9 +141,9 @@ ShellRoot {
     FloatingWindow {
         id: window
         title: "Users & Access"
-        implicitWidth: 880
-        implicitHeight: 560
-        minimumSize: Qt.size(700, 400)
+        implicitWidth: 760
+        implicitHeight: 520
+        minimumSize: Qt.size(560, 360)
         color: pal.window
         visible: true
         onClosed: Qt.quit()
@@ -193,67 +193,36 @@ ShellRoot {
                 }
             }
 
-            // the machine: memory, swap, load, and whether a new session would be accepted
-            Rectangle {
+            // the machine in one line: memory, and whether a new session would be accepted (waydesk-admin status has the rest)
+            RowLayout {
                 id: machine
                 readonly property var m: root.status.machine || null
                 readonly property var a: root.status.admission || null
+                readonly property real used: m ? (m.mem_total_mb - m.mem_available_mb) / m.mem_total_mb : 0
                 visible: m !== null
                 Layout.fillWidth: true
-                implicitHeight: 74
-                radius: 12
-                color: pal.base
-                border.color: pal.mid
+                spacing: 12
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.margins: 14
-                    spacing: 18
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-                        Label {
-                            text: machine.m ? "Memory  " + root.mb(machine.m.mem_total_mb - machine.m.mem_available_mb) + " in use of " + root.mb(machine.m.mem_total_mb) + "  ·  " + root.mb(machine.m.mem_available_mb) + " available" : ""
-                            color: pal.text
-                            font.weight: Font.DemiBold
-                        }
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: 8
-                            radius: 4
-                            color: pal.mid
-                            Rectangle {
-                                readonly property real used: machine.m ? (machine.m.mem_total_mb - machine.m.mem_available_mb) / machine.m.mem_total_mb : 0
-                                width: parent.width * Math.min(1, used)
-                                height: parent.height
-                                radius: 4
-                                color: used > 0.85 ? "#e07a5f" : (used > 0.7 ? "#f2cc8f" : pal.highlight)
-                            }
-                        }
-                        Label {
-                            text: machine.m ? (machine.m.swap_total_mb > 0 ? "Swap  " + root.mb(machine.m.swap_used_mb) + " of " + root.mb(machine.m.swap_total_mb) + " used" : "No swap") + "  ·  load " + machine.m.load.join(" ") + " on " + machine.m.cores + " cores" : ""
-                            color: pal.placeholderText
-                            font.pixelSize: 11
-                        }
+                Label {
+                    text: machine.m ? "Memory  " + root.mb(machine.m.mem_total_mb - machine.m.mem_available_mb) + " of " + root.mb(machine.m.mem_total_mb) + " in use" : ""
+                    color: pal.text
+                }
+                Rectangle {
+                    Layout.preferredWidth: 120
+                    implicitHeight: 6
+                    radius: 3
+                    color: pal.mid
+                    Rectangle {
+                        width: parent.width * Math.min(1, machine.used)
+                        height: parent.height
+                        radius: 3
+                        color: machine.used > 0.85 ? "#e07a5f" : (machine.used > 0.7 ? "#f2cc8f" : pal.highlight)
                     }
-
-                    ColumnLayout {
-                        Layout.preferredWidth: 250
-                        spacing: 2
-                        Label {
-                            text: machine.a ? (machine.a.open ? "New sessions: accepted" : "New sessions: refused") : ""
-                            color: machine.a && !machine.a.open ? "#e07a5f" : pal.text
-                            font.weight: Font.DemiBold
-                        }
-                        Label {
-                            text: machine.a ? (machine.a.open ? machine.a.sessions + " running, needs " + root.mb(machine.a.min_available_mb) + " available" : machine.a.reason) : ""
-                            color: pal.placeholderText
-                            font.pixelSize: 11
-                            wrapMode: Text.Wrap
-                            Layout.fillWidth: true
-                        }
-                    }
+                }
+                Item { Layout.fillWidth: true }
+                Label {
+                    text: machine.a ? (machine.a.open ? "New sessions: accepted" : "New sessions: refused (" + machine.a.reason + ")") : ""
+                    color: machine.a && !machine.a.open ? "#e07a5f" : pal.placeholderText
                 }
             }
 
@@ -262,140 +231,145 @@ ShellRoot {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                spacing: 8
+                spacing: 6
                 model: root.users
 
+                // one line per account: who, what it is doing, and one menu with everything that can be done to it
                 delegate: Rectangle {
                     id: card
                     required property var modelData
                     readonly property bool mine: modelData.name === root.me
+                    readonly property bool running: modelData.session === "running"
                     // what the account uses now (null when it has nothing running)
                     readonly property var use: root.usageOf(modelData.name)
                     width: list.width
-                    height: 118
-                    radius: 12
-                    color: pal.base
+                    height: 62
+                    radius: 10
+                    color: rowHover.hovered ? Qt.lighter(pal.base, 1.07) : pal.base
                     border.color: pal.mid
 
-                    ColumnLayout {
+                    HoverHandler { id: rowHover }
+
+                    RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 16
-                        anchors.rightMargin: 12
-                        anchors.topMargin: 8
-                        anchors.bottomMargin: 4
-                        spacing: 0
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 10
+                        spacing: 12
 
-                        // who, the session, and what can be done to the account
-                        RowLayout {
+                        Rectangle {
+                            Layout.preferredWidth: 36
+                            Layout.preferredHeight: 36
+                            radius: 18
+                            color: card.modelData.sudo ? pal.highlight : pal.mid
+                            Label {
+                                anchors.centerIn: parent
+                                text: card.modelData.name.charAt(0).toUpperCase()
+                                color: card.modelData.sudo ? pal.highlightedText : pal.text
+                                font.weight: Font.DemiBold
+                                font.pixelSize: 15
+                            }
+                        }
+
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 10
+                            spacing: 1
 
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: 0
+                            RowLayout {
+                                spacing: 8
                                 Label {
                                     text: card.modelData.name + (card.mine ? "  (you)" : "")
                                     font.weight: Font.DemiBold
-                                    font.pixelSize: 15
+                                    font.pixelSize: 14
                                     color: pal.text
                                     elide: Text.ElideRight
-                                    Layout.fillWidth: true
                                 }
-                                Label {
-                                    text: card.modelData.login_shell ? "uid " + card.modelData.uid : "no login shell: cannot log in"
-                                    color: card.modelData.login_shell ? pal.placeholderText : "#e07a5f"
-                                    font.pixelSize: 11
+                                Rectangle {
+                                    visible: card.modelData.sudo
+                                    implicitWidth: adminChip.implicitWidth + 12
+                                    implicitHeight: 18
+                                    radius: 9
+                                    color: Qt.rgba(pal.highlight.r, pal.highlight.g, pal.highlight.b, 0.22)
+                                    Label { id: adminChip; anchors.centerIn: parent; text: "Administrator"; font.pixelSize: 10; color: pal.text }
+                                }
+                                Rectangle {
+                                    visible: !card.modelData.rdp || !card.modelData.login_shell
+                                    implicitWidth: blockedChip.implicitWidth + 12
+                                    implicitHeight: 18
+                                    radius: 9
+                                    color: Qt.rgba(0.88, 0.48, 0.37, 0.25)
+                                    Label { id: blockedChip; anchors.centerIn: parent; text: "Cannot log in"; font.pixelSize: 10; color: pal.text }
                                 }
                             }
 
-                            ColumnLayout {
-                                Layout.preferredWidth: 170
-                                spacing: 0
-                                Label {
-                                    text: card.modelData.session === "running" ? "Session running" : "No session"
-                                    color: card.modelData.session === "running" ? pal.highlight : pal.placeholderText
-                                    font.weight: card.modelData.session === "running" ? Font.DemiBold : Font.Normal
-                                }
-                                Label {
-                                    visible: card.modelData.session === "running"
-                                    text: "since " + card.modelData.session_since
-                                    color: pal.placeholderText
-                                    font.pixelSize: 10
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
-                                }
-                                Label {
-                                    visible: card.use !== null
-                                    text: card.use ? root.mb(card.use.mem_mb) + "  ·  CPU " + Math.round(card.use.cpu_percent) + "%" + (card.use.swap_mb > 0 ? "  ·  swap " + root.mb(card.use.swap_mb) : "") : ""
-                                    color: pal.text
-                                    font.pixelSize: 11
-                                    font.weight: Font.DemiBold
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
-                                }
-                            }
-
-                            Button {
-                                text: "End session"
-                                visible: card.modelData.session === "running"
-                                enabled: !root.working
-                                onClicked: root.change(["sessions", "end", card.modelData.name])
-                            }
-                            Button {
-                                text: "Limits…"
-                                enabled: !root.working
-                                onClicked: {
-                                    root.sheetUser = card.modelData.name;
-                                    limitMemory.text = "";
-                                    limitCpu.value = 100;
-                                    root.sheet = "limit";
-                                }
-                            }
-                            Button {
-                                text: "New password"
-                                enabled: !root.working
-                                onClicked: root.change(["users", "passwd", card.modelData.name, "--json"], (out) => root.showPassword("New password for " + card.modelData.name, out))
-                            }
-                            Button {
-                                text: "Remove…"
-                                enabled: !root.working && !card.mine
-                                onClicked: { root.sheetUser = card.modelData.name; removeHome.checked = false; root.sheet = "remove"; }
+                            Label {
+                                id: statusLine
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                font.pixelSize: 11
+                                color: card.running ? pal.highlight : pal.placeholderText
+                                text: !card.modelData.login_shell ? "No login shell"
+                                    : card.running ? "Session running" + (card.use ? "  ·  " + root.mb(card.use.mem_mb) + "  ·  CPU " + Math.round(card.use.cpu_percent) + "%" : "")
+                                    : "No session"
+                                HoverHandler { id: statusHover }
+                                ToolTip.visible: statusHover.hovered && card.use !== null && card.use.top.length > 0
+                                ToolTip.delay: 400
+                                ToolTip.text: card.use ? "Most memory: " + card.use.top.map(t => t.name + " " + root.mb(t.mb)).join(", ") + (card.use.cap_mb ? "\nLimit: " + root.mb(card.use.cap_mb) : "") : ""
                             }
                         }
 
-                        // what the account may do
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 24
-                            Switch {
-                                text: "Can log in"
-                                checked: card.modelData.rdp
-                                enabled: !root.working && !card.mine
-                                onToggled: root.change(["users", checked ? "enable" : "disable", card.modelData.name])
-                            }
-                            Switch {
-                                text: "Flatpak installs without a password"
-                                checked: card.modelData.flatpak_admin
-                                enabled: !root.working
-                                onToggled: root.change(["users", "admin", card.modelData.name, checked ? "on" : "off"])
-                            }
-                            Switch {
-                                text: "Administrator"
-                                checked: card.modelData.sudo
-                                enabled: !root.working && !card.mine
-                                onToggled: root.change(["users", "sudo", card.modelData.name, checked ? "on" : "off"])
-                            }
-                            Item { Layout.fillWidth: true }
-                        }
+                        Button {
+                            id: optionsButton
+                            text: "Options  \u25BE"
+                            enabled: !root.working
+                            onClicked: rowMenu.popup(optionsButton, optionsButton.width - rowMenu.width, optionsButton.height)
 
-                        // the programs holding the most memory
-                        Label {
-                            visible: card.use !== null && card.use.top.length > 0
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            color: pal.placeholderText
-                            font.pixelSize: 11
-                            text: card.use ? "Most memory: " + card.use.top.map(t => t.name + " " + root.mb(t.mb)).join(", ") + (card.use.cap_mb ? "   ·   limit " + root.mb(card.use.cap_mb) : "") : ""
+                            Menu {
+                                id: rowMenu
+                                // wide enough for the longest entry, and opened under the button with its right edge on the button's
+                                width: 290
+
+                                MenuItem {
+                                    text: "End session"
+                                    visible: card.running
+                                    height: visible ? implicitHeight : 0
+                                    onTriggered: root.change(["sessions", "end", card.modelData.name])
+                                }
+                                MenuItem {
+                                    text: "New password"
+                                    onTriggered: root.change(["users", "passwd", card.modelData.name, "--json"], (out) => root.showPassword("New password for " + card.modelData.name, out))
+                                }
+                                MenuItem {
+                                    text: "Limits\u2026"
+                                    onTriggered: { root.sheetUser = card.modelData.name; limitMemory.text = ""; limitCpu.value = 100; root.sheet = "limit"; }
+                                }
+                                MenuSeparator {}
+                                MenuItem {
+                                    text: "Can log in"
+                                    checkable: true
+                                    checked: card.modelData.rdp
+                                    enabled: !card.mine
+                                    onTriggered: root.change(["users", checked ? "enable" : "disable", card.modelData.name])
+                                }
+                                MenuItem {
+                                    text: "Administrator"
+                                    checkable: true
+                                    checked: card.modelData.sudo
+                                    enabled: !card.mine
+                                    onTriggered: root.change(["users", "sudo", card.modelData.name, checked ? "on" : "off"])
+                                }
+                                MenuItem {
+                                    text: "Install apps without a password"
+                                    checkable: true
+                                    checked: card.modelData.flatpak_admin
+                                    onTriggered: root.change(["users", "admin", card.modelData.name, checked ? "on" : "off"])
+                                }
+                                MenuSeparator {}
+                                MenuItem {
+                                    text: "Remove\u2026"
+                                    enabled: !card.mine
+                                    onTriggered: { root.sheetUser = card.modelData.name; removeHome.checked = false; root.sheet = "remove"; }
+                                }
+                            }
                         }
                     }
                 }
