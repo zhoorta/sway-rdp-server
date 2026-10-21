@@ -145,3 +145,18 @@ the stated deployment (loopback, an SSH tunnel or a VPN).
    also log in over SSH from the start. By design; the command's output could say so.
 4. Still open from before: plain TLS login, unpinned third-party apt keys, no second factor, no fuzzing of the RDP side,
    amd64 untested, no review by someone else.
+
+---
+
+# Fourth pass (2026-10-21): the machine's memory
+
+Who wrote it: the author of the code, with an AI assistant. Still not an independent review. Found while measuring: a 4 GB machine was taken down twice by
+the kernel's out-of-memory killer with five accounts logged in; a user (or a handful of logins) could do the same to everybody.
+
+| # | Finding | Fix | Checked |
+|---|---|---|---|
+| 18 | **Any set of logins, or one runaway account, could exhaust the memory of the machine** and with it every session (a denial of service by accounts that are allowed to log in). | The root helper refuses a new session when less than max(900 MB, 15 %) of the memory is available or the optional limit of active users is reached (an account with a running session just reconnects); every account's slice has ceilings of 35 % / 50 % of the memory, 50 % in swap and 8192 tasks; zram swap with zstd. | Unit tests of the rule; on the VM a new account was refused (journal: `session refused`) while the running one reconnected; five users fit and the sixth and seventh were refused with no kill. |
+
+Noted: `waydesk-admin status` and the account list are open to every local account, like `/proc` is: they show the names of the programs and the memory of the other accounts
+(not their files or what is in them). `users limit` and `users limit ... reset` need root; sizes, weights and task numbers are checked before they reach `systemctl`
+(unit tests: no option, unit or shell syntax gets through). A refused login is only a failed login for the RDP client; nothing tells it why, which is also nothing for an attacker to learn.

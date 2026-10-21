@@ -16,7 +16,10 @@ install -m 755 /tmp/target/release/waydesk-server $P/usr/bin/waydesk-server
 install -m 755 /tmp/target/release/waydesk-admin $P/usr/bin/waydesk-admin
 mkdir -p $P/usr/share/polkit-1/actions && install -m 644 packaging/org.waydesk.admin.policy $P/usr/share/polkit-1/actions/
 install -m 644 packaging/systemd/*.service $P/lib/systemd/system/   # includes waydesk-session@.service
-mkdir -p $P/lib/systemd/system/user-.slice.d && install -m 644 packaging/systemd/user-slice/50-waydesk.conf $P/lib/systemd/system/user-.slice.d/
+mkdir -p $P/lib/systemd/system/user-.slice.d && install -m 644 packaging/systemd/user-slice/10-waydesk.conf $P/lib/systemd/system/user-.slice.d/
+mkdir -p $P/usr/lib/systemd/zram-generator.conf.d $P/usr/lib/sysctl.d
+install -m 644 packaging/systemd/zram/50-waydesk.conf $P/usr/lib/systemd/zram-generator.conf.d/50-waydesk.conf
+install -m 644 packaging/systemd/sysctl/50-waydesk.conf $P/usr/lib/sysctl.d/50-waydesk.conf
 install -m 644 packaging/default-waydesk $P/etc/default/waydesk
 install -m 644 packaging/pam-waydesk-server $P/etc/pam.d/waydesk-server
 install -m 644 packaging/pam-waydesk-session $P/etc/pam.d/waydesk-session

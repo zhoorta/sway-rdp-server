@@ -125,12 +125,34 @@ Chromium. Four such users, logged in one after the other, left 830 MB of 3.75 GB
 video calls, office suites) cost much more per user; count on 3 users per 4 GB for real work.
 
 Plan on about 0.4-0.5 GB per logged-in session for the desktop itself, plus what the programs use, plus about 1 GB
-for the system. The 4 GB VM ran out of memory with five accounts logged in; when it does, the kernel kills the shell (`qs`) of an account first, and that
-account is left with windows and no bar. Sessions stay until they time out (`--idle-timeout`, 8 h by default; `--end-on-disconnect` ends them when the
+for the system. Sessions stay until they time out (`--idle-timeout`, 8 h by default; `--end-on-disconnect` ends them when the
 client leaves), so the number that counts is the accounts logged in, not the ones connected. `WAYDESK_DMS_SOFTWARE=1` in `/etc/default/waydesk` takes about
 170 MB off each session by drawing the shell without OpenGL (the bar, the dock and the launcher look right; rounded corners in the settings window
-and some previews do not). To keep one account from taking the rest, give the accounts a share: for example a drop-in `/etc/systemd/system/user-.slice.d/60-share.conf`
-with `MemoryHigh=` and `MemoryMax=` (the packaged one only caps an account at 90 % of the machine).
+and some previews do not).
+
+### Running out of memory
+
+With these four layers the same 4 GB VM took **five users with Chromium and three pages each** (the zram swap held 240-420 MB of idle pages), refused the
+sixth and the seventh at login, and was never short enough for the kernel to kill anything (it was killed twice, with five accounts, before). Without zram the
+fifth user is the one that does not fit. The 4 GB test VM was killed by the kernel's out-of-memory killer with five accounts logged in (it kills the shell, `qs`, of an account first, which leaves
+that account with windows and no bar). The package prevents it in four layers, none of which asks anything at install time:
+
+1. **A new session is refused when the machine cannot take one more.** The root helper checks the available memory before it starts a session for an account
+   that has none: by default it needs the larger of 900 MB and 15 % of the memory (swap is not counted: an account that is swapping is not working). The
+   account's running session is never refused, so nobody is thrown out for a newcomer. The refusal is in the journal (`session refused: the machine is short of
+   memory`); the RDP client only sees that the login failed. Change it with `--min-available-mb N` (0 = off) and `--max-active-users N` in `WAYDESK_HELPER_ARGS`
+   (see `/etc/default/waydesk`).
+2. **Every account has ceilings** (`user-.slice.d/10-waydesk.conf`): at most 35 % of the machine's memory before the kernel reclaims from that account first, 50 % at
+   the most (then only that account's biggest process is killed), no more than half of the memory in swap, 8192 tasks. They are ceilings, not shares: they do
+   not hold anybody back while the machine has room, and CPU is not capped at all (every account has the same `CPUWeight`, so a busy one gets every idle core and
+   gives way only when the others want theirs). An account that needs more, a developer with VS Code and builds for example, gets it with
+   `sudo waydesk-admin users limit NAME --memory 12G [--cpu-weight 200] [--swap 4G]` (`reset` goes back to the defaults), or in the Users & Access panel, **Limits…**.
+3. **Compressed swap in RAM.** `systemd-zram-generator` is recommended; Debian's file makes a zram swap of half the RAM (at most 4 GiB), and the package
+   picks zstd for it and sets `vm.swappiness=100` and `vm.page-cluster=0` (`/usr/lib/sysctl.d/50-waydesk.conf`). A short spike is absorbed by compressing idle pages instead of
+   killing a browser. A disk swap behind it works too (zram has the higher priority); disk swap alone is slow for a desktop, and on network storage worse.
+4. **Look at it.** `waydesk-admin status` (any account may run it) shows the memory, the swap, the load, whether a new session would be accepted, and for every
+   account its memory, swap, CPU and the programs that hold the most memory (resident memory, so shared pages count for each process); `--json` for scripts. The same is in
+   the **Users & Access** panel (administrators only): a bar for the machine, and memory, CPU and programs on each account's card.
 
 ## Who may log in
 

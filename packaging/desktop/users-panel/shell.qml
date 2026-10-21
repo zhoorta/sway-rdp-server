@@ -1,6 +1,7 @@
-// Users & Access: who may log in over RDP, who is an administrator, and the sessions that are running.
+// Users & Access: who may log in over RDP, who is an administrator, the sessions that are running and what they use.
 //
-// The list is read with `waydesk-admin users list --json` (open to everybody); every change goes through
+// The list is read with `waydesk-admin users list --json` and the machine and the sessions with `waydesk-admin status --json`
+// (both open to everybody; this window is for administrators: the launcher entry is hidden from the others); every change goes through
 // `pkexec waydesk-admin ...`, which asks an administrator's password in the shell's own dialog (polkit action
 // org.waydesk.admin). All the rules (who may be touched, nobody removing themselves or the last administrator) are in that
 // command, not here: this window only shows and asks. Colours come from the Qt palette, which qt6ct keeps in step with DMS.
@@ -15,6 +16,9 @@ ShellRoot {
     id: root
 
     property var users: []
+    // Memory, swap, load, whether a new session would be accepted, and what each account uses (waydesk-admin status --json).
+    property var status: ({})
+    property string sheetLimitMemory: ""
     // What the window shows at the top: an error of the last action, or nothing.
     property string notice: ""
     property bool working: false
@@ -90,6 +94,29 @@ ShellRoot {
         });
     }
 
+    function refreshStatus() {
+        run(["/usr/bin/waydesk-admin", "status", "--json"], (code, out, err) => {
+            if (code !== 0)
+                return;
+            try {
+                root.status = JSON.parse(out);
+            } catch (e) {
+            }
+        });
+    }
+
+    function usageOf(name) {
+        const list = root.status.users || [];
+        for (let i = 0; i < list.length; i++)
+            if (list[i].name === name)
+                return list[i];
+        return null;
+    }
+
+    function mb(n) {
+        return n >= 1024 ? (n / 1024).toFixed(1) + " GB" : n + " MB";
+    }
+
     function showPassword(label, json) {
         try {
             root.sheetPassword = JSON.parse(json).password;
@@ -100,13 +127,13 @@ ShellRoot {
         }
     }
 
-    Component.onCompleted: refresh()
+    Component.onCompleted: { refresh(); refreshStatus(); }
 
     Timer {
         interval: 8000
         repeat: true
         running: root.sheet === "" && !root.working
-        onTriggered: root.refresh()
+        onTriggered: { root.refresh(); root.refreshStatus(); }
     }
 
     // ---- the window ----
@@ -135,7 +162,7 @@ ShellRoot {
                     color: pal.windowText
                     Layout.fillWidth: true
                 }
-                Button { text: "Refresh"; onClicked: root.refresh() }
+                Button { text: "Refresh"; onClicked: { root.refresh(); root.refreshStatus(); } }
                 Button {
                     text: "Add account…"
                     highlighted: true
@@ -166,6 +193,70 @@ ShellRoot {
                 }
             }
 
+            // the machine: memory, swap, load, and whether a new session would be accepted
+            Rectangle {
+                id: machine
+                readonly property var m: root.status.machine || null
+                readonly property var a: root.status.admission || null
+                visible: m !== null
+                Layout.fillWidth: true
+                implicitHeight: 74
+                radius: 12
+                color: pal.base
+                border.color: pal.mid
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.margins: 14
+                    spacing: 18
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Label {
+                            text: machine.m ? "Memory  " + root.mb(machine.m.mem_total_mb - machine.m.mem_available_mb) + " in use of " + root.mb(machine.m.mem_total_mb) + "  ·  " + root.mb(machine.m.mem_available_mb) + " available" : ""
+                            color: pal.text
+                            font.weight: Font.DemiBold
+                        }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 8
+                            radius: 4
+                            color: pal.mid
+                            Rectangle {
+                                readonly property real used: machine.m ? (machine.m.mem_total_mb - machine.m.mem_available_mb) / machine.m.mem_total_mb : 0
+                                width: parent.width * Math.min(1, used)
+                                height: parent.height
+                                radius: 4
+                                color: used > 0.85 ? "#e07a5f" : (used > 0.7 ? "#f2cc8f" : pal.highlight)
+                            }
+                        }
+                        Label {
+                            text: machine.m ? (machine.m.swap_total_mb > 0 ? "Swap  " + root.mb(machine.m.swap_used_mb) + " of " + root.mb(machine.m.swap_total_mb) + " used" : "No swap") + "  ·  load " + machine.m.load.join(" ") + " on " + machine.m.cores + " cores" : ""
+                            color: pal.placeholderText
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.preferredWidth: 250
+                        spacing: 2
+                        Label {
+                            text: machine.a ? (machine.a.open ? "New sessions: accepted" : "New sessions: refused") : ""
+                            color: machine.a && !machine.a.open ? "#e07a5f" : pal.text
+                            font.weight: Font.DemiBold
+                        }
+                        Label {
+                            text: machine.a ? (machine.a.open ? machine.a.sessions + " running, needs " + root.mb(machine.a.min_available_mb) + " available" : machine.a.reason) : ""
+                            color: pal.placeholderText
+                            font.pixelSize: 11
+                            wrapMode: Text.Wrap
+                            Layout.fillWidth: true
+                        }
+                    }
+                }
+            }
+
             ListView {
                 id: list
                 Layout.fillWidth: true
@@ -178,8 +269,10 @@ ShellRoot {
                     id: card
                     required property var modelData
                     readonly property bool mine: modelData.name === root.me
+                    // what the account uses now (null when it has nothing running)
+                    readonly property var use: root.usageOf(modelData.name)
                     width: list.width
-                    height: 104
+                    height: 118
                     radius: 12
                     color: pal.base
                     border.color: pal.mid
@@ -231,6 +324,15 @@ ShellRoot {
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
+                                Label {
+                                    visible: card.use !== null
+                                    text: card.use ? root.mb(card.use.mem_mb) + "  ·  CPU " + Math.round(card.use.cpu_percent) + "%" + (card.use.swap_mb > 0 ? "  ·  swap " + root.mb(card.use.swap_mb) : "") : ""
+                                    color: pal.text
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
                             }
 
                             Button {
@@ -238,6 +340,16 @@ ShellRoot {
                                 visible: card.modelData.session === "running"
                                 enabled: !root.working
                                 onClicked: root.change(["sessions", "end", card.modelData.name])
+                            }
+                            Button {
+                                text: "Limits…"
+                                enabled: !root.working
+                                onClicked: {
+                                    root.sheetUser = card.modelData.name;
+                                    limitMemory.text = "";
+                                    limitCpu.value = 100;
+                                    root.sheet = "limit";
+                                }
                             }
                             Button {
                                 text: "New password"
@@ -274,6 +386,16 @@ ShellRoot {
                                 onToggled: root.change(["users", "sudo", card.modelData.name, checked ? "on" : "off"])
                             }
                             Item { Layout.fillWidth: true }
+                        }
+
+                        // the programs holding the most memory
+                        Label {
+                            visible: card.use !== null && card.use.top.length > 0
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            color: pal.placeholderText
+                            font.pixelSize: 11
+                            text: card.use ? "Most memory: " + card.use.top.map(t => t.name + " " + root.mb(t.mb)).join(", ") + (card.use.cap_mb ? "   ·   limit " + root.mb(card.use.cap_mb) : "") : ""
                         }
                     }
                 }
@@ -369,6 +491,50 @@ ShellRoot {
                                 onClicked: {
                                     const args = ["users", "remove", root.sheetUser];
                                     if (removeHome.checked) args.push("--delete-home");
+                                    root.sheet = "";
+                                    root.change(args);
+                                }
+                            }
+                        }
+                    }
+
+                    // limits of one account
+                    ColumnLayout {
+                        visible: root.sheet === "limit"
+                        spacing: 10
+                        Label { text: "Limits of " + root.sheetUser; font.pixelSize: 18; font.weight: Font.DemiBold; color: pal.windowText }
+                        Label {
+                            text: "Ceilings, not reservations: they only matter when the account asks for more. By default no account can take more than half of the machine's memory; give one that needs more (VS Code with builds, big documents) a higher ceiling."
+                            wrapMode: Text.Wrap
+                            color: pal.placeholderText
+                            Layout.fillWidth: true
+                        }
+                        TextField {
+                            id: limitMemory
+                            Layout.fillWidth: true
+                            placeholderText: "memory ceiling, for example 6G or 800M (empty: leave as it is)"
+                            validator: RegularExpressionValidator { regularExpression: /^[1-9][0-9]{0,5}[MGT]$/ }
+                        }
+                        RowLayout {
+                            Label { text: "CPU weight"; color: pal.windowText }
+                            SpinBox { id: limitCpu; from: 1; to: 10000; value: 100; editable: true }
+                            Label { text: "100 is the same as everybody; 200 gets twice the share when the cores are busy"; color: pal.placeholderText; font.pixelSize: 11; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                        }
+                        RowLayout {
+                            Layout.alignment: Qt.AlignRight
+                            Button { text: "Cancel"; onClicked: root.sheet = "" }
+                            Button {
+                                text: "Reset to default"
+                                onClicked: { const u = root.sheetUser; root.sheet = ""; root.change(["users", "limit", u, "reset"]); }
+                            }
+                            Button {
+                                text: "Apply"
+                                highlighted: true
+                                enabled: (limitMemory.text === "" || limitMemory.acceptableInput) && !root.working
+                                onClicked: {
+                                    const args = ["users", "limit", root.sheetUser];
+                                    if (limitMemory.text !== "") { args.push("--memory"); args.push(limitMemory.text); }
+                                    args.push("--cpu-weight"); args.push(String(limitCpu.value));
                                     root.sheet = "";
                                     root.change(args);
                                 }

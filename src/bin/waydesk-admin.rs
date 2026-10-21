@@ -9,19 +9,27 @@
 //!   waydesk-admin users sudo NAME on|off        (the group sudo)
 //!   waydesk-admin sessions list [--json]
 //!   waydesk-admin sessions end NAME
+//!   waydesk-admin status [--json]                (memory, swap, load, whether a new session would be accepted, and what each account uses)
+//!   waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
 //!
-//! Listing is open to everybody (the account database is). Everything else needs root (`sudo`, or `pkexec` from the panel).
+//! Listing and `status` are open to everybody (the account database and the cgroup files are). Everything else needs root (`sudo`, or `pkexec` from the panel).
 //! The work is done by the system's own tools (useradd, userdel, gpasswd, chpasswd, systemctl, loginctl), started by their
 //! absolute path with fixed arguments and no shell, after every name and password has been checked. Passwords only travel
 //! over a pipe to `chpasswd`, never as arguments, and are never logged. Accounts below uid 1000 and root are never touched.
 
+use std::collections::{HashMap, HashSet};
 use std::ffi::CString;
 use std::io::{Read as _, Write as _};
 use std::os::raw::c_char;
+use std::os::unix::fs::MetadataExt as _;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use anyhow::{bail, ensure, Context as _, Result};
 use serde_json::json;
+
+#[path = "../memory.rs"]
+mod memory;
 
 const RDP_GROUP: &str = "waydesk-users";
 const ADMIN_GROUP: &str = "waydesk-admins";
@@ -196,6 +204,8 @@ fn run() -> Result<()> {
         ["users", "admin", name, onoff] => set_group(name, ADMIN_GROUP, parse_onoff(onoff)?),
         ["users", "sudo", name, onoff] => users_sudo(name, parse_onoff(onoff)?),
         ["sessions", "list"] => sessions_list(json_out),
+        ["status"] => status(json_out),
+        ["users", "limit", name, rest @ ..] => users_limit(name, rest),
         ["sessions", "end", name] => {
             require_root()?;
             let a = account(name)?;
@@ -219,6 +229,8 @@ usage: waydesk-admin users list [--json]
        waydesk-admin users admin NAME on|off   (Flatpak installs without a password)
        waydesk-admin users sudo NAME on|off
        waydesk-admin sessions list [--json] | end NAME
+       waydesk-admin status [--json]
+       waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
 ";
 
 fn take_flag(args: &mut Vec<String>, flag: &str) -> bool {
@@ -435,6 +447,270 @@ fn users_passwd(name: &str, rest: &[&str], json_out: bool) -> Result<()> {
     Ok(())
 }
 
+// ---- what the machine and the sessions use ----
+
+const USER_SLICES: &str = "/sys/fs/cgroup/user.slice";
+
+fn user_cgroup(uid: u32) -> PathBuf {
+    Path::new(USER_SLICES).join(format!("user-{uid}.slice"))
+}
+
+/// A number in a cgroup file ("max" and anything else that is not one: None).
+fn read_number(path: &Path) -> Option<u64> {
+    std::fs::read_to_string(path).ok()?.trim().parse().ok()
+}
+
+/// Microseconds of CPU the cgroup has used so far.
+fn cpu_usec(dir: &Path) -> Option<u64> {
+    std::fs::read_to_string(dir.join("cpu.stat")).ok()?.lines().find_map(|l| l.strip_prefix("usage_usec ")?.trim().parse().ok())
+}
+
+struct Usage {
+    name: String,
+    uid: u32,
+    session: bool,
+    mem_mb: u64,
+    swap_mb: u64,
+    tasks: u64,
+    /// Share of one core over the sample (a busy browser on two cores is 200).
+    cpu_percent: f64,
+    cap_mb: Option<u64>,
+    /// The programs of the account that hold the most memory (resident, shared pages counted for each process).
+    top: Vec<(String, u64)>,
+}
+
+/// The resident memory (kB) of the programs of each of the accounts, by program name.
+fn resident_by_program(uids: &HashSet<u32>) -> HashMap<u32, HashMap<String, u64>> {
+    let page_kb = (unsafe { libc::sysconf(libc::_SC_PAGESIZE) }.max(4096) as u64) / 1024;
+    let mut out: HashMap<u32, HashMap<String, u64>> = HashMap::new();
+    let Ok(dir) = std::fs::read_dir("/proc") else { return out };
+    for entry in dir.flatten() {
+        let name = entry.file_name();
+        let Some(pid) = name.to_str().filter(|n| n.bytes().all(|b| b.is_ascii_digit())) else { continue };
+        let Ok(meta) = std::fs::metadata(entry.path()) else { continue };
+        if !uids.contains(&meta.uid()) {
+            continue;
+        }
+        let comm = std::fs::read_to_string(format!("/proc/{pid}/comm")).unwrap_or_default().trim().to_owned();
+        let rss_pages: u64 = std::fs::read_to_string(format!("/proc/{pid}/statm")).ok().and_then(|t| t.split_whitespace().nth(1)?.parse().ok()).unwrap_or(0);
+        if !comm.is_empty() {
+            *out.entry(meta.uid()).or_default().entry(comm).or_default() += rss_pages * page_kb;
+        }
+    }
+    out
+}
+
+/// What every account that has a cgroup or a session uses; the CPU is measured over `sample`.
+fn gather_usage(sample: std::time::Duration) -> Result<Vec<Usage>> {
+    let accounts = accounts()?;
+    let first: Vec<Option<u64>> = accounts.iter().map(|a| cpu_usec(&user_cgroup(a.uid))).collect();
+    let started = std::time::Instant::now();
+    std::thread::sleep(sample);
+    let elapsed_us = started.elapsed().as_micros().max(1) as f64;
+    let uids: HashSet<u32> = accounts.iter().map(|a| a.uid).collect();
+    let by_program = resident_by_program(&uids);
+    let mut out = Vec::new();
+    for (a, before) in accounts.into_iter().zip(first) {
+        let dir = user_cgroup(a.uid);
+        let session = session_state(a.uid).0 == "running";
+        if !dir.exists() && !session {
+            continue;
+        }
+        let cpu_percent = match (before, cpu_usec(&dir)) {
+            (Some(b), Some(n)) if n >= b => (n - b) as f64 / elapsed_us * 100.0,
+            _ => 0.0,
+        };
+        let mut top: Vec<(String, u64)> = by_program.get(&a.uid).map(|m| m.iter().map(|(k, v)| (k.clone(), v / 1024)).collect()).unwrap_or_default();
+        top.sort_by(|x, y| y.1.cmp(&x.1).then(x.0.cmp(&y.0)));
+        top.truncate(3);
+        out.push(Usage {
+            name: a.name,
+            uid: a.uid,
+            session,
+            mem_mb: read_number(&dir.join("memory.current")).unwrap_or(0) / 1_048_576,
+            swap_mb: read_number(&dir.join("memory.swap.current")).unwrap_or(0) / 1_048_576,
+            tasks: read_number(&dir.join("pids.current")).unwrap_or(0),
+            cpu_percent,
+            cap_mb: read_number(&dir.join("memory.max")).map(|b| b / 1_048_576),
+            top,
+        });
+    }
+    Ok(out)
+}
+
+/// "1.4 GB" or "620 MB".
+fn human_mb(mb: u64) -> String {
+    if mb >= 1024 {
+        format!("{:.1} GB", mb as f64 / 1024.0)
+    } else {
+        format!("{mb} MB")
+    }
+}
+
+/// What the helper was started with: (--min-available-mb, --max-active-users).
+fn helper_policy() -> (Option<u64>, usize) {
+    let pid: u32 = run_tool("/usr/bin/systemctl", &["show", "waydesk-helper.service", "-p", "MainPID", "--value"]).ok().and_then(|o| o.trim().parse().ok()).unwrap_or(0);
+    let cmdline = if pid > 0 { std::fs::read(format!("/proc/{pid}/cmdline")).unwrap_or_default() } else { Vec::new() };
+    policy_from_args(&cmdline.split(|b| *b == 0).map(|a| String::from_utf8_lossy(a).into_owned()).collect::<Vec<_>>())
+}
+
+fn policy_from_args(args: &[String]) -> (Option<u64>, usize) {
+    let value = |flag: &str| args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1));
+    (value("--min-available-mb").and_then(|v| v.parse().ok()), value("--max-active-users").and_then(|v| v.parse().ok()).unwrap_or(0))
+}
+
+/// The swap devices: (name, size kB, used kB).
+fn swap_devices() -> Vec<(String, u64, u64)> {
+    let text = std::fs::read_to_string("/proc/swaps").unwrap_or_default();
+    text.lines().skip(1).filter_map(|l| {
+        let f: Vec<&str> = l.split_whitespace().collect();
+        Some((f.first()?.to_string(), f.get(2)?.parse().ok()?, f.get(3)?.parse().ok()?))
+    }).collect()
+}
+
+fn status(json_out: bool) -> Result<()> {
+    let info = memory::read_meminfo().context("cannot read /proc/meminfo")?;
+    let load = std::fs::read_to_string("/proc/loadavg").unwrap_or_default().split_whitespace().take(3).map(str::to_owned).collect::<Vec<_>>();
+    let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+    let (min_mb, max_users) = helper_policy();
+    let usage = gather_usage(std::time::Duration::from_millis(1000))?;
+    let running = usage.iter().filter(|u| u.session).count();
+    let admission = memory::admission(&info, running, min_mb, max_users);
+    let needed_mb = min_mb.unwrap_or_else(|| memory::auto_min_available_mb(info.total_kb));
+    let (open, reason) = match &admission {
+        memory::Admission::Open => (true, String::new()),
+        memory::Admission::Full { available_mb, needed_mb } => (false, format!("{available_mb} MB available, {needed_mb} MB needed")),
+        memory::Admission::TooManyUsers { users, max } => (false, format!("{users} of {max} active users")),
+    };
+    let swaps = swap_devices();
+    if json_out {
+        let users: Vec<_> = usage.iter().map(|u| json!({
+            "name": u.name, "uid": u.uid, "session": u.session, "mem_mb": u.mem_mb, "swap_mb": u.swap_mb, "tasks": u.tasks,
+            "cpu_percent": (u.cpu_percent * 10.0).round() / 10.0, "cap_mb": u.cap_mb,
+            "top": u.top.iter().map(|(n, mb)| json!({ "name": n, "mb": mb })).collect::<Vec<_>>(),
+        })).collect();
+        println!("{}", serde_json::to_string_pretty(&json!({
+            "machine": {
+                "mem_total_mb": info.total_kb / 1024, "mem_available_mb": info.available_kb / 1024,
+                "swap_total_mb": info.swap_total_kb / 1024, "swap_used_mb": (info.swap_total_kb - info.swap_free_kb.min(info.swap_total_kb)) / 1024,
+                "swap_devices": swaps.iter().map(|(n, size, used)| json!({ "name": n, "size_mb": size / 1024, "used_mb": used / 1024 })).collect::<Vec<_>>(),
+                "load": load, "cores": cores,
+            },
+            "admission": { "open": open, "reason": reason, "min_available_mb": needed_mb, "max_active_users": max_users, "sessions": running },
+            "users": users,
+        }))?);
+        return Ok(());
+    }
+    println!("Memory    {} in all, {} available", human_mb(info.total_kb / 1024), human_mb(info.available_kb / 1024));
+    if swaps.is_empty() {
+        println!("Swap      none");
+    } else {
+        let list: Vec<String> = swaps.iter().map(|(n, size, used)| format!("{} {} ({} used)", n.rsplit('/').next().unwrap_or(n), human_mb(size / 1024), human_mb(used / 1024))).collect();
+        println!("Swap      {}", list.join(", "));
+    }
+    println!("Load      {} ({cores} cores)", load.join(" "));
+    let limit = if max_users > 0 { format!(", at most {max_users} active users") } else { String::new() };
+    if open {
+        println!("Sessions  {running} running; a new one would be accepted (needs {} available{limit})", human_mb(needed_mb));
+    } else {
+        println!("Sessions  {running} running; a new one would be REFUSED: {reason}{limit}");
+    }
+    if usage.is_empty() {
+        println!("\nNobody is logged in.");
+        return Ok(());
+    }
+    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT");
+    for u in &usage {
+        let top: Vec<String> = u.top.iter().map(|(n, mb)| format!("{n} {mb} MB")).collect();
+        println!(
+            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8}  {}",
+            u.name,
+            if u.session { "running" } else { "-" },
+            human_mb(u.mem_mb),
+            if u.swap_mb > 0 { human_mb(u.swap_mb) } else { "-".into() },
+            u.cpu_percent,
+            u.cap_mb.map(human_mb).unwrap_or_else(|| "none".into()),
+            top.join(", ")
+        );
+    }
+    Ok(())
+}
+
+// ---- limits of one account ----
+
+/// "8G", "512M", "100K", "2T" in bytes; 0 is allowed (no swap at all).
+fn parse_size_bytes(s: &str) -> Option<u64> {
+    if s == "0" {
+        return Some(0);
+    }
+    let (digits, unit) = s.split_at(s.len().checked_sub(1)?);
+    let n: u64 = digits.parse().ok().filter(|n| *n > 0)?;
+    let factor: u64 = match unit {
+        "K" | "k" => 1 << 10,
+        "M" | "m" => 1 << 20,
+        "G" | "g" => 1 << 30,
+        "T" | "t" => 1 << 40,
+        _ => return None,
+    };
+    n.checked_mul(factor)
+}
+
+/// The systemd properties for `users limit` options (the memory ceiling also sets a high mark at 90 %, where the kernel starts
+/// reclaiming from the account instead of letting it grow to the ceiling).
+fn limit_properties(opts: &[&str]) -> Result<Vec<String>> {
+    let mut props = Vec::new();
+    let mut it = opts.iter();
+    while let Some(flag) = it.next() {
+        let value = it.next().with_context(|| format!("{flag} needs a value"))?;
+        match *flag {
+            "--memory" => {
+                let max = parse_size_bytes(value).filter(|b| *b > 0).with_context(|| format!("{value:?} is not a size (for example 6G or 800M)"))?;
+                props.push(format!("MemoryHigh={}", max / 10 * 9));
+                props.push(format!("MemoryMax={max}"));
+            }
+            "--swap" => props.push(format!("MemorySwapMax={}", parse_size_bytes(value).with_context(|| format!("{value:?} is not a size (for example 2G, or 0 for none)"))?)),
+            "--cpu-weight" => {
+                let w: u32 = value.parse().ok().filter(|w| (1..=10000).contains(w)).with_context(|| format!("{value:?} is not a CPU weight (1 to 10000, the default is 100)"))?;
+                props.push(format!("CPUWeight={w}"));
+            }
+            "--tasks" => {
+                let t: u32 = value.parse().ok().filter(|t| *t >= 64).with_context(|| format!("{value:?} is not a number of tasks (64 or more)"))?;
+                props.push(format!("TasksMax={t}"));
+            }
+            other => bail!("unknown option {other} for limit"),
+        }
+    }
+    ensure!(!props.is_empty(), "say what to limit: --memory, --swap, --cpu-weight or --tasks (or show, or reset)");
+    Ok(props)
+}
+
+fn users_limit(name: &str, rest: &[&str]) -> Result<()> {
+    let a = account(name)?;
+    let unit = format!("user-{}.slice", a.uid);
+    match rest {
+        [] | ["show"] => {
+            let out = run_tool("/usr/bin/systemctl", &["show", &unit, "-p", "MemoryHigh", "-p", "MemoryMax", "-p", "MemorySwapMax", "-p", "CPUWeight", "-p", "TasksMax"])?;
+            println!("limits of {} ({unit}):\n{}", a.name, out.trim_end());
+            Ok(())
+        }
+        ["reset"] => {
+            require_root()?;
+            run_tool("/usr/bin/systemctl", &["revert", &unit])?;
+            println!("{} has the default limits again", a.name);
+            Ok(())
+        }
+        opts => {
+            require_root()?;
+            let props = limit_properties(opts)?;
+            let mut args = vec!["set-property", unit.as_str()];
+            args.extend(props.iter().map(String::as_str));
+            run_tool("/usr/bin/systemctl", &args)?;
+            println!("limits of {} set: {}", a.name, props.join(" "));
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -504,5 +780,37 @@ mod tests {
         assert!(take_flag(&mut args, "--json"));
         assert_eq!(args, vec!["users", "list"]);
         assert!(!take_flag(&mut args, "--json"));
+    }
+
+    #[test]
+    fn sizes_are_read_with_their_unit() {
+        assert_eq!(parse_size_bytes("8G"), Some(8 << 30));
+        assert_eq!(parse_size_bytes("512m"), Some(512 << 20));
+        assert_eq!(parse_size_bytes("0"), Some(0));
+        for bad in ["", "G", "8", "8GB", "-1G", "1.5G", "0G", "99999999999T", "8 G"] {
+            assert_eq!(parse_size_bytes(bad), None, "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn limits_become_systemd_properties_and_nothing_else() {
+        assert_eq!(limit_properties(&["--memory", "10G"]).unwrap(), vec!["MemoryHigh=9663676416", "MemoryMax=10737418240"]);
+        assert_eq!(limit_properties(&["--cpu-weight", "200", "--swap", "0", "--tasks", "4096"]).unwrap(), vec!["CPUWeight=200", "MemorySwapMax=0", "TasksMax=4096"]);
+        for bad in [&["--memory", "0"][..], &["--memory"], &["--cpu-weight", "0"], &["--cpu-weight", "10001"], &["--tasks", "5"], &["--nice", "1"], &[], &["--memory", "1G;rm"]] {
+            assert!(limit_properties(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn the_policy_of_the_helper_is_read_from_its_arguments() {
+        let args: Vec<String> = ["waydesk-server", "--helper", "--min-available-mb", "1200", "--max-active-users", "6"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(policy_from_args(&args), (Some(1200), 6));
+        assert_eq!(policy_from_args(&args[..2]), (None, 0));
+    }
+
+    #[test]
+    fn sizes_are_shown_in_mb_or_gb() {
+        assert_eq!(human_mb(620), "620 MB");
+        assert_eq!(human_mb(1536), "1.5 GB");
     }
 }

@@ -19,6 +19,11 @@ if [ "$1" = configure ]; then
     chown waydesk:waydesk /etc/waydesk/key.pem /etc/waydesk/cert.pem
     chmod 600 /etc/waydesk/key.pem
     systemctl daemon-reload >/dev/null 2>&1 || true
+    # Compressed swap in RAM (systemd-zram-generator, recommended) and its kernel settings, without a reboot.
+    /usr/lib/systemd/systemd-sysctl /usr/lib/sysctl.d/50-waydesk.conf >/dev/null 2>&1 || true
+    if [ -x /usr/lib/systemd/system-generators/zram-generator ] && ! grep -q zram /proc/swaps 2>/dev/null; then
+        systemctl start systemd-zram-setup@zram0.service >/dev/null 2>&1 || true
+    fi
     systemctl enable waydesk-helper.service waydesk.service >/dev/null 2>&1 || true
     systemctl restart waydesk-helper.service waydesk.service >/dev/null 2>&1 || true
 fi

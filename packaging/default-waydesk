@@ -26,3 +26,10 @@ WAYDESK_SESSION_ARGS=
 # Memory: a session costs about 0.5 GB for the desktop itself (see the README, "Sizing"), most of it the shell (DankMaterialShell).
 # 1 makes the shell use Qt's software renderer: about 170 MB less per session, but square corners and some blank previews.
 #WAYDESK_DMS_SOFTWARE=1
+
+# A new session is refused when the machine cannot take one more (the account's running session is never refused: it reconnects).
+# By default it needs the larger of 900 MB and 15 % of the memory available (`waydesk-admin status` shows it and whether a login would
+# be accepted now). Change it, or limit the accounts that may have a session, by adding to the helper's options (keep the group):
+#WAYDESK_HELPER_ARGS=--require-group waydesk-users --min-available-mb 1500 --max-active-users 6
+#   --min-available-mb N    0 switches the memory check off
+#   --max-active-users N    0 (the default) is no limit

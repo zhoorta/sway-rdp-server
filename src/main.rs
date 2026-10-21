@@ -13,6 +13,7 @@ mod helper;
 mod helperclient;
 mod input;
 mod link;
+mod memory;
 mod proto;
 mod session;
 mod sessionaudio;
@@ -475,6 +476,10 @@ async fn main() -> anyhow::Result<()> {
     let mut helper_socket = PathBuf::from("/run/waydesk/helper.sock");
     let mut daemon_user = "waydesk".to_string();
     let mut systemd_sessions = false;
+    // A new session needs this much available memory (MB; automatic when not given, 0 = no check), and at most this many accounts
+    // may have a session (0 = no limit). Accounts that already have one just reconnect.
+    let mut min_available_mb: Option<u64> = None;
+    let mut max_active_users = 0usize;
     // How long a session without a client lives (seconds, 0 = for ever), and whether it ends when the client leaves.
     let mut idle_timeout = 8 * 3600u64;
     let mut end_on_disconnect = false;
@@ -495,6 +500,8 @@ async fn main() -> anyhow::Result<()> {
             "--own-sway" => own_sway = true,
             "--helper" => run_helper = true,
             "--systemd-sessions" => systemd_sessions = true,
+            "--min-available-mb" => min_available_mb = Some(args.next().context("--min-available-mb needs a number (0 = no check)")?.parse()?),
+            "--max-active-users" => max_active_users = args.next().context("--max-active-users needs a number (0 = no limit)")?.parse()?,
             "--idle-timeout" => idle_timeout = args.next().context("--idle-timeout needs seconds")?.parse()?,
             "--end-on-disconnect" => end_on_disconnect = true,
             "--register" => register = args.next().map(PathBuf::from),
@@ -543,7 +550,7 @@ async fn main() -> anyhow::Result<()> {
     }
     if run_helper {
         let exe = std::env::current_exe().context("path of this program")?;
-        return helper::run(helper::Config { socket: helper_socket, daemon_user, allow_users, require_group, exe, worker_args, workspace, systemd_sessions });
+        return helper::run(helper::Config { socket: helper_socket, daemon_user, allow_users, require_group, exe, worker_args, workspace, systemd_sessions, min_available_mb, max_active_users });
     }
     anyhow::ensure!(matches!(auth_mode.as_str(), "file" | "pam" | "helper"), "--auth must be file, pam or helper");
     anyhow::ensure!(!per_user || auth_mode == "pam", "--per-user needs --auth pam (the account comes from the login)");

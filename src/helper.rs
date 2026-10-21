@@ -28,6 +28,7 @@ use tracing::{info, warn};
 
 use crate::auth::{lookup_user, PamPolicy, UserInfo};
 use crate::fdpass;
+use crate::memory::{self, Admission};
 use crate::proto::{self, HelperReq, HelperResp};
 use crate::spawn::spawn_worker;
 
@@ -44,6 +45,9 @@ pub struct Config {
     /// Start sessions as `waydesk-session@<uid>.service` (the packaged way: they get the account's own slice and none
     /// of the helper's sandbox) instead of as children of the helper.
     pub systemd_sessions: bool,
+    /// What a new session needs (see `memory::admission`).
+    pub min_available_mb: Option<u64>,
+    pub max_active_users: usize,
 }
 
 /// Connections served at once.
@@ -278,6 +282,22 @@ fn session_for(user: &UserInfo, cfg: &Config, sessions: &Sessions, register_path
     if let Some(s) = sessions.attach(user.uid) {
         info!(user = %user.name, "reconnecting to the running session");
         return Ok(s);
+    }
+    // A new session costs memory the others may need: when the machine cannot take one more, the login is refused here (the
+    // account's running session, if it has one, was handed out above, so nobody is thrown out for a newcomer).
+    if let Some(info) = memory::read_meminfo() {
+        let running = sessions.by_uid.lock().unwrap().len();
+        match memory::admission(&info, running, cfg.min_available_mb, cfg.max_active_users) {
+            Admission::Open => {}
+            Admission::Full { available_mb, needed_mb } => {
+                warn!(user = %user.name, available_mb, needed_mb, running, "session refused: the machine is short of memory");
+                anyhow::bail!("the server is short of memory ({available_mb} MB available, {needed_mb} MB needed for a new session)");
+            }
+            Admission::TooManyUsers { users, max } => {
+                warn!(user = %user.name, users, max, "session refused: the limit of active users is reached");
+                anyhow::bail!("the limit of {max} active users is reached");
+            }
+        }
     }
     ensure_runtime_dir(user)?;
     if cfg.systemd_sessions {
