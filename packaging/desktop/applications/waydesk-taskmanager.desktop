@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Task Manager
+Comment=Processes, CPU, memory and network
+Exec=waydesk-taskmanager
+Icon=utilities-system-monitor
+Categories=System;Monitor;
+Terminal=false
+StartupNotify=false

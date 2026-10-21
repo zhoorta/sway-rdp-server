@@ -43,6 +43,10 @@ whiptail wizard for DMS and developer, creative and AI apps. Design, threat mode
 [docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
 exists (run the binary inside your own sway).
 
+**Task Manager** (the launcher, or `Ctrl+Shift+Esc`) opens the shell's System Monitor: processes (search, sort by CPU or memory, end one), CPU, memory and swap, network speeds,
+disks and system information, for the account's own session. It shows what any account can see in `/proc` (the processes of the others too, see "Running out of memory");
+`waydesk-admin status` and the Users & Access panel are the administrator's view of every session.
+
 Workspaces (virtual desktops): the first is called Remote, others are made on demand and go away when their last window does (four at most). With the mouse: the
 **+** next to the workspace pill of the bar makes one and goes to it, and the arrow beside it lists the workspaces with their windows (click a window to go to it,
 **Move to** sends it to another workspace or to a new one). With the keyboard: `Super+1..4` go to a workspace, `Super+Shift+1..4` send the focused window there,
