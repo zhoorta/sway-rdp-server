@@ -22,3 +22,7 @@ WAYDESK_SESSION_ARGS=
 # installation). Add accounts with: adduser ACCOUNT waydesk-users. To let every ordinary account with a login shell in, as
 # before, put the line below WITH nothing after the equals sign; another group: WAYDESK_HELPER_ARGS=--require-group NAME
 #WAYDESK_HELPER_ARGS=--require-group waydesk-users
+
+# Memory: a session costs about 0.5 GB for the desktop itself (see the README, "Sizing"), most of it the shell (DankMaterialShell).
+# 1 makes the shell use Qt's software renderer: about 170 MB less per session, but square corners and some blank previews.
+#WAYDESK_DMS_SOFTWARE=1

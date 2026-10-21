@@ -431,6 +431,14 @@ PY
         rm -rf "$dms_copy"
     fi
 fi
+# Memory: the shell draws with Mesa's software OpenGL (about 400 MB resident). Qt's own software renderer needs about 170 MB less,
+# but has no rounded clipping or shader effects (square corners, some previews stay blank): an option for servers short of RAM,
+# WAYDESK_DMS_SOFTWARE=1 in /etc/default/waydesk.
+if [ "${WAYDESK_DMS_SOFTWARE:-}" = 1 ]; then
+    systemctl --user set-environment QT_QUICK_BACKEND=software 2>/dev/null
+else
+    systemctl --user unset-environment QT_QUICK_BACKEND 2>/dev/null
+fi
 # The account's user manager outlives its sessions and keeps what an older one pushed into it (dbus-update-activation-environment
 # below only adds): GSETTINGS_BACKEND=memory, set by a session that started before the user bus existed, kept the portal from
 # reading dconf, so Flatpak apps never saw the dark preference. This session has the bus, so drop it.

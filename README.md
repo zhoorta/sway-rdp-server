@@ -102,6 +102,25 @@ per-account resource limits yet). See docs/MULTIUSER-DESIGN.md.
 Dual-licensed under either of [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option. `patches/ironrdp-server` is a
 modified copy of IronRDP's `ironrdp-server` crate and stays under its own licence (MIT or Apache-2.0, files included there).
 
+## Sizing
+
+Measured in the 4 GB arm64 development VM (software rendering, 1280x800), desktop with the bar and the dock, nothing else open (2026-10-21):
+
+| | Memory |
+|---|---|
+| First session, idle (PSS: shared libraries divided between the processes that map them) | about 610 MB: the shell (`qs`) 394, the session process 45, `dms` 39, the file manager 29, sway 23, portals 18, helpers 15, sound 11 |
+| Each further idle session (drop in available RAM) | about 410 MB |
+| An open terminal, or a file manager window | +20 MB, +5 MB |
+| The daemon (`waydesk`, all connections) | about 5 MB |
+
+Plan on about 0.5 GB per logged-in session for the desktop itself, plus what the programs use (a browser is several hundred MB more), plus about 1 GB
+for the system. The 4 GB VM ran out of memory with five accounts logged in; when it does, the kernel kills the shell (`qs`) of an account first, and that
+account is left with windows and no bar. Sessions stay until they time out (`--idle-timeout`, 8 h by default; `--end-on-disconnect` ends them when the
+client leaves), so the number that counts is the accounts logged in, not the ones connected. `WAYDESK_DMS_SOFTWARE=1` in `/etc/default/waydesk` takes about
+170 MB off each session by drawing the shell without OpenGL (the bar, the dock and the launcher look right; rounded corners in the settings window
+and some previews do not). To keep one account from taking the rest, give the accounts a share: for example a drop-in `/etc/systemd/system/user-.slice.d/60-share.conf`
+with `MemoryHigh=` and `MemoryMax=` (the packaged one only caps an account at 90 % of the machine).
+
 ## Who may log in
 
 Members of the group `waydesk-users` (the package makes it, and on a first install adds the account that ran the installation):
