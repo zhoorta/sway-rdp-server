@@ -214,6 +214,12 @@ if [ -e /usr/share/applications/pcmanfm-qt.desktop ] && { [ ! -e "$fm_entry" ] |
     mkdir -p "$apps_dir"
     { echo '# waydesk: the name is File Manager'; sed -e '/^Name\[/d' -e 's/^Name=.*/Name=File Manager/' /usr/share/applications/pcmanfm-qt.desktop; } > "$fm_entry.new" && mv "$fm_entry.new" "$fm_entry"
 fi
+# "Desktop" in the launcher opens the shell's wallpaper settings, not the file manager's desktop dialog (same rule: our first line).
+desktop_entry="$apps_dir/pcmanfm-qt-desktop-pref.desktop"
+if [ ! -e "$desktop_entry" ] || grep -q '^# waydesk:' "$desktop_entry"; then
+    mkdir -p "$apps_dir"
+    printf '# waydesk: opens the wallpaper settings of the shell\n[Desktop Entry]\nType=Application\nName=Desktop\nGenericName=Desktop Settings\nComment=Wallpaper and look of the desktop\nExec=waydesk-desktop-settings\nIcon=user-desktop\nCategories=Settings;\nStartupNotify=true\n' > "$desktop_entry"
+fi
 # Users & Access is for administrators (the group sudo, which is who polkit asks for a password): the others do not see it in the
 # launcher. Looked up in the account database, so a change shows at the next start of the shell.
 users_entry="$apps_dir/waydesk-users.desktop"
