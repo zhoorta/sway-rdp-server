@@ -37,6 +37,7 @@ install -m 644 packaging/desktop/etc-waydesk/sway.conf $D/etc/xdg/waydesk/sway.c
 install -m 755 packaging/desktop/setup/*.sh $D/usr/share/waydesk/setup/
 install -m 644 packaging/desktop/setup/*.tsv $D/usr/share/waydesk/setup/
 mkdir -p $D/usr/share/waydesk/gtk $D/usr/lib/environment.d && install -m 644 packaging/desktop/gtk/*.css $D/usr/share/waydesk/gtk/
+mkdir -p $D/usr/share/icons/hicolor/scalable/apps && install -m 644 packaging/desktop/icons/*.svg $D/usr/share/icons/hicolor/scalable/apps/
 install -m 644 packaging/desktop/environment.d/*.conf $D/usr/lib/environment.d/
 mkdir -p $D/usr/share/polkit-1/rules.d && install -m 644 packaging/desktop/polkit/*.rules $D/usr/share/polkit-1/rules.d/
 mkdir -p $D/usr/lib/systemd/system/waydesk-session@.service.d && install -m 644 packaging/desktop/systemd-session/*.conf $D/usr/lib/systemd/system/waydesk-session@.service.d/

@@ -168,8 +168,19 @@
  	'commands/unmark.c',
  	'commands/urgent.c',
 --- sway-1.10.1/sway/tree/container.c	2025-01-26 13:43:46
-+++ work/sway/tree/container.c	2026-10-21 16:57:15
-@@ -296,6 +296,28 @@
++++ work/sway/tree/container.c	2026-10-21 17:49:21
+@@ -108,7 +108,9 @@
+ 		alloc_rect_node(c->title_bar.border, &failed);
+ 	}
+ 
+-	for (int i = 0; i < 5; i++) {
++	// The background goes around the title, the marks and the three window buttons: up to nine pieces
++	// (it was five before the buttons; a piece that is missing is a hole that clicks fall through).
++	for (int i = 0; i < 12; i++) {
+ 		alloc_rect_node(c->title_bar.background, &failed);
+ 	}
+ 
+@@ -296,6 +298,28 @@
  		sway_text_node_set_color(con->title_bar.marks_text, colors->text);
  		sway_text_node_set_background(con->title_bar.marks_text, colors->background);
  	}
@@ -198,7 +209,7 @@
  }
  
  void container_update_itself_and_parents(struct sway_container *con) {
-@@ -338,6 +360,27 @@
+@@ -338,6 +362,27 @@
  	pixman_region32_t text_area;
  	pixman_region32_init(&text_area);
  
@@ -226,7 +237,7 @@
  	if (con->title_bar.marks_text) {
  		struct sway_text_node *node = con->title_bar.marks_text;
  		marks_buffer_width = node->width;
-@@ -372,10 +415,10 @@
+@@ -372,10 +417,10 @@
  		} else if (title_align == ALIGN_CENTER) {
  			h_padding = ((int)width - marks_buffer_width - node->width) >> 1;
  		} else {
@@ -239,7 +250,7 @@
  
  		int alloc_width = MIN((int) node->width,
  			width - h_padding - config->titlebar_h_padding);
-@@ -416,6 +459,26 @@
+@@ -416,6 +461,26 @@
  	container_update(con);
  }
  
@@ -266,7 +277,7 @@
  void container_update_marks(struct sway_container *con) {
  	char *buffer = NULL;
  
-@@ -477,6 +540,18 @@
+@@ -477,6 +542,18 @@
  
  	con->title_bar.title_text = sway_text_node_create(con->title_bar.tree,
  		con->formatted_title, colors->text, config->pango_markup);

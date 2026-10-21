@@ -220,12 +220,12 @@ if [ ! -e "$dms_dir/.hidden-qterminal-2" ]; then
     done
     mkdir -p "$dms_dir" && : > "$dms_dir/.hidden-qterminal-2"
 fi
-# The file manager is called "File Manager" in the launcher (Debian names it after the program). A copy of its entry in the
+# The file manager is called "File Manager" in the launcher (Debian names it after the program) and has an icon of our own (the stock one is a filing cabinet). A copy of its entry in the
 # account's own folder, made again at every start while it carries our first line; an entry of the account's own stays.
 fm_entry="$apps_dir/pcmanfm-qt.desktop"
 if [ -e /usr/share/applications/pcmanfm-qt.desktop ] && { [ ! -e "$fm_entry" ] || grep -q '^# waydesk:' "$fm_entry"; }; then
     mkdir -p "$apps_dir"
-    { echo '# waydesk: the name is File Manager'; sed -e '/^Name\[/d' -e 's/^Name=.*/Name=File Manager/' /usr/share/applications/pcmanfm-qt.desktop; } > "$fm_entry.new" && mv "$fm_entry.new" "$fm_entry"
+    { echo '# waydesk: the name is File Manager'; sed -e '/^Name\[/d' -e 's/^Name=.*/Name=File Manager/' -e 's/^Icon=.*/Icon=waydesk-file-manager/' /usr/share/applications/pcmanfm-qt.desktop; } > "$fm_entry.new" && mv "$fm_entry.new" "$fm_entry"
 fi
 # "Desktop" in the launcher opens the shell's wallpaper settings, not the file manager's desktop dialog (same rule: our first line).
 desktop_entry="$apps_dir/pcmanfm-qt-desktop-pref.desktop"

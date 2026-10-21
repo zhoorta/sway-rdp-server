@@ -14,8 +14,10 @@ PluginComponent {
     property var minimized: []
     // The title bars have their own buttons.
     property bool ownButtons: false
-    // Nothing to show: no buttons of its own and nothing minimized.
-    visible: !ownButtons || minimized.length > 0
+    // The dock lists the minimized windows too (a click brings one back): with it on, and the buttons on the title bars, there is
+    // nothing left for this widget. Without the dock it stays as the arrow, while something is minimized.
+    readonly property bool dockOn: (SettingsData.dockConfigs || []).some(config => config.enabled)
+    visible: !ownButtons || (minimized.length > 0 && !dockOn)
 
     function refresh() {
         Proc.runCommand("swayWindowControls.ownButtons", ["sh", "-c", "test -e \"$XDG_RUNTIME_DIR/waydesk-titlebar-buttons\" && echo yes"], function (out, code) {
