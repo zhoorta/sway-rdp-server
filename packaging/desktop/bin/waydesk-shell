@@ -282,6 +282,9 @@ fi
 #  - The launcher menu (right click on an app) says "Pin to Dock" and there is no dock: "Pin to desktop" puts the app on the
 #    desktop (waydesk-add-to-desktop).
 #  - The control center header of DMS 1.x has an edit button (rearranging its tiles) that has no setting to hide it.
+#  - Settings pages with nothing to set on a remote desktop are left out of the sidebar (dock, displays, network, power, input,
+#    users, lock screen, plugins ...), and so are the "Material" wallpapers: they are drawn by the shell's own wallpaper layer,
+#    which is off (the file manager draws the desktop), so choosing one changes nothing. An image or a colour does (waydesk-wallpaper).
 dms_src=/usr/share/quickshell/dms
 dms_copy="${XDG_CACHE_HOME:-$HOME/.cache}/waydesk/dms-shell"
 rm -rf "$dms_copy"
@@ -369,6 +372,45 @@ if needle not in text:
 os.remove(dst)
 with open(dst, "w") as f:
     f.write(text.replace(needle, "visible: false\n            " + needle, 1))
+PY
+    fi
+    tabs=Common/SettingsTabs.qml
+    if [ -f "$dms_src/$tabs" ]; then
+        python3 - "$dms_src/$tabs" "$dms_copy/$tabs" <<'PY' && patched=1
+import json, os, sys
+src, dst = sys.argv[1:]
+text = open(src).read()
+needle = "    function isVisible(entry) {\n        if (!entry)\n            return false;\n"
+if needle not in text:
+    sys.exit(1)
+hidden = [
+    "dock", "dock_general", "dock_widgets", "dock_appearance", "dock_advanced",
+    "desktop_widgets", "desktop_widget", "wellbeing",
+    "displays", "display_config", "display_gamma", "display_widgets",
+    "input", "keybinds", "keyboard", "mouse_touchpad",
+    "power_battery", "power_sleep", "battery",
+    "network", "network_wifi", "network_ethernet", "network_vpn", "network_cellular", "network_status",
+    "user_accounts", "users", "user_create", "security_accounts", "lock_screen", "greeter", "greeter_auth",
+    "window_rules", "compositor_layout", "multiplexers", "printers", "updater", "updater_changelog",
+    "plugins", "plugins_manage",
+]
+add = "        if (%s.indexOf(entry.id) >= 0)\n            return false;\n" % json.dumps(hidden)
+os.remove(dst)
+with open(dst, "w") as f:
+    f.write(text.replace(needle, needle + add, 1))
+PY
+    fi
+    wall=Modules/Settings/WallpaperColorsTab.qml
+    if [ -f "$dms_src/$wall" ]; then
+        python3 - "$dms_src/$wall" "$dms_copy/$wall" <<'PY' && patched=1
+import os, sys
+src, dst = sys.argv[1:]
+text = open(src).read()
+if "visible: root.materialWallpaper\n" not in text:
+    sys.exit(1)
+os.remove(dst)
+with open(dst, "w") as f:
+    f.write(text.replace("visible: root.materialWallpaper\n", "visible: false\n"))
 PY
     fi
     if [ "$patched" = 1 ]; then

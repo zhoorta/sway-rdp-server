@@ -11,7 +11,7 @@ desktop settings keeps it: this only replaces what it made itself.
 
 A wallpaper picked in the shell's settings (DMS keeps it in ~/.local/state/dms/session.json) is handed to pcmanfm-qt too, with
 its fill mode, because pcmanfm-qt draws the desktop and the shell's own wallpaper layer is off; cleared again, the generated
-background comes back. Solid colours, a wallpaper per monitor and a light and a dark one are not followed (the shared path is).
+background comes back. A solid colour becomes a one colour image. A wallpaper per monitor and a light and a dark one are not followed (the shared path is).
 """
 import colorsys
 import hashlib
@@ -133,6 +133,27 @@ def read_json(*paths):
     return {}
 
 
+def solid_image(colour):
+    """A small PNG of one colour (stretched over the screen) for a colour picked in the shell's settings."""
+    try:
+        r, g, b = rgb(colour)
+    except ValueError:
+        return None
+    path = os.path.join(OUT_DIR, f"color-{r:02x}{g:02x}{b:02x}.png")
+    if not os.path.exists(path):
+        os.makedirs(OUT_DIR, exist_ok=True)
+        body = zlib.compress((b"\x00" + bytes((r, g, b)) * 8) * 8)
+
+        def chunk(tag, data):
+            return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+        png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 8, 8, 8, 2, 0, 0, 0)) + chunk(b"IDAT", body) + chunk(b"IEND", b"")
+        with open(path + ".new", "wb") as f:
+            f.write(png)
+        os.replace(path + ".new", path)
+    return path
+
+
 def dms_wallpaper():
     """(image path, pcmanfm-qt fill mode) of the wallpaper picked in the shell's settings, or None (not set, or a colour)."""
     session = read_json(*(os.path.join(STATE, d, "session.json") for d in ("dms", "DankMaterialShell")))
@@ -140,6 +161,9 @@ def dms_wallpaper():
     if not isinstance(path, str):
         return None
     path = path[len("file://"):] if path.startswith("file://") else path
+    if path.startswith("#"):
+        solid = solid_image(path)
+        return (solid, "stretch") if solid else None
     if not path.startswith("/") or not os.path.isfile(path):
         return None
     settings = read_json(*(os.path.join(CONFIG, d, "settings.json") for d in ("dms", "DankMaterialShell")))
