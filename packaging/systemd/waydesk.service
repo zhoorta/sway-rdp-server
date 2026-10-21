@@ -33,6 +33,11 @@ SystemCallArchitectures=native
 SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources
 UMask=0077
+# Resource limits: the daemon holds the RDP connections and the H.264 streams, so room for many clients, but a flood or a leak
+# stops here and not at the host. Raise them in a drop-in (systemctl edit waydesk) for a bigger server.
+MemoryMax=1G
+TasksMax=512
+LimitNOFILE=8192
 
 [Install]
 WantedBy=multi-user.target

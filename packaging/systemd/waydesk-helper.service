@@ -43,6 +43,15 @@ ProtectKernelLogs=yes
 # audit record of a login. Starting the sessions goes through systemd, which has the rest.
 CapabilityBoundingSet=CAP_CHOWN CAP_DAC_READ_SEARCH CAP_AUDIT_WRITE CAP_SETUID CAP_SETGID
 SystemCallArchitectures=native
+# Ordinary service calls only. @privileged stays allowed on purpose (chown of the socket, the setuid and setgid that PAM and
+# the login check use); mount, module, raw I/O, reboot, clock, debug and the other special groups are not in @system-service.
+# A refused call fails with EPERM instead of killing the helper, so a missing entry is a failed login, not an outage.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# 64 connections at once plus PAM: far more than it needs, small enough that a leak or a flood cannot take the host.
+MemoryMax=256M
+TasksMax=256
+LimitNOFILE=4096
 
 [Install]
 WantedBy=multi-user.target
