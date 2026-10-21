@@ -7,8 +7,11 @@ SUDO=""; [ "$(id -u)" -eq 0 ] || SUDO="sudo"
 $SUDO apt-get install -y --no-install-recommends curl gnupg ca-certificates
 $SUDO mkdir -p /etc/apt/keyrings
 
-# quickshell must come from trixie-backports (the old DankLinux build is deprecated).
-if dpkg -s quickshell >/dev/null 2>&1 && apt-cache policy quickshell | grep -q 'opensuse'; then
+# quickshell must come from trixie-backports (the old DankLinux build is deprecated). The installed build is the one that counts: a
+# backports version has "~bpo" in it. (Looking for the DankLinux repository in `apt-cache policy` removed a good, held build once that
+# repository also listed a newer quickshell.)
+if dpkg -s quickshell >/dev/null 2>&1 && ! dpkg-query -W -f='${Version}' quickshell | grep -q '~bpo'; then
+  $SUDO apt-mark unhold quickshell >/dev/null 2>&1 || true
   $SUDO apt-get remove -y quickshell
 fi
 echo "deb http://deb.debian.org/debian trixie-backports main" | $SUDO tee /etc/apt/sources.list.d/trixie-backports.list >/dev/null

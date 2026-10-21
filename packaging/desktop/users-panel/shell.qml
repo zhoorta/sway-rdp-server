@@ -251,6 +251,12 @@ ShellRoot {
                 spacing: 6
                 model: root.shown
 
+                // A scroll bar on the right, there whenever the list is longer than the window; the rows leave room for it.
+                ScrollBar.vertical: ScrollBar {
+                    implicitWidth: 10
+                    policy: list.contentHeight > list.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                }
+
                 // one line per account: who, what it is doing, and one menu with everything that can be done to it
                 delegate: Rectangle {
                     id: card
@@ -259,7 +265,7 @@ ShellRoot {
                     readonly property bool running: modelData.session === "running"
                     // what the account uses now (null when it has nothing running)
                     readonly property var use: root.usageOf(modelData.name)
-                    width: list.width
+                    width: list.width - 16
                     height: 62
                     radius: 10
                     color: rowHover.hovered ? Qt.lighter(pal.base, 1.07) : pal.base
