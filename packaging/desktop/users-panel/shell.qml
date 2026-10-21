@@ -16,6 +16,9 @@ ShellRoot {
     id: root
 
     property var users: []
+    // Show only the accounts that have a session running.
+    property bool onlyActive: false
+    readonly property var shown: onlyActive ? users.filter(u => u.session === "running") : users
     // Memory, swap, load, whether a new session would be accepted, and what each account uses (waydesk-admin status --json).
     property var status: ({})
     property string sheetLimitMemory: ""
@@ -162,6 +165,11 @@ ShellRoot {
                     color: pal.windowText
                     Layout.fillWidth: true
                 }
+                Switch {
+                    text: "Only with a session"
+                    checked: root.onlyActive
+                    onToggled: root.onlyActive = checked
+                }
                 Button { text: "Refresh"; onClicked: { root.refresh(); root.refreshStatus(); } }
                 Button {
                     text: "Add account…"
@@ -232,7 +240,7 @@ ShellRoot {
                 Layout.fillHeight: true
                 clip: true
                 spacing: 6
-                model: root.users
+                model: root.shown
 
                 // one line per account: who, what it is doing, and one menu with everything that can be done to it
                 delegate: Rectangle {
@@ -376,8 +384,8 @@ ShellRoot {
 
                 Label {
                     anchors.centerIn: parent
-                    visible: root.users.length === 0
-                    text: "No accounts yet. Add one."
+                    visible: root.shown.length === 0
+                    text: root.onlyActive ? "Nobody has a session running." : "No accounts yet. Add one."
                     color: pal.placeholderText
                 }
             }
