@@ -49,7 +49,7 @@ plugins = load("plugin_settings.json")
 if plugins is None:
     plugins = {}
 added = False
-for name in ("swayWindowControls", "swayVolume", "swaySettings"):
+for name in ("swayWindowControls", "swayVolume", "swaySettings", "swayWorkspaces"):
     if name not in plugins:
         plugins[name] = {"enabled": True}
         added = True
@@ -66,7 +66,7 @@ if settings is not None and "powerMenuActions" not in settings:
 if settings is not None and "barConfigs" not in settings:
     settings["barConfigs"] = [{
         "id": "default", "name": "Main Bar", "enabled": True, "position": 0, "screenPreferences": ["all"],
-        "leftWidgets": ["launcherButton", "swayWindowControls", "workspaceSwitcher", "focusedWindow"],
+        "leftWidgets": ["launcherButton", "swayWindowControls", "workspaceSwitcher", "swayWorkspaces", "focusedWindow"],
         "centerWidgets": ["clock"],
         "rightWidgets": ["systemTray", "swayVolume", "notificationButton", "swaySettings", "powerMenuButton"],
     }]
@@ -87,6 +87,21 @@ if settings is not None and not os.path.exists(marker):
         at = next((i + 1 for i, w in enumerate(left) if w == "launcherButton" or (isinstance(w, dict) and w.get("id") == "launcherButton")), 0)
         left.insert(at, old[0] if old else "swayWindowControls")
         changed = True
+    open(marker, "w").close()
+# The workspace button ("+", and the list of workspaces) goes after the workspace switcher, once per account.
+marker = os.path.join(d, ".workspaces-widget")
+if settings is not None and not os.path.exists(marker):
+    bars = settings.get("barConfigs") or []
+    if bars and not changed:
+        is_id = lambda w, name: w == name or (isinstance(w, dict) and w.get("id") == name)
+        everywhere = [w for k in ("leftWidgets", "centerWidgets", "rightWidgets") for w in bars[0].get(k, [])]
+        if not any(is_id(w, "swayWorkspaces") for w in everywhere):
+            left = bars[0].setdefault("leftWidgets", [])
+            at = next((i + 1 for i, w in enumerate(left) if is_id(w, "workspaceSwitcher")), None)
+            if at is None:
+                at = next((i + 1 for i, w in enumerate(left) if is_id(w, "swayWindowControls") or is_id(w, "launcherButton")), len(left))
+            left.insert(at, "swayWorkspaces")
+            changed = True
     open(marker, "w").close()
 # The log out button (the power menu, which offers only log out) is the last item of the bar, once per account as well.
 marker = os.path.join(d, ".power-button-last")

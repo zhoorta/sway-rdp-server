@@ -7,6 +7,11 @@
   waydesk-windows list       the minimized windows as JSON: [{"id", "title", "app"}]
   waydesk-windows fit        pull every window of this workspace back into the usable area
   waydesk-windows watch      run `fit` twice a second (started by the session's sway config)
+  waydesk-windows workspaces            the workspaces and their windows as JSON (the bar's workspace button uses it)
+  waydesk-windows workspace-new         a new workspace at the next free number, and go to it
+  waydesk-windows workspace-go NAME     go to a workspace
+  waydesk-windows focus ID              focus a window (and so go to its workspace)
+  waydesk-windows move-to ID NAME|new   send a window to a workspace (a new one, which it also goes to)
 """
 import json
 import os
@@ -153,6 +158,59 @@ def fit_all():
             fit_node(ws, n)
 
 
+FIRST_WORKSPACE = "Remote"
+MAX_WORKSPACES = 9
+
+
+def valid_workspace(name):
+    """A name that is safe to put in a sway command: letters, digits, space, _ and -, at most 32 characters."""
+    return 0 < len(name) <= 32 and all(c.isalnum() or c in " _-" for c in name)
+
+
+def workspace_list():
+    """[{name, focused, visible, windows: [{id, title, app, focused}]}], the first workspace first, then by number."""
+    out = {}
+    for w in workspaces():
+        if w["name"] != "__i3_scratch":
+            out[w["name"]] = {"name": w["name"], "focused": bool(w.get("focused")), "visible": bool(w.get("visible")), "windows": []}
+    for ws, n in walk(tree()):
+        if ws is None or ws["name"] not in out or n.get("nodes") or n.get("floating_nodes"):
+            continue
+        app = n.get("app_id") or (n.get("window_properties") or {}).get("class")
+        if app is not None or n.get("window") is not None:
+            out[ws["name"]]["windows"].append({"id": n["id"], "title": n.get("name") or "", "app": app or "", "focused": bool(n.get("focused"))})
+
+    def order(w):
+        return (w["name"] != FIRST_WORKSPACE, not w["name"].isdigit(), int(w["name"]) if w["name"].isdigit() else 0, w["name"])
+
+    return sorted(out.values(), key=order)
+
+
+def next_workspace_name(names):
+    """The smallest number from 2 that no workspace has (the first one is called Remote), or None at the limit."""
+    if len(names) >= MAX_WORKSPACES:
+        return None
+    n = 2
+    while str(n) in names:
+        n += 1
+    return str(n)
+
+
+def new_workspace():
+    name = next_workspace_name({w["name"] for w in workspace_list()})
+    if name is None:
+        sys.exit(f"{MAX_WORKSPACES} workspaces is the most")
+    command(f'workspace "{name}"')
+    return name
+
+
+def new_workspace_name():
+    name = next_workspace_name({w["name"] for w in workspace_list()})
+    if name is None:
+        sys.exit(f"{MAX_WORKSPACES} workspaces is the most")
+    return name
+
+
 def watch():
     """Dragging a window sends sway no event, so look twice a second."""
     while True:
@@ -180,6 +238,19 @@ def main():
         fit_all()
     elif cmd == "watch":
         watch()
+    elif cmd == "workspaces":
+        print(json.dumps(workspace_list()))
+    elif cmd == "workspace-new":
+        new_workspace()
+    elif cmd == "workspace-go" and len(sys.argv) > 2 and valid_workspace(sys.argv[2]):
+        command(f'workspace "{sys.argv[2]}"')
+    elif cmd == "focus" and len(sys.argv) > 2 and sys.argv[2].isdigit():
+        command(f"[con_id={sys.argv[2]}] focus")
+    elif cmd == "move-to" and len(sys.argv) > 3 and sys.argv[2].isdigit() and (sys.argv[3] == "new" or valid_workspace(sys.argv[3])):
+        target = new_workspace_name() if sys.argv[3] == "new" else sys.argv[3]
+        command(f'[con_id={sys.argv[2]}] move container to workspace "{target}"')
+        if sys.argv[3] == "new":
+            command(f'workspace "{target}"')
     else:
         sys.exit(__doc__)
 

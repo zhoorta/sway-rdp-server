@@ -1,0 +1,12 @@
+{
+    "id": "swayWorkspaces",
+    "name": "Workspaces",
+    "description": "A button to add a workspace, and a list of the workspaces with their windows: go to one, send a window to another (waydesk sessions)",
+    "version": "1.0.0",
+    "author": "waydesk",
+    "type": "widget",
+    "capabilities": ["workspaces"],
+    "component": "./Workspaces.qml",
+    "icon": "dashboard",
+    "permissions": []
+}
