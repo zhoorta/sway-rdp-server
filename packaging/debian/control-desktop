@@ -5,7 +5,7 @@ Maintainer: José Mendonça <jmendonca@gmail.com>
 Section: x11
 Priority: optional
 Depends: waydesk-server (>= @VERSION@), foot, qt6-wayland, qt6ct, pcmanfm-qt, qterminal, xdg-desktop-portal, xdg-desktop-portal-gtk, gnome-software, gnome-software-plugin-flatpak, gvfs, gvfs-daemons, fonts-inter, fonts-jetbrains-mono, fonts-noto, grim, slurp, wl-clipboard, dbus-user-session, dbus-bin, xdg-utils, python3, papirus-icon-theme, libglib2.0-bin, dconf-gsettings-backend, gtk-update-icon-cache, pkexec
-Recommends: wmenu, whiptail
+Recommends: chromium, wmenu, whiptail
 Suggests: dms
 Description: Windows-like desktop for waydesk sessions
  Default sway configuration for the sessions of waydesk (floating windows,

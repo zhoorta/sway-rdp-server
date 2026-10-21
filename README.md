@@ -43,6 +43,11 @@ whiptail wizard for DMS and developer, creative and AI apps. Design, threat mode
 [docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
 exists (run the binary inside your own sway).
 
+The default browser is Chromium (`waydesk-desktop` recommends it; `/etc/xdg/sway-mimeapps.list` makes it the default for links, and it is on a new
+desktop). Chromium and Firefox ESR are set to use the title bar of the window manager (`/etc/chromium/initial_preferences`, which also carries Debian's own
+defaults for a new profile, and a Firefox default preference), so they get the window buttons below like every other window; an existing Chromium profile
+is changed once at the next start of the shell.
+
 Window buttons (red closes, yellow minimizes, green maximizes) in the title bar of every window need a patched sway, because sway's title
 bars are text only: `packaging/sway/build.sh [arm64|amd64]` builds Debian's sway 1.10 with `packaging/sway/waydesk-titlebar-buttons.patch`
 (a new command, `titlebar_button close|minimize|maximize COMMAND`, set by `waydesk-titlebar-buttons`; a double click on a title bar runs the

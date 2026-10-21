@@ -38,6 +38,11 @@ install -m 755 packaging/desktop/setup/*.sh $D/usr/share/waydesk/setup/
 install -m 644 packaging/desktop/setup/*.tsv $D/usr/share/waydesk/setup/
 mkdir -p $D/usr/share/waydesk/gtk $D/usr/lib/environment.d && install -m 644 packaging/desktop/gtk/*.css $D/usr/share/waydesk/gtk/
 mkdir -p $D/usr/share/icons/hicolor/scalable/apps && install -m 644 packaging/desktop/icons/*.svg $D/usr/share/icons/hicolor/scalable/apps/
+# Chromium and Firefox use the title bar of sway (window buttons), Chromium is the default browser
+mkdir -p $D/etc/chromium $D/usr/lib/firefox-esr/defaults/pref $D/etc/xdg
+install -m 644 packaging/desktop/browsers/chromium-initial_preferences $D/etc/chromium/initial_preferences
+install -m 644 packaging/desktop/browsers/firefox-waydesk.js $D/usr/lib/firefox-esr/defaults/pref/waydesk.js
+install -m 644 packaging/desktop/browsers/sway-mimeapps.list $D/etc/xdg/sway-mimeapps.list
 install -m 644 packaging/desktop/environment.d/*.conf $D/usr/lib/environment.d/
 mkdir -p $D/usr/share/polkit-1/rules.d && install -m 644 packaging/desktop/polkit/*.rules $D/usr/share/polkit-1/rules.d/
 mkdir -p $D/usr/lib/systemd/system/waydesk-session@.service.d && install -m 644 packaging/desktop/systemd-session/*.conf $D/usr/lib/systemd/system/waydesk-session@.service.d/

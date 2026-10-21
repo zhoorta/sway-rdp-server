@@ -199,6 +199,26 @@ if changed:
         json.dump(settings, f, indent=2)
 PY
 fi
+# Chromium draws its own title bar unless told otherwise, and then has no window buttons of ours. A new profile is told by
+# /etc/chromium/initial_preferences; one that exists gets it once (not while Chromium runs: it would write its own copy back).
+chromium_prefs="${XDG_CONFIG_HOME:-$HOME/.config}/chromium/Default/Preferences"
+if [ ! -e "$dms_dir/.browser-frame" ]; then
+    if [ ! -f "$chromium_prefs" ] || ! pgrep -u "$(id -u)" -x chromium >/dev/null 2>&1; then
+        [ -f "$chromium_prefs" ] && python3 - "$chromium_prefs" <<'PY'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        prefs = json.load(f)
+except (OSError, ValueError):
+    sys.exit(0)
+prefs.setdefault("browser", {})["custom_chrome_frame"] = False
+with open(path, "w") as f:
+    json.dump(prefs, f, separators=(",", ":"))
+PY
+        mkdir -p "$dms_dir" && : > "$dms_dir/.browser-frame"
+    fi
+fi
 # Technical entries stay out of the launcher (an account that wants one back deletes its file in ~/.local/share/applications).
 apps_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 if [ ! -e "$dms_dir/.hidden-entries" ]; then

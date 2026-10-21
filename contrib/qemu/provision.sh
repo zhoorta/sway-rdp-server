@@ -47,7 +47,7 @@ apt-get update -qq
 # Without the recommended packages (apt would add a screensaver, a second portal and a policy-kit agent of its own). The ones
 # that matter are named here: audio, the clipboard, the picker of "Add app to desktop", the wallpaper, Flatpak, a browser.
 apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold flatpak ./waydesk-server_*.deb ./waydesk-desktop_*.deb $(ls ./waydesk_*.deb 2>/dev/null) \
-    pipewire pipewire-pulse pulseaudio-utils wireplumber wl-clipboard wmenu whiptail swaybg firefox-esr
+    pipewire pipewire-pulse pulseaudio-utils wireplumber wl-clipboard wmenu whiptail swaybg chromium firefox-esr
 # The patched file manager (menus without Desktop Preferences, Create Launcher, Open in Terminal), when it was built; held so that
 # Debian's own pcmanfm-qt does not replace it.
 if ls ./pcmanfm-qt_*.deb >/dev/null 2>&1; then
