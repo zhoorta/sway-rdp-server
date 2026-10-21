@@ -250,7 +250,7 @@ PluginComponent {
 
                                     Rectangle {
                                         id: newChip
-                                        visible: root.workspaces.length < 9
+                                        visible: root.workspaces.length < 4
                                         width: newText.implicitWidth + 14
                                         height: 22
                                         radius: 11
@@ -278,7 +278,7 @@ PluginComponent {
                 }
 
                 Rectangle {
-                    visible: root.workspaces.length < 9
+                    visible: root.workspaces.length < 4
                     width: parent.width
                     height: 34
                     radius: Theme.cornerRadius

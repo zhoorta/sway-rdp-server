@@ -43,7 +43,7 @@ whiptail wizard for DMS and developer, creative and AI apps. Design, threat mode
 [docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
 exists (run the binary inside your own sway).
 
-Workspaces (virtual desktops): the first is called Remote, others are made on demand and go away when their last window does (up to nine). With the mouse: the
+Workspaces (virtual desktops): the first is called Remote, others are made on demand and go away when their last window does (four at most). With the mouse: the
 **+** next to the workspace pill of the bar makes one and goes to it, and the arrow beside it lists the workspaces with their windows (click a window to go to it,
 **Move to** sends it to another workspace or to a new one). With the keyboard: `Super+1..4` go to a workspace, `Super+Shift+1..4` send the focused window there,
 `Super+Ctrl+Left/Right` step through them and `Super+Ctrl+D` makes a new one. The button is a bar plugin (`swayWorkspaces`) that only calls `waydesk-windows` (sway's IPC).
