@@ -150,9 +150,13 @@ that account with windows and no bar). The package prevents it in four layers, n
 3. **Compressed swap in RAM.** `systemd-zram-generator` is recommended; Debian's file makes a zram swap of half the RAM (at most 4 GiB), and the package
    picks zstd for it and sets `vm.swappiness=100` and `vm.page-cluster=0` (`/usr/lib/sysctl.d/50-waydesk.conf`). A short spike is absorbed by compressing idle pages instead of
    killing a browser. A disk swap behind it works too (zram has the higher priority); disk swap alone is slow for a desktop, and on network storage worse.
-4. **Look at it.** `waydesk-admin status` (any account may run it) shows the memory, the swap, the load, whether a new session would be accepted, and for every
+4. **Look at it.** `waydesk-admin status` shows the memory, the swap, the load, whether a new session would be accepted, and for every
    account its memory, swap, CPU and the programs that hold the most memory (resident memory, so shared pages count for each process); `--json` for scripts. The same is in
    the **Users & Access** panel (administrators only): a bar for the machine, and memory, CPU and programs on each account's card.
+   Administrators (the group `sudo`) see every account; any other account that runs `status`, `users list` or `sessions list` sees its own row and the totals of the
+   machine. That only keeps the tool from collecting it: the same numbers are in `/proc` and the cgroup files, which every account can read on Debian. On a
+   host whose users do not trust each other, consider mounting `/proc` with `hidepid=invisible` (and `gid=` of a group for the administrators), and test the
+   desktop sessions (polkit, Flatpak, logind) thoroughly before relying on it: it hides processes from services that expect to see them.
 
 ## Who may log in
 

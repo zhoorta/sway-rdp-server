@@ -146,6 +146,25 @@ fn members_of(group: &str) -> Result<Vec<String>> {
     Ok(accounts()?.into_iter().filter(|a| in_group(a, group)).map(|a| a.name).collect())
 }
 
+/// Who may be looked at: everybody for root and the administrators, only the account of the caller for the others.
+fn only_visible(all: Vec<Account>, caller: u32, caller_is_admin: bool) -> Vec<Account> {
+    if caller == 0 || caller_is_admin {
+        all
+    } else {
+        all.into_iter().filter(|a| a.uid == caller).collect()
+    }
+}
+
+/// The accounts the caller may look at. Administrators are the group `sudo`, as for the polkit rules and the Users & Access panel; the
+/// other accounts see their own row only (the data is in /proc and the cgroups anyway: this keeps the tool from collecting it for them;
+/// see the README for `hidepid`).
+fn visible_accounts() -> Result<Vec<Account>> {
+    let all = accounts()?;
+    let uid = unsafe { libc::getuid() };
+    let is_admin = all.iter().find(|a| a.uid == uid).is_some_and(|me| in_group(me, SUDO_GROUP));
+    Ok(only_visible(all, uid, is_admin))
+}
+
 /// The account that asked, when this runs through sudo or pkexec (so it cannot be used to remove oneself).
 fn caller_uid() -> Option<u32> {
     ["PKEXEC_UID", "SUDO_UID"].iter().find_map(|k| std::env::var(k).ok()?.parse().ok())
@@ -253,7 +272,7 @@ fn users_list(json_out: bool) -> Result<()> {
         eprintln!("note: the group {RDP_GROUP} does not exist, so nobody may log in (is the waydesk package installed?)");
     }
     let mut rows = Vec::new();
-    for a in accounts()? {
+    for a in visible_accounts()? {
         let (session, since) = session_state(a.uid);
         rows.push((a.name.clone(), a.uid, in_group(&a, RDP_GROUP), in_group(&a, ADMIN_GROUP), in_group(&a, SUDO_GROUP), login_shell(&a.shell, &shells), session, since));
     }
@@ -277,7 +296,7 @@ fn users_list(json_out: bool) -> Result<()> {
 
 fn sessions_list(json_out: bool) -> Result<()> {
     let mut rows = Vec::new();
-    for a in accounts()? {
+    for a in visible_accounts()? {
         let (state, since) = session_state(a.uid);
         if state == "running" {
             rows.push((a.name, a.uid, since));
@@ -502,7 +521,7 @@ fn resident_by_program(uids: &HashSet<u32>) -> HashMap<u32, HashMap<String, u64>
 
 /// What every account that has a cgroup or a session uses; the CPU is measured over `sample`.
 fn gather_usage(sample: std::time::Duration) -> Result<Vec<Usage>> {
-    let accounts = accounts()?;
+    let accounts = visible_accounts()?;
     let first: Vec<Option<u64>> = accounts.iter().map(|a| cpu_usec(&user_cgroup(a.uid))).collect();
     let started = std::time::Instant::now();
     std::thread::sleep(sample);
@@ -574,7 +593,8 @@ fn status(json_out: bool) -> Result<()> {
     let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
     let (min_mb, max_users) = helper_policy();
     let usage = gather_usage(std::time::Duration::from_millis(1000))?;
-    let running = usage.iter().filter(|u| u.session).count();
+    // The admission rule counts every account with a session, whoever the caller may look at.
+    let running = accounts()?.iter().filter(|a| session_state(a.uid).0 == "running").count();
     let admission = memory::admission(&info, running, min_mb, max_users);
     let needed_mb = min_mb.unwrap_or_else(|| memory::auto_min_available_mb(info.total_kb));
     let (open, reason) = match &admission {
@@ -689,6 +709,7 @@ fn users_limit(name: &str, rest: &[&str]) -> Result<()> {
     let unit = format!("user-{}.slice", a.uid);
     match rest {
         [] | ["show"] => {
+            ensure!(visible_accounts()?.iter().any(|v| v.uid == a.uid), "only an administrator may look at the limits of another account");
             let out = run_tool("/usr/bin/systemctl", &["show", &unit, "-p", "MemoryHigh", "-p", "MemoryMax", "-p", "MemorySwapMax", "-p", "CPUWeight", "-p", "TasksMax"])?;
             println!("limits of {} ({unit}):\n{}", a.name, out.trim_end());
             Ok(())
@@ -812,5 +833,16 @@ mod tests {
     fn sizes_are_shown_in_mb_or_gb() {
         assert_eq!(human_mb(620), "620 MB");
         assert_eq!(human_mb(1536), "1.5 GB");
+    }
+
+    #[test]
+    fn an_ordinary_account_sees_itself_and_an_administrator_everybody() {
+        let acct = |name: &str, uid: u32| Account { name: name.into(), uid, gid: uid, shell: "/bin/bash".into() };
+        let all = vec![acct("jose", 1000), acct("ana", 1001), acct("rui", 1002)];
+        let names = |v: Vec<Account>| v.into_iter().map(|a| a.name).collect::<Vec<_>>();
+        assert_eq!(names(only_visible(all.clone(), 1001, false)), vec!["ana"]);
+        assert_eq!(names(only_visible(all.clone(), 1001, true)), vec!["jose", "ana", "rui"]);
+        assert_eq!(names(only_visible(all.clone(), 0, false)), vec!["jose", "ana", "rui"], "root");
+        assert!(only_visible(all, 33, false).is_empty(), "a system account has no row");
     }
 }
