@@ -35,6 +35,15 @@ ShellRoot {
 
     SystemPalette { id: pal }
 
+    // Menu entries with room around them (the default ones are packed tight).
+    component RoomyItem: MenuItem {
+        topPadding: 10
+        bottomPadding: 10
+        leftPadding: 16
+        rightPadding: 16
+        implicitHeight: visible ? implicitContentHeight + topPadding + bottomPadding : 0
+    }
+
     // ---- running commands ----
 
     Component {
@@ -335,44 +344,44 @@ ShellRoot {
                                 id: rowMenu
                                 // wide enough for the longest entry, and opened under the button with its right edge on the button's
                                 width: 290
+                                padding: 8
 
-                                MenuItem {
+                                RoomyItem {
                                     text: "End session"
                                     visible: card.running
-                                    height: visible ? implicitHeight : 0
                                     onTriggered: root.change(["sessions", "end", card.modelData.name])
                                 }
-                                MenuItem {
+                                RoomyItem {
                                     text: "New password"
                                     onTriggered: root.change(["users", "passwd", card.modelData.name, "--json"], (out) => root.showPassword("New password for " + card.modelData.name, out))
                                 }
-                                MenuItem {
+                                RoomyItem {
                                     text: "Limits\u2026"
                                     onTriggered: { root.sheetUser = card.modelData.name; limitMemory.text = ""; limitCpu.value = 100; root.sheet = "limit"; }
                                 }
-                                MenuSeparator {}
-                                MenuItem {
+                                MenuSeparator { topPadding: 6; bottomPadding: 6 }
+                                RoomyItem {
                                     text: "Can log in"
                                     checkable: true
                                     checked: card.modelData.rdp
                                     enabled: !card.mine
                                     onTriggered: root.change(["users", checked ? "enable" : "disable", card.modelData.name])
                                 }
-                                MenuItem {
+                                RoomyItem {
                                     text: "Administrator"
                                     checkable: true
                                     checked: card.modelData.sudo
                                     enabled: !card.mine
                                     onTriggered: root.change(["users", "sudo", card.modelData.name, checked ? "on" : "off"])
                                 }
-                                MenuItem {
+                                RoomyItem {
                                     text: "Install apps without a password"
                                     checkable: true
                                     checked: card.modelData.flatpak_admin
                                     onTriggered: root.change(["users", "admin", card.modelData.name, checked ? "on" : "off"])
                                 }
-                                MenuSeparator {}
-                                MenuItem {
+                                MenuSeparator { topPadding: 6; bottomPadding: 6 }
+                                RoomyItem {
                                     text: "Remove\u2026"
                                     enabled: !card.mine
                                     onTriggered: { root.sheetUser = card.modelData.name; removeHome.checked = false; root.sheet = "remove"; }
