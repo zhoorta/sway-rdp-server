@@ -2,10 +2,10 @@
    flat, rounded, the accent colour for what is selected. Colours come from the palette (qt6ct keeps it in step with DMS),
    so nothing here names a colour. */
 QMenuBar { background: palette(window); border: none; padding: 2px 4px; }
-QMenuBar::item { background: transparent; padding: 6px 12px; margin: 2px 1px; border-radius: 10px; }
+QMenuBar::item { background: transparent; padding: 8px 14px; margin: 3px 2px; border-radius: 10px; }
 QMenuBar::item:selected { background: palette(mid); }
-QMenu { background: palette(base); border: 1px solid palette(mid); border-radius: 14px; padding: 8px; }
-QMenu::item { padding: 8px 22px 8px 12px; margin: 1px 0; border-radius: 10px; min-height: 20px; }
+QMenu { background: palette(base); border: 1px solid palette(mid); border-radius: 14px; padding: 10px; }
+QMenu::item { padding: 10px 28px 10px 14px; margin: 2px 0; border-radius: 10px; min-height: 22px; }
 QMenu::item:disabled { color: palette(placeholder-text); }
 QMenu::icon { padding-left: 6px; }
 QMenu::right-arrow { margin-right: 8px; }
@@ -37,8 +37,8 @@ QStatusBar::item { border: none; }
 QToolTip { background: palette(base); color: palette(text); border: 1px solid palette(mid); border-radius: 8px; padding: 4px 8px; }
 QHeaderView::section { background: palette(window); border: none; padding: 4px 8px; }
 QListView, QTreeView { border: none; }
-QListView::item, QTreeView::item { border-radius: 10px; padding: 4px; }
-QTreeView::item { padding: 6px 4px; }
+QListView::item, QTreeView::item { border-radius: 10px; padding: 6px; }
+QTreeView::item { padding: 8px 6px; }
 QTreeView::branch { background: transparent; }
 QAbstractItemView { outline: none; }
 QListView::item:selected, QTreeView::item:selected { background: palette(highlight); color: palette(highlighted-text); }
@@ -46,7 +46,7 @@ QSplitter::handle { background: transparent; }
 /* the file manager (pcmanfm-qt): the side pane and the folder view are two panes on the window, as in the DMS settings */
 QMainWindow { background: palette(window); }
 Fm--SidePane, Fm--PlacesView { background: palette(window); border: none; }
-Fm--PlacesView { padding: 4px; }
+Fm--PlacesView { padding: 6px; }
 QMainWindow Fm--FolderView QAbstractItemView { background: palette(light); border: none; border-radius: 14px; padding: 6px; }
 Fm--PathBar { background: transparent; }
 /* file manager: side pane switch, toolbar and path bar as pills, the way DMS draws its buttons */

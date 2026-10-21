@@ -120,7 +120,8 @@ Listing is open to everybody; everything else needs root. A new account's passwo
 the account changes it with `passwd` in a terminal on the desktop. The tool never touches root or accounts below uid 1000, and refuses to
 remove or demote the account that runs it or the last administrator. Passwords go to `chpasswd` over a pipe, never as arguments.
 
-On the desktop, **Users & Access** (start menu, or `waydesk-users`) does the same with switches and buttons: who can log in, who
+On the desktop, **Users & Access** (start menu, or `waydesk-users`; only for administrators, the group `sudo`: others do not see it and it
+does not open for them) does the same with switches and buttons: who can log in, who
 installs Flatpaks without a password, who is an administrator, the running sessions, new passwords (shown once) and removal. Changes
 go through `pkexec waydesk-admin` (polkit action `org.waydesk.admin`), so an administrator's password is asked for each time.
 

@@ -46,6 +46,9 @@ WorkAreaMargins=12, 56, 12, 12
 [System]
 Terminal=waydesk-terminal
 
+[FolderView]
+FolderViewCellMargins=@Size(8 8)
+
 [Volume]
 AutoRun=false
 MountOnStartup=false
@@ -59,7 +62,13 @@ LastWindowHeight=640
 SplitterPos=200
 EOC
 fi
-# A desktop that is not empty from the first start: Home and Trash (built into the file manager) and launchers of a few apps, made
+# More room around the items of the file manager (the default margin is 3): once, and only for a margin nobody has changed.
+spacing_marker="${XDG_CONFIG_HOME:-$HOME/.config}/waydesk/.fm-spacing"
+if [ ! -e "$spacing_marker" ]; then
+    mkdir -p "$(dirname "$spacing_marker")" && : > "$spacing_marker"
+    [ -e "$fm_dir/settings.conf" ] && sed -i 's/^FolderViewCellMargins=@Size(3 3)$/FolderViewCellMargins=@Size(8 8)/' "$fm_dir/settings.conf"
+fi
+# A desktop that is not empty from the first start: Home and Trash (built into the file manager) and a launcher of the browser, made
 # once. An account that already set the built-in items up, or put things on its desktop, keeps what it has.
 seed_dir="${XDG_CONFIG_HOME:-$HOME/.config}/waydesk"
 if [ ! -e "$seed_dir/.desktop-seeded" ]; then
@@ -69,7 +78,7 @@ if [ ! -e "$seed_dir/.desktop-seeded" ]; then
         # The launchers are marked trusted through gvfs, which needs the account's session bus.
         : "${DBUS_SESSION_BUS_ADDRESS:=unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}"
         export DBUS_SESSION_BUS_ADDRESS
-        waydesk-add-to-desktop waydesk-terminal firefox-esr org.gnome.Software >/dev/null 2>&1
+        waydesk-add-to-desktop firefox-esr >/dev/null 2>&1
     fi
 fi
 # The session starts before its screen exists (the output is made when the RDP client arrives, and it may be gone while the

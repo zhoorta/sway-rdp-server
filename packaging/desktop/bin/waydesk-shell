@@ -190,7 +190,7 @@ fi
 apps_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 if [ ! -e "$dms_dir/.hidden-entries" ]; then
     mkdir -p "$apps_dir"
-    for id in foot-server footclient qterminal qterminal_drop qt6ct vim thunar-bulk-rename thunar-settings python3 org.quickshell com.danklinux.dms com.danklinux.dms.notepad dms-open; do
+    for id in foot-server footclient qterminal qterminal-drop qt6ct vim thunar-bulk-rename thunar-settings python3 org.quickshell com.danklinux.dms com.danklinux.dms.notepad dms-open; do
         if [ -e "/usr/share/applications/$id.desktop" ] && [ ! -e "$apps_dir/$id.desktop" ]; then
             printf '[Desktop Entry]\nType=Application\nName=%s\nNoDisplay=true\n' "$id" > "$apps_dir/$id.desktop"
         fi
@@ -198,14 +198,30 @@ if [ ! -e "$dms_dir/.hidden-entries" ]; then
     mkdir -p "$dms_dir" && : > "$dms_dir/.hidden-entries"
 fi
 # Accounts set up before QTerminal came: the stock entries give way to "Terminal" (waydesk-terminal), which has the shell's colours.
-if [ ! -e "$dms_dir/.hidden-qterminal" ]; then
+if [ ! -e "$dms_dir/.hidden-qterminal-2" ]; then
     mkdir -p "$apps_dir"
-    for id in qterminal qterminal_drop; do
+    for id in qterminal qterminal-drop; do
         if [ -e "/usr/share/applications/$id.desktop" ] && [ ! -e "$apps_dir/$id.desktop" ]; then
             printf '[Desktop Entry]\nType=Application\nName=%s\nNoDisplay=true\n' "$id" > "$apps_dir/$id.desktop"
         fi
     done
-    mkdir -p "$dms_dir" && : > "$dms_dir/.hidden-qterminal"
+    mkdir -p "$dms_dir" && : > "$dms_dir/.hidden-qterminal-2"
+fi
+# The file manager is called "File Manager" in the launcher (Debian names it after the program). A copy of its entry in the
+# account's own folder, made again at every start while it carries our first line; an entry of the account's own stays.
+fm_entry="$apps_dir/pcmanfm-qt.desktop"
+if [ -e /usr/share/applications/pcmanfm-qt.desktop ] && { [ ! -e "$fm_entry" ] || grep -q '^# waydesk:' "$fm_entry"; }; then
+    mkdir -p "$apps_dir"
+    { echo '# waydesk: the name is File Manager'; sed -e '/^Name\[/d' -e 's/^Name=.*/Name=File Manager/' /usr/share/applications/pcmanfm-qt.desktop; } > "$fm_entry.new" && mv "$fm_entry.new" "$fm_entry"
+fi
+# Users & Access is for administrators (the group sudo, which is who polkit asks for a password): the others do not see it in the
+# launcher. Looked up in the account database, so a change shows at the next start of the shell.
+users_entry="$apps_dir/waydesk-users.desktop"
+if id -nG "$(id -un)" | tr ' ' '\n' | grep -qx sudo; then
+    grep -qs '^# waydesk:' "$users_entry" && rm -f "$users_entry"
+elif [ ! -e "$users_entry" ] || grep -q '^# waydesk:' "$users_entry"; then
+    mkdir -p "$apps_dir"
+    printf '# waydesk: Users & Access is for administrators\n[Desktop Entry]\nType=Application\nName=Users & Access\nNoDisplay=true\n' > "$users_entry"
 fi
 # GTK apps (Thunar, ...) in the colours of the shell: DMS writes the colours, a stylesheet of ours applies them (a gtk.css without
 # our first line is the account's own and stays), dark, with the icon theme of the launcher and one font.
