@@ -119,7 +119,12 @@ Measured in the 4 GB arm64 development VM (software rendering, 1280x800), deskto
 | An open terminal, or a file manager window | +20 MB, +5 MB |
 | The daemon (`waydesk`, all connections) | about 5 MB |
 
-Plan on about 0.5 GB per logged-in session for the desktop itself, plus what the programs use (a browser is several hundred MB more), plus about 1 GB
+With Chromium (the default browser) and three light pages open, a user costs about 700 MB in all: about 430 MB for the session and about 270 MB for
+Chromium. Four such users, logged in one after the other, left 830 MB of 3.75 GB available; a fifth would not fit, so a 4 GB machine serves about
+**4 users working with a browser, or about 8 with nothing but the desktop open** (a few more with `WAYDESK_DMS_SOFTWARE=1`, below). Heavy sites (mail,
+video calls, office suites) cost much more per user; count on 3 users per 4 GB for real work.
+
+Plan on about 0.4-0.5 GB per logged-in session for the desktop itself, plus what the programs use, plus about 1 GB
 for the system. The 4 GB VM ran out of memory with five accounts logged in; when it does, the kernel kills the shell (`qs`) of an account first, and that
 account is left with windows and no bar. Sessions stay until they time out (`--idle-timeout`, 8 h by default; `--end-on-disconnect` ends them when the
 client leaves), so the number that counts is the accounts logged in, not the ones connected. `WAYDESK_DMS_SOFTWARE=1` in `/etc/default/waydesk` takes about
