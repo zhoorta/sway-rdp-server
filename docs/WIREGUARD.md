@@ -4,8 +4,9 @@ The RDP login is a plain TLS login with the account's password, and the port lis
 elsewhere, do not publish the port: put it behind a tunnel. This page shows two ways, WireGuard (a VPN, for several users or devices)
 and an SSH tunnel (one user, no setup on the server).
 
-> Status: written from the configuration of the services and WireGuard's documentation; **not yet tested end to end** on a Waydesk
-> host. Try it on a throwaway machine first.
+> Status: the WireGuard setup below was tested on a Debian 13 arm64 VM (client in a network namespace): the tunnel came up, TLS to
+> `10.8.0.1:3389` worked through it with the certificate verified, and the port was closed on the host's other address. An RDP login
+> through the tunnel, a reboot and the SSH tunnel were not tried.
 
 ## WireGuard
 
