@@ -15,6 +15,7 @@ P=/tmp/pkg; rm -rf $P; mkdir -p $P/DEBIAN $P/usr/bin $P/lib/systemd/system $P/et
 install -m 755 /tmp/target/release/waydesk-server $P/usr/bin/waydesk-server
 install -m 755 /tmp/target/release/waydesk-admin $P/usr/bin/waydesk-admin
 install -m 755 /tmp/target/release/waydesk-passwd $P/usr/bin/waydesk-passwd
+mkdir -p $P/usr/sbin && install -m 755 packaging/bin/waydesk-setup-admin $P/usr/sbin/waydesk-setup-admin   # the first administrator (RDP login)
 mkdir -p $P/usr/share/polkit-1/actions && install -m 644 packaging/org.waydesk.admin.policy $P/usr/share/polkit-1/actions/
 install -m 644 packaging/systemd/*.service $P/lib/systemd/system/   # includes waydesk-session@.service
 mkdir -p $P/lib/systemd/system/user-.slice.d && install -m 644 packaging/systemd/user-slice/10-waydesk.conf $P/lib/systemd/system/user-.slice.d/

@@ -1,0 +1,94 @@
+#!/bin/bash
+# waydesk-setup-admin: makes the first administrator, the account that logs in over RDP and manages the others.
+#
+#   waydesk-setup-admin                                  asks for the name and the password (SSH or console)
+#   waydesk-setup-admin --name NAME [--password-stdin]   the password is read from the first line of stdin (never from an argument)
+#   waydesk-setup-admin --name NAME --password-hash HASH a crypt hash (mkpasswd -m yescrypt), for automation: no clear text on disk
+#   waydesk-setup-admin --existing NAME                  an account that exists already (the one the installer made): it gets
+#                                                        the rights and keeps its password unless one is given
+#
+# The administrator gets: access over RDP (group waydesk-users), the administrator panels of the desktop (group sudo) and Flatpak
+# installs without a password (group waydesk-admins). Run it as root (sudo). It can be run again: it only adds what is missing.
+set -eu
+name="" existing="" hash="" use_stdin=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --name) name=${2:?--name needs an account name}; shift 2 ;;
+        --existing) existing=${2:?--existing needs an account name}; name=$existing; shift 2 ;;
+        --password-stdin) use_stdin=1; shift ;;
+        --password-hash) hash=${2:?--password-hash needs a hash}; shift 2 ;;
+        -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "waydesk-setup-admin: unknown option $1 (try --help)" >&2; exit 2 ;;
+    esac
+done
+[ "$(id -u)" -eq 0 ] || { echo "waydesk-setup-admin: run it as root (sudo waydesk-setup-admin)" >&2; exit 1; }
+command -v waydesk-admin >/dev/null || { echo "waydesk-setup-admin: waydesk-admin is not installed (apt install waydesk-server)" >&2; exit 1; }
+
+interactive=""; [ -t 0 ] && [ -z "$use_stdin" ] && interactive=1
+valid_name() { printf '%s' "$1" | grep -Eq '^[a-z_][a-z0-9_-]{0,31}$'; }
+min_len=10
+
+if [ -z "$name" ]; then
+    [ -n "$interactive" ] || { echo "waydesk-setup-admin: no --name given and no terminal to ask on" >&2; exit 2; }
+    echo "The first administrator: the account that connects over RDP and manages the other accounts."
+    while :; do
+        read -r -p "Account name (lower case letters, digits, - and _): " name
+        valid_name "$name" && break
+        echo "  not a valid name, try again"
+    done
+fi
+valid_name "$name" || { echo "waydesk-setup-admin: $name is not a valid account name" >&2; exit 2; }
+exists=""; getent passwd "$name" >/dev/null && exists=1
+if [ -n "$exists" ] && [ -z "$existing" ]; then
+    if [ -n "$interactive" ]; then
+        read -r -p "$name exists already. Give it the administrator rights? [y/N] " yn
+        case "$yn" in y|Y|yes) existing=$name ;; *) echo "nothing done"; exit 1 ;; esac
+    else
+        echo "waydesk-setup-admin: $name exists already (use --existing $name to give it the rights)" >&2; exit 1
+    fi
+fi
+[ -n "$exists" ] || [ -z "$existing" ] || { echo "waydesk-setup-admin: --existing $name: no such account" >&2; exit 1; }
+
+# The password: read it before changing anything, so a refusal leaves nothing half made.
+password=""
+if [ -n "$hash" ]; then
+    :
+elif [ -n "$use_stdin" ]; then
+    IFS= read -r password || true
+elif [ -n "$interactive" ] && { [ -z "$existing" ] || { read -r -p "Set a new password for $name? [y/N] " yn; case "$yn" in y|Y|yes) true ;; *) false ;; esac; }; }; then
+    while :; do
+        read -r -s -p "Password for $name (at least $min_len characters; it is the RDP password): " password; echo
+        read -r -s -p "Again: " again; echo
+        if [ "$password" != "$again" ]; then echo "  the two passwords differ"; continue; fi
+        if [ "${#password}" -lt "$min_len" ]; then echo "  too short"; continue; fi
+        if [ "$password" = "$name" ]; then echo "  not the account name"; continue; fi
+        break
+    done
+elif [ -z "$existing" ]; then
+    echo "waydesk-setup-admin: a new account needs a password (--password-stdin, --password-hash or a terminal)" >&2; exit 2
+fi
+if [ -n "$password" ] && [ "${#password}" -lt "$min_len" ]; then
+    echo "waydesk-setup-admin: the password must have at least $min_len characters" >&2; exit 2
+fi
+
+if [ -z "$exists" ]; then
+    # `users add` sets a random password nobody sees; the real one is set below.
+    waydesk-admin users add "$name" --json >/dev/null
+fi
+if [ -n "$hash" ]; then
+    usermod -p "$hash" "$name"
+elif [ -n "$password" ]; then
+    printf '%s\n' "$password" | waydesk-admin users passwd "$name" --stdin >/dev/null
+fi
+unset password again
+waydesk-admin users enable "$name" >/dev/null
+waydesk-admin users admin "$name" on >/dev/null
+waydesk-admin users sudo "$name" on >/dev/null
+
+echo "Administrator $name is ready: RDP login, the administrator panels, installs without a password."
+if [ -f /etc/waydesk/cert.pem ]; then
+    echo "RDP certificate to check in the client on the first connection:"
+    openssl x509 -in /etc/waydesk/cert.pem -noout -fingerprint -sha256 | sed 's/^/  /'
+fi
+bind=$(sed -n 's/^WAYDESK_BIND=//p' /etc/default/waydesk 2>/dev/null | tail -1)
+echo "The RDP port listens on ${bind:-127.0.0.1:3389}: reach it through a VPN or an SSH tunnel (docs/WIREGUARD.md), not from the internet."

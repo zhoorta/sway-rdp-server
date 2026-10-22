@@ -75,6 +75,51 @@ So the realistic shell budget is about 340 MB (default) or about 230 MB (low-mem
 at all (a different shell, not a trimmed DMS). Not done: patch 70 is in the repository but the `waydesk-shell` `.deb` has not been rebuilt with it (the
 network was too slow); it was applied in place on the VM for the test above.
 
+## Stage 3 (helpers) and stage 4 (repository), status 2026-10-22
+
+**Helpers.** None of `danksearch`, `dgop`, `matugen` runs while a session is idle (no process in any account); DMS calls `dsearch`, `dgop` and `matugen` on
+demand. Upstream has `v2.0.0` for `danksearch` and `dgop` (we ran 1.6.0 and 1.6.2) and `v4.2.0` for `matugen` (we ran 4.0.0).
+`packaging/dms/build-helpers.sh` builds all three from those tags in a Debian 13 container (Go 1.27.3 pinned and checksummed; Rust from Debian with
+`cargo build --locked`) and packs them under the **same package names** with the version `<upstream>+waydesk1`, so they replace the OBS packages
+by version and need no change in the `Depends` of `waydesk-shell`. Licences: `danksearch` and `dgop` MIT; `matugen` GPL-2.0-or-later.
+
+**Repository.** `packaging/repo/make-repo.sh OUTDIR` makes a signed apt repository from `packaging/out` (newest version of each package and
+architecture; `Packages` gz/xz; `Release` with SHA-256 hashes; `InRelease` and `Release.gpg`; the public key as `waydesk-archive-keyring.gpg`).
+Tested with a throwaway **test key** (not the real one) served over HTTP to the dev VM:
+- the signed repository is accepted, and its packages appear in `apt-cache policy`;
+- a tampered index is refused (hash mismatch on `Packages`); a repository with no signature is refused (`The repository ... is not signed`, no
+  package becomes visible); a repository signed by another key is refused (`Missing key ... needed to verify signature`);
+- `packaging/repo/waydesk.pref` pins our names (`waydesk-shell`, `dms`, `danksearch`, `dgop`, `matugen`) to priority 990 for `Origin: Waydesk`, so a
+  third-party repository cannot override them with a newer version; verified (`*** 2.0.0+waydesk1 990`).
+`waydesk-setup` (`dms.sh`) now installs `waydesk-shell` from our repository when `/etc/apt/sources.list.d/waydesk.sources` exists, and does not add the
+OBS repositories then (quickshell still comes from Debian's trixie-backports). Without that file it behaves as before.
+
+Not decided, and not done on purpose:
+- **Where the repository lives** (`packaging/repo/waydesk.sources.in` has the URL as a placeholder) and **who holds the signing key**. The key used in the test
+  is a throwaway in `/tmp`. The real key should be made on a machine you trust, with a passphrase, and its fingerprint published next to the repository.
+- **matugen is GPL.** A published repository must offer its source: at least `deb-src` / the source archive for the tag, or the written offer. The package
+  says where the source is (`README.waydesk`), which is not enough for a public repository.
+- A `waydesk-repo` package (keyring + `waydesk.sources` + `waydesk.pref`) so that one `apt install ./waydesk-repo.deb` sets it up: needs the URL.
+
+## Stage 5 (other targets): what is known and what it needs
+
+Known from today (2026-10-22):
+- `waydesk-server` and `waydesk-desktop` install and run on **Ubuntu 26.04** (arm64, Hetzner); the shell does not, because the prebuilt `quickshell` wants exactly
+  Qt 6.8.2 and Ubuntu has 6.10. Everything else in the shell stack (`dms`, `danksearch`, `dgop`, `matugen`) is a static Go or Rust binary that does not care.
+- `waydesk-shell` as built here is `Architecture: arm64` only: `build-dms.sh` and `build-helpers.sh` need the sha256 of the amd64 Go toolchain
+  (a one-line change each, from https://go.dev/dl/), and an amd64 build has never been run on real hardware by these scripts. The amd64 dev VM was deleted
+  on 2026-10-22 (disk space); recreate it with `VM_ARCH=amd64 contrib/qemu/vm.sh create` (slow: emulated).
+- The sway title-bar patch (`packaging/sway`) is for Debian's sway 1.10.1; Ubuntu 26.04 ships sway 1.11, which it was never tried against.
+
+Order I would do it in, each step small and testable:
+1. **amd64 on Debian 13**: fill in the two checksums, build, install on a rebuilt amd64 VM or a Hetzner CPX server, run one session. Smallest step and the most likely
+   real target (most servers are amd64).
+2. **quickshell from source** in the same container pipeline (a CMake build against the target's Qt): first on Debian 13 (to compare with the backports package), then on
+   Ubuntu 26.04 with Qt 6.10. This is what unblocks Ubuntu; the build recipe and its dependency list are not written yet.
+3. **The sway patch on 1.11** (or a decision to drop the title-bar buttons for sway >= 1.11 and use the bar plugin only).
+4. **Fedora**: an RPM spec per package, the dependency names, SELinux policy for the root helper and the session units (the biggest part), `libopenh264` from the
+   Cisco repository, the `wheel` group in place of `sudo` in the administrator checks. Only worth starting when someone asks for it.
+
 ## Runtime patches that would move into the build
 
 `waydesk-shell` makes a per-account copy of the shell (`~/.cache/waydesk/dms-shell`, a tree of symlinks to `/usr/share/quickshell/dms` in which

@@ -12,6 +12,19 @@ client asks for, so a Retina Mac or a laptop with 200 % scaling gets a sharp des
 window can be resized live. Status: **early, one author, tested mostly with FreeRDP in a VM; the Windows App on macOS
 was tested before the multi-user work and not since.**
 
+## The first administrator
+
+Nobody can log in over RDP until an account is in the group `waydesk-users`. On a server where `apt install waydesk` was run with `sudo`, the account that
+ran it is added automatically. Otherwise (a new server, a cloud image) make the first administrator, who also manages the other accounts and installs apps without
+a password:
+
+```
+sudo waydesk-setup-admin            # asks for the name and the password twice (at least 10 characters)
+sudo waydesk-setup-admin --existing anna   # an account that exists already: it only gets the rights
+```
+
+It prints the certificate fingerprint to check in the RDP client. There is no default account and no default password. For automation see `docs/APPLIANCE.md`.
+
 ## Names
 
 **Waydesk** is the name of the product (a Windows-like remote Linux desktop over RDP); `apt install waydesk` installs everything.

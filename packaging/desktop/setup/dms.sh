@@ -21,8 +21,15 @@ repo() { # name url
   [ -f "/etc/apt/keyrings/$name.gpg" ] || curl -fsSL "${url}Release.key" | $SUDO gpg --dearmor -o "/etc/apt/keyrings/$name.gpg"
   echo "deb [signed-by=/etc/apt/keyrings/$name.gpg] $url /" | $SUDO tee "/etc/apt/sources.list.d/$name.list" >/dev/null
 }
+# With the waydesk repository configured (/etc/apt/sources.list.d/waydesk.sources, packaging/repo), the shell and its helpers (danksearch,
+# dgop, matugen) come from there, built by us (docs/DMS-PACKAGE.md), and the third-party repositories are not added. Only quickshell still
+# comes from Debian (trixie-backports).
+OWN_REPO=
+[ -f /etc/apt/sources.list.d/waydesk.sources ] && OWN_REPO=1
+if [ -z "$OWN_REPO" ]; then
 repo danklinux     https://download.opensuse.org/repositories/home:/AvengeMedia:/danklinux/Debian_13/
 repo avengemedia-dms https://download.opensuse.org/repositories/home:/AvengeMedia:/dms/Debian_13/
+fi
 
 $SUDO apt-get update
 # Only when it is missing: an installed quickshell is held with DMS (below) and moves with it (WAYDESK_DMS_UPDATE=1); asking for the
@@ -35,7 +42,12 @@ dpkg -s quickshell >/dev/null 2>&1 || $SUDO apt-get install -y -t trixie-backpor
 DMS_TESTED=2.0.0db1
 DMS_WANT="${WAYDESK_DMS_VERSION:-$DMS_TESTED}"
 $SUDO apt-get install -y qt6-wayland
-if [ -n "${WAYDESK_DMS_UPDATE:-}" ]; then
+if [ -n "$OWN_REPO" ]; then
+  # Our own build (package waydesk-shell, Provides: dms): updated with the rest of waydesk, only quickshell stays held.
+  $SUDO apt-mark unhold dms >/dev/null 2>&1 || true
+  $SUDO apt-get install -y waydesk-shell
+  $SUDO apt-mark hold quickshell >/dev/null
+elif [ -n "${WAYDESK_DMS_UPDATE:-}" ]; then
   $SUDO apt-mark unhold dms quickshell >/dev/null 2>&1 || true
   $SUDO apt-get install -y dms
   $SUDO apt-get install -y -t trixie-backports quickshell
@@ -46,7 +58,7 @@ elif ! $SUDO apt-get install -y "dms=$DMS_WANT"; then
   $SUDO apt-get install -y dms
 fi
 # quickshell (from trixie-backports) is what DMS runs on: held too, so it only changes together with DMS.
-$SUDO apt-mark hold dms quickshell >/dev/null
+if [ -z "$OWN_REPO" ]; then $SUDO apt-mark hold dms quickshell >/dev/null; fi
 
 # With waydesk-desktop the system config (/etc/xdg/waydesk/sway.conf) starts DMS through sway-session.target. Without it,
 # set that up in the account's own sway config, as the DMS docs ask for sway.

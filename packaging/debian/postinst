@@ -26,5 +26,10 @@ if [ "$1" = configure ]; then
     fi
     systemctl enable waydesk-helper.service waydesk.service >/dev/null 2>&1 || true
     systemctl restart waydesk-helper.service waydesk.service >/dev/null 2>&1 || true
+    # On a first install nobody may log in over RDP until an account is in waydesk-users (the account that ran the installation was added
+    # above). When there is none, say how to make the first administrator.
+    if [ -z "$2" ] && [ -z "$(getent group waydesk-users | cut -d: -f4)" ]; then
+        echo "waydesk: nobody can log in over RDP yet. Make the first administrator:  sudo waydesk-setup-admin"
+    fi
 fi
 exit 0

@@ -1,0 +1,20 @@
+[Unit]
+Description=Waydesk first boot: this server's certificate and its first administrator
+ConditionPathExists=!/var/lib/waydesk/firstboot.done
+After=local-fs.target waydesk-helper.service
+Wants=waydesk-helper.service
+Before=getty@tty1.service ssh.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# On the console, so that it can ask: tty1 is free (getty starts after this). Without a console it only reads firstboot.conf.
+StandardInput=tty-force
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+StandardOutput=journal+console
+ExecStart=/usr/lib/waydesk/waydesk-firstboot
+
+[Install]
+WantedBy=multi-user.target

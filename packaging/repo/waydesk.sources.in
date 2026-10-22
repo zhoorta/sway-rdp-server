@@ -1,0 +1,6 @@
+# /etc/apt/sources.list.d/waydesk.sources (the package waydesk-repo installs it)
+Types: deb
+URIs: https://waydesk.stackcare.pt/apt
+Suites: trixie
+Components: main
+Signed-By: /usr/share/keyrings/waydesk-archive-keyring.gpg

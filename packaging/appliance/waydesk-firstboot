@@ -1,0 +1,54 @@
+#!/bin/sh
+# Runs once, at the first boot of a Waydesk image (waydesk-firstboot.service). An image is copied to many servers, so what must be
+# unique per server is made here: the RDP certificate and key, and the first administrator, who logs in over RDP.
+#
+# The administrator comes from /etc/waydesk/firstboot.conf (written by cloud-init `write_files`, or by hand), a shell file:
+#   WAYDESK_ADMIN_NAME=anna
+#   WAYDESK_ADMIN_PASSWORD_HASH='$y$j9T$...'      (mkpasswd -m yescrypt; a hash, so no clear text is stored)
+#   WAYDESK_HOSTNAME=desk1                         (optional)
+# Without that file and with a console, it asks on the console. Without both, it leaves a hint in the login message and tries
+# again at the next boot: there is no default account and no default password.
+set -u
+conf=/etc/waydesk/firstboot.conf
+state=/var/lib/waydesk
+done=$state/firstboot.done
+hint=/etc/motd.d/waydesk-first-admin
+[ -e "$done" ] && exit 0
+mkdir -p "$state"
+
+# Always: a certificate and key of this server only (the image carried none, or the one it was built with is shared).
+if [ ! -e "$state/cert.made" ]; then
+    host=$(hostname)
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=$host" \
+        -keyout /etc/waydesk/key.pem -out /etc/waydesk/cert.pem >/dev/null 2>&1
+    chown waydesk:waydesk /etc/waydesk/key.pem /etc/waydesk/cert.pem
+    chmod 600 /etc/waydesk/key.pem
+    touch "$state/cert.made"
+    systemctl try-restart waydesk.service >/dev/null 2>&1 || true
+fi
+
+WAYDESK_ADMIN_NAME=""; WAYDESK_ADMIN_PASSWORD_HASH=""; WAYDESK_HOSTNAME=""
+[ -f "$conf" ] && . "$conf"
+[ -n "$WAYDESK_HOSTNAME" ] && hostnamectl set-hostname "$WAYDESK_HOSTNAME" 2>/dev/null
+
+made=""
+if [ -n "$WAYDESK_ADMIN_NAME" ] && [ -n "$WAYDESK_ADMIN_PASSWORD_HASH" ]; then
+    if getent passwd "$WAYDESK_ADMIN_NAME" >/dev/null; then
+        waydesk-setup-admin --existing "$WAYDESK_ADMIN_NAME" --password-hash "$WAYDESK_ADMIN_PASSWORD_HASH" && made=1
+    else
+        waydesk-setup-admin --name "$WAYDESK_ADMIN_NAME" --password-hash "$WAYDESK_ADMIN_PASSWORD_HASH" && made=1
+    fi
+elif [ -t 0 ]; then
+    waydesk-setup-admin && made=1
+fi
+
+if [ -n "$made" ]; then
+    # the hash is no secret worth keeping around
+    [ -f "$conf" ] && { shred -u "$conf" 2>/dev/null || rm -f "$conf"; }
+    rm -f "$hint"
+    touch "$done"
+else
+    mkdir -p /etc/motd.d
+    printf '\nWaydesk has no administrator yet, so nobody can log in over RDP.\nMake one:   sudo waydesk-setup-admin\n\n' > "$hint"
+fi
+exit 0
