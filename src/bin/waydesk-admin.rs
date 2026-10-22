@@ -417,7 +417,7 @@ fn users_add(name: &str, rest: &[&str], json_out: bool) -> Result<()> {
     } else {
         println!("made {} (uid {}), groups: {}", a.name, a.uid, if granted.is_empty() { "none".into() } else { granted.join(", ") });
         println!("temporary password (shown once): {password}");
-        println!("The account can change it at once: Change password, in the desktop's power menu (or passwd in a terminal).");
+        println!("The account should change it at once: Change password, in the desktop's power menu.");
     }
     Ok(())
 }
@@ -459,7 +459,7 @@ fn users_passwd(name: &str, rest: &[&str], json_out: bool) -> Result<()> {
     if shown && json_out {
         println!("{}", json!({ "name": a.name, "password": password }));
     } else if shown {
-        println!("new password for {} (shown once): {password}", a.name);
+        println!("new password for {} (shown once): {password}  (the account should change it: Change password, in the power menu)", a.name);
     } else {
         println!("changed the password of {}", a.name);
     }

@@ -554,7 +554,7 @@ ShellRoot {
                             horizontalAlignment: TextInput.AlignHCenter
                         }
                         Label {
-                            text: "Shown once. The account can change it in a terminal on the desktop with: passwd"
+                            text: "Shown once. The account should change it: Change password, in the power menu next to Log out."
                             wrapMode: Text.Wrap
                             color: pal.placeholderText
                             Layout.fillWidth: true
