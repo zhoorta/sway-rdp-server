@@ -36,13 +36,34 @@ Go 1.27.3 (pinned, checksum checked; the 2.0.0 `go.mod` needs 1.27.1 and Debian 
 - Upstream's own Debian packaging (`distro/debian/dms`) does not build from source either: it downloads the release binary from GitHub.
 - The build needs the network (Go modules, pinned by `go.sum`; they are not vendored).
 
+## Stage 1 status (2026-10-22): built and running on the dev VM
+
+`packaging/dms/build-dms.sh` now builds the package `waydesk-shell` (Provides/Conflicts/Replaces `dms`): our `dms` binary, the QML tree with the
+patches applied (`.waydesk-patched` marks it), upstream's service, desktop files and icon. The patches are files now
+(`packaging/desktop/dms-patches/`, one driver `apply.sh`), used both by the build and, for a stock DMS, by `waydesk-shell` at an account's start.
+
+Tested on the arm64 dev VM (one account, restarted after the install): the old `dms` is replaced, `qs` runs from `/usr/share/quickshell/dms`, the four
+bar plugins load, the power menu has the patched layout (hint under "Log out", a line, "Change password"), and there is no per-account copy any more.
+Idle `qs` was 347-353 MB, against 361-362 MB with the OBS package: no real change, because nothing is trimmed yet.
+
+Things found on the way:
+- The binary carries its own copy of the UI and runs that unless `DMS_SHELL_DIR` (or `-c`) names another directory. The first package build
+  therefore ran the unpatched embedded shell: the patched tree in `/usr/share/quickshell/dms` was never used. The package now ships
+  `dms.service` with `Environment=DMS_SHELL_DIR=/usr/share/quickshell/dms`, so every way of starting the shell uses the patched tree.
+- Not verified: the package built by the script *with* that unit line. It was tested as the first build repacked offline with the same one-line change
+  (the network was too slow to rebuild, about 55 KB/s); the script's change is the same `sed`, but a clean rebuild from the script is still to do.
+- The build script retries downloads and fails stalled ones (a stalled git download hung it for 20 minutes once).
+- A long-lived user manager can still hold a stale `DMS_SHELL_DIR` from the old per-account copy: the first start after the switch logged "Failed to open
+  .../dms-shell/shell.qml" once and then recovered (the unit's own setting wins).
+- Debian's `quickshell`, `cava`, the Qt modules and the other helpers (`danksearch`, `dgop`, `matugen`) are still installed from where they were.
+
 ## Runtime patches that would move into the build
 
 `waydesk-shell` makes a per-account copy of the shell (`~/.cache/waydesk/dms-shell`, a tree of symlinks to `/usr/share/quickshell/dms` in which
 only the patched files are real copies) and patches it with Python, at every shell start, for: the "focused app" bar widget (asks sway through
 `waydesk-focused-pid`), "Pin to desktop" in the launcher menu, the edit button of the control centre header, the settings pages that mean nothing on
 a remote desktop and the Material wallpapers, and the power menu ("Change password", the hold-to-confirm hint). They would become patch files
-applied to the source tree before the build: a patch that no longer applies fails the build, and the per-start copy and the Python step go away.
+applied to the source tree before the build: a build with fewer than five patches applied fails, and the per-start copy and the Python step go away.
 
 ## Stages
 

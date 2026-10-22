@@ -59,6 +59,7 @@ mkdir -p $D/usr/share/waydesk/passwd-panel && install -m 644 packaging/desktop/p
 mkdir -p $D/usr/share/applications && install -m 644 packaging/desktop/applications/*.desktop $D/usr/share/applications/
 install -m 755 packaging/debian/postinst-desktop $D/DEBIAN/postinst
 mkdir -p $D/usr/share/waydesk/dms-plugin && cp -r packaging/desktop/dms-plugin/. $D/usr/share/waydesk/dms-plugin/ && chmod -R go-w,a+rX $D/usr/share/waydesk/dms-plugin
+mkdir -p $D/usr/share/waydesk/dms-patches && install -m 755 packaging/desktop/dms-patches/apply.sh $D/usr/share/waydesk/dms-patches/ && install -m 644 packaging/desktop/dms-patches/*.py $D/usr/share/waydesk/dms-patches/
 install -m 644 packaging/desktop/systemd-user/sway-session.target $D/usr/lib/systemd/user/sway-session.target
 ln -s ../dms.service $D/usr/lib/systemd/user/sway-session.target.wants/dms.service
 cat LICENSE-MIT > $D/usr/share/doc/waydesk-desktop/copyright
