@@ -77,3 +77,26 @@ Same VM and procedure as above (accounts logged in one after the other, Chromium
 Five users fit, no out-of-memory kill (kernel log: 0 in the 30 minutes of the run), the machine stayed usable at about 650 MB available. Without zram the same
 VM had 830 MB available after four users and no room for a fifth. At the end `waydesk-admin status` showed per account 490-780 MB of its cgroup, 70-130 MB of it in swap,
 and Chromium as the largest program (about 1.2 GB resident, shared pages counted for each process).
+
+## Hetzner CAX11, over the internet (2026-10-22, commit 6dac08c)
+Hetzner Cloud CAX11 (2 vCPU Ampere, 3.8 GB, Debian 13.6 arm64, zram 1.9 GB), the `.deb` packages of that commit plus DMS 2.0.0db1, quickshell 0.3.0 and the
+patched sway; RDP on a WireGuard address (`docs/WIREGUARD.md`), reached from a Mac in Portugal (ping 77 ms). `tester1` came in with the Windows App (1680x1050);
+`tester2`-`tester4` with `sdl-freerdp` at 1280x720, one after the other, Chromium with three real pages (Wikipedia, Hacker News, debian.org) opened in each from the
+server, 65 s after each login.
+
+| Sessions | Available after Chromium opened | Swap used | Next login |
+|---|---|---|---|
+| 1 | 2.8 GB | 653 MB | accepted |
+| 2 | 2.0 GB | 598 MB | accepted |
+| 3 | 1.3 GB | 597 MB | accepted |
+| 4 | 699 MB | 736 MB | REFUSED (699 < 900) |
+
+- The fifth account (`tester5`) logged in (PAM), then the helper refused the session: "short of memory (700 MB available, 900 MB needed), running=4". No out-of-memory kill
+  (kernel log 0), the four sessions went on. The RDP client only shows "Network disconnect": the reason is in the server log, not on the user's screen.
+- An account with a running session reconnected while the server was full (`tester3`: "reconnecting to the running session").
+- A session with the desktop idle: 581 MB (earlier VM figure: about 610). With Chromium and the three pages: 750 MB to 1.1 GB per account. One fewer user than the
+  VM run (five), with more swap in use from the start: real pages, a long-lived first session and the package cache of the server in memory.
+- CPU: a session whose screen keeps changing (`tester1`) kept the session process (H.264 encoder) at 70-90 % of a core and Chromium at about 27 %; the idle ones were at 3-7 %.
+  On two cores the encoder, not memory, is likely to be the limit with several active users. Not measured yet with several busy sessions.
+- Found on the way: Software (gnome-software) crashed at start because `librsvg2-common` (the SVG loader of GTK) was not installed after a
+  `--no-install-recommends` install; fixed by making it a dependency of `waydesk-desktop` (4960315).
