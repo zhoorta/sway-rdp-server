@@ -118,3 +118,26 @@ acknowledgement log (one line per 200 frames).
   capture takes (sway renders without a GPU) on top of that sleep. This is the first thing to look at if smoothness for video matters.
 - Window work, scrolling and typing were fine in the desktop session over the same link (the session on `tester1`, "looks great").
 - Rule of thumb for 2 vCPU: memory allows 4 browser users; two of them with continuous motion already use about 90 % of the CPU.
+
+## Where the CPU of a moving screen goes (2026-10-22, dev VM, arm64, perf)
+The Hetzner run (above) gave 14-15 fps for one moving 720p screen and 5 fps for three. To see why, the session process of one account (capture, colour
+conversion, H.264) was profiled with `perf record -F 999 -g` while a full-screen 720p30 test pattern (`mpv av://lavfi:testsrc2`) played, client `sdl-freerdp`.
+
+- **89 % of the session process is inside libopenh264** (motion search: `SumOf8x8BlockOfFrame`, `FillQpelLocationByFeatureValue`, `WelsSampleSad*`). Our own code is
+  about 9 % (capture and the frame comparison in `Shared::push` about 2 %, colour conversion 2.6 %). The 30 ms sleep of the capture loop is not the limit: the VM
+  delivers 30.3 fps with it. The 14 fps of the CAX11 were the encoder on slower, busy cores.
+- Same load, session process CPU and bytes sent (30 s each, 30 fps in every row):
+
+| Encoder setting | CPU of the session process | Sent to the client |
+|---|---|---|
+| screen content, medium, 4 threads (the default) | 43 % of a core | 6.4 Mbit/s |
+| screen content, low complexity | 43 % | not measured |
+| screen content, medium, 1 thread | 44 % | not measured |
+| **camera video** (`WAYDESK_H264_USAGE=camera`) | **15 %** | **12.7 Mbit/s** |
+
+- Complexity and the number of threads change nothing measurable. The usage type is the lever: camera mode is about three times cheaper in CPU and needs twice the
+  bandwidth. It stays an option, not the default (bandwidth over the internet matters more for most users); a CPU-starved server that plays video can set it in
+  `/etc/default/waydesk`. Scrolling text in a terminal (4 % CPU, 1.5 against 1.7 Mbit/s) is the same in both modes, so ordinary work does not care.
+- Not done: the same comparison on the CAX11 itself (the server was deleted before this), the picture quality of camera mode on text (not looked at), a switch
+  that picks the mode by itself when the CPU is short.
+- Trap while measuring: logging in again right after `loginctl terminate-user` can time out on `user@UID.service` (90 s); wait until the old user manager has stopped.

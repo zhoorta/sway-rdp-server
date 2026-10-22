@@ -38,7 +38,12 @@ impl H264 {
         let config = EncoderConfig::new()
             .bitrate(BitRate::from_bps(t.bitrate))
             .max_frame_rate(FrameRate::from_hz(t.fps as f32))
-            .usage_type(UsageType::ScreenContentRealTime)
+            // Screen content is the default: about half the bits of camera mode for moving pictures (measured), at about three times
+            // the CPU. WAYDESK_H264_USAGE=camera trades that back for servers with little CPU (see /etc/default/waydesk).
+            .usage_type(match std::env::var("WAYDESK_H264_USAGE").as_deref() {
+                Ok("camera") => UsageType::CameraVideoRealTime,
+                _ => UsageType::ScreenContentRealTime,
+            })
             .complexity(Complexity::Medium)
             .scene_change_detect(true)
             .num_threads(4)

@@ -33,3 +33,9 @@ WAYDESK_SESSION_ARGS=
 #WAYDESK_HELPER_ARGS=--require-group waydesk-users --min-available-mb 1500 --max-active-users 6
 #   --min-available-mb N    0 switches the memory check off
 #   --max-active-users N    0 (the default) is no limit
+
+# Video encoder: "screen" (default) uses OpenH264's screen-content mode, which needs about half the bandwidth for moving pictures but
+# about three times the CPU of "camera" (measured with a full-screen 720p30 test pattern: 43 % against 15 % of a core, 6.4 against
+# 12.7 Mbit/s; scrolling text and ordinary work cost the same in both). On a server with few cores that plays video, "camera" can
+# keep the frame rate up. Takes effect for sessions that start after the change (end the session or log out first).
+#WAYDESK_H264_USAGE=camera
