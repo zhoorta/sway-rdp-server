@@ -275,6 +275,21 @@ fn ensure_runtime_dir(user: &UserInfo) -> Result<()> {
     anyhow::bail!("{} did not appear", dir.display())
 }
 
+/// A new session was refused on purpose (memory, number of users); the daemon turns it into the reason the client is shown.
+#[derive(Debug)]
+struct Refused {
+    reason: u8,
+    message: String,
+}
+
+impl std::fmt::Display for Refused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for Refused {}
+
 /// The running session of the account, or a new one (started and waited for until it registers).
 fn session_for(user: &UserInfo, cfg: &Config, sessions: &Sessions, register_path: &std::path::Path) -> Result<UnixStream> {
     let gate = sessions.gate(user.uid);
@@ -291,11 +306,15 @@ fn session_for(user: &UserInfo, cfg: &Config, sessions: &Sessions, register_path
             Admission::Open => {}
             Admission::Full { available_mb, needed_mb } => {
                 warn!(user = %user.name, available_mb, needed_mb, running, "session refused: the machine is short of memory");
-                anyhow::bail!("the server is short of memory ({available_mb} MB available, {needed_mb} MB needed for a new session)");
+                return Err(Refused {
+                    reason: proto::REFUSED_MEMORY,
+                    message: format!("the server is short of memory ({available_mb} MB available, {needed_mb} MB needed for a new session)"),
+                }
+                .into());
             }
             Admission::TooManyUsers { users, max } => {
                 warn!(user = %user.name, users, max, "session refused: the limit of active users is reached");
-                anyhow::bail!("the limit of {max} active users is reached");
+                return Err(Refused { reason: proto::REFUSED_USERS, message: format!("the limit of {max} active users is reached") }.into());
             }
         }
     }
@@ -363,7 +382,10 @@ fn serve(mut sock: UnixStream, cfg: &Config, policy: &PamPolicy, sessions: &Sess
                     }
                     Err(e) => {
                         warn!(user = %user.name, "cannot start the session: {e:#}");
-                        reply(&mut sock, &HelperResp::Error { message: format!("{e:#}") })
+                        match e.downcast_ref::<Refused>() {
+                            Some(r) => reply(&mut sock, &HelperResp::Refused { reason: r.reason, message: r.message.clone() }),
+                            None => reply(&mut sock, &HelperResp::Error { message: format!("{e:#}") }),
+                        }
                     }
                 },
             },

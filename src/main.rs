@@ -23,12 +23,12 @@ mod worker;
 
 use std::num::{NonZeroU16, NonZeroUsize};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Context as _;
 use ironrdp_server::{
-    BitmapUpdate, Credentials, DesktopSize, DisplayUpdate, KeyboardEvent, MouseEvent, PixelFormat, RGBAPointer, RdpServer,
+    BitmapUpdate, Credentials, DesktopSize, DisplayUpdate, KeyboardEvent, MouseEvent, PixelFormat, RGBAPointer, RdpServer, Refusal,
     RdpServerDisplay, RdpServerDisplayUpdates, RdpServerInputHandler, TlsIdentityCtx,
 };
 use tracing::{error, info, warn};
@@ -196,6 +196,8 @@ struct Slot {
     user: Arc<Mutex<Option<auth::UserInfo>>>,
     /// The connection to the root helper, when logins and sessions go through it.
     helper: Option<Arc<helperclient::HelperConn>>,
+    /// Why the helper refused a new session (`proto::REFUSED_*`), 0 when it did not.
+    refused: AtomicU8,
 }
 
 impl Slot {
@@ -208,6 +210,7 @@ impl Slot {
             scale: AtomicU32::new(100),
             wanted: Mutex::new(None),
             applying: AtomicBool::new(false),
+            refused: AtomicU8::new(0),
         }
     }
 
@@ -316,6 +319,9 @@ impl RdpServerDisplay for Handler {
                 }
                 Err(e) => {
                     error!("cannot create session: {e:#}");
+                    if let Some(r) = e.downcast_ref::<helperclient::SessionRefused>() {
+                        self.slot.refused.store(r.reason, Ordering::Relaxed);
+                    }
                     client_size
                 }
             };
@@ -339,6 +345,15 @@ impl RdpServerDisplay for Handler {
                 error!("cannot create session: {e:#}");
                 client_size
             }
+        }
+    }
+
+    /// Why there is no session, when the helper refused one on purpose: the client is told with an error code.
+    fn refusal(&mut self) -> Option<Refusal> {
+        match self.slot.refused.load(Ordering::Relaxed) {
+            proto::REFUSED_MEMORY => Some(Refusal::OutOfMemory),
+            proto::REFUSED_USERS => Some(Refusal::Denied),
+            _ => None,
         }
     }
 

@@ -1,6 +1,6 @@
 diff -ru /tmp/claude-501/orig/ironrdp-server/src/builder.rs patches/ironrdp-server/src/builder.rs
---- /tmp/claude-501/orig/ironrdp-server/src/builder.rs	2006-07-24 02:21:28
-+++ patches/ironrdp-server/src/builder.rs	2026-10-15 19:37:39
+--- /tmp/claude-501/orig/ironrdp-server/src/builder.rs	2026-10-22 16:13:57
++++ patches/ironrdp-server/src/builder.rs	2026-10-20 23:37:02
 @@ -43,6 +43,7 @@
      display_suppressed: Option<Arc<AtomicBool>>,
      autodetect_rtt: Option<Arc<AtomicU32>>,
@@ -52,9 +52,42 @@ diff -ru /tmp/claude-501/orig/ironrdp-server/src/builder.rs patches/ironrdp-serv
              },
              self.state.handler,
              self.state.display,
+diff -ru /tmp/claude-501/orig/ironrdp-server/src/display.rs patches/ironrdp-server/src/display.rs
+--- /tmp/claude-501/orig/ironrdp-server/src/display.rs	2026-10-22 16:13:57
++++ patches/ironrdp-server/src/display.rs	2026-10-22 16:02:34
+@@ -249,6 +249,16 @@
+     async fn next_update(&mut self) -> Result<Option<DisplayUpdate>>;
+ }
+ 
++/// Why a display could not give a client a session: the client is told with an error code before the connection closes.
++/// (waydesk-server patch.)
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum Refusal {
++    /// The machine has no memory for another session.
++    OutOfMemory,
++    /// The server refuses this connection.
++    Denied,
++}
++
+ /// Display for an RDP server
+ ///
+ /// # Example
+@@ -295,6 +305,12 @@
+     async fn request_initial_size(&mut self, client_size: DesktopSize) -> DesktopSize {
+         debug!(?client_size, "Requesting initial size");
+         self.size().await
++    }
++
++    /// Why `updates` has no session to give, when the refusal was on purpose: the server sends it to the client as an
++    /// error code before it closes the connection. (waydesk-server patch.)
++    fn refusal(&mut self) -> Option<Refusal> {
++        None
+     }
+ 
+     /// Return a display updates receiver
 diff -ru /tmp/claude-501/orig/ironrdp-server/src/encoder/mod.rs patches/ironrdp-server/src/encoder/mod.rs
---- /tmp/claude-501/orig/ironrdp-server/src/encoder/mod.rs	2006-07-24 02:21:28
-+++ patches/ironrdp-server/src/encoder/mod.rs	2026-10-15 18:43:26
+--- /tmp/claude-501/orig/ironrdp-server/src/encoder/mod.rs	2026-10-22 16:13:57
++++ patches/ironrdp-server/src/encoder/mod.rs	2026-10-20 23:37:02
 @@ -11,7 +11,9 @@
      CachedPointerAttribute, ColorPointerAttribute, Point16, PointerAttribute, PointerPositionAttribute,
  };
@@ -90,8 +123,8 @@ diff -ru /tmp/claude-501/orig/ironrdp-server/src/encoder/mod.rs patches/ironrdp-
 +    Ok(UpdateFragmenter::new(UpdateCode::SurfaceCommands, payload))
  }
 diff -ru /tmp/claude-501/orig/ironrdp-server/src/handler.rs patches/ironrdp-server/src/handler.rs
---- /tmp/claude-501/orig/ironrdp-server/src/handler.rs	2006-07-24 02:21:28
-+++ patches/ironrdp-server/src/handler.rs	2026-10-15 19:05:19
+--- /tmp/claude-501/orig/ironrdp-server/src/handler.rs	2026-10-22 16:13:57
++++ patches/ironrdp-server/src/handler.rs	2026-10-20 23:37:02
 @@ -73,6 +73,13 @@
  pub trait RdpServerInputHandler: Send {
      fn keyboard(&mut self, event: KeyboardEvent);
@@ -106,9 +139,21 @@ diff -ru /tmp/claude-501/orig/ironrdp-server/src/handler.rs patches/ironrdp-serv
  }
  
  impl From<(u8, fast_path::KeyboardFlags)> for KeyboardEvent {
+diff -ru /tmp/claude-501/orig/ironrdp-server/src/lib.rs patches/ironrdp-server/src/lib.rs
+--- /tmp/claude-501/orig/ironrdp-server/src/lib.rs	2026-10-22 16:13:57
++++ patches/ironrdp-server/src/lib.rs	2026-10-22 16:01:35
+@@ -24,7 +24,7 @@
+ pub use clipboard::CliprdrServerFactory;
+ pub use display::{
+     BitmapUpdate, ColorPointer, DesktopSize, DisplayUpdate, Framebuffer, PixelFormat, RGBAPointer, RdpServerDisplay,
+-    RdpServerDisplayUpdates,
++    RdpServerDisplayUpdates, Refusal,
+ };
+ pub use echo::{EchoDvcBridge, EchoRoundTripMeasurement, EchoServerHandle, EchoServerMessage};
+ #[cfg(feature = "egfx")]
 diff -ru /tmp/claude-501/orig/ironrdp-server/src/server.rs patches/ironrdp-server/src/server.rs
---- /tmp/claude-501/orig/ironrdp-server/src/server.rs	2006-07-24 02:21:28
-+++ patches/ironrdp-server/src/server.rs	2026-10-15 19:37:48
+--- /tmp/claude-501/orig/ironrdp-server/src/server.rs	2026-10-22 16:13:57
++++ patches/ironrdp-server/src/server.rs	2026-10-22 16:10:10
 @@ -230,6 +230,9 @@
      /// Deactivation-Reactivation resize. Defaults to `false`. Set via
      /// [`RdpServerBuilder::with_honor_client_desktop_size`](crate::RdpServerBuilder::with_honor_client_desktop_size).
@@ -224,12 +269,73 @@ diff -ru /tmp/claude-501/orig/ironrdp-server/src/server.rs patches/ironrdp-serve
      pub fn get_svc_processor<T: SvcProcessor + 'static>(&mut self) -> Option<&mut T> {
          self.static_channels
              .get_by_type_mut::<T>()
-@@ -1368,6 +1405,8 @@
-                 debug!("Skipping credential validation (no credentials in AcceptorResult)");
+@@ -1233,7 +1270,24 @@
+         W: FramedWrite,
+     {
+         debug!("Starting client loop");
+-        let mut display_updates = self.display.lock().await.updates().await?;
++        let updates = self.display.lock().await.updates().await;
++        let mut display_updates = match updates {
++            Ok(u) => u,
++            Err(e) => {
++                // waydesk-server patch: tell the client why there is no session (memory, limit) instead of dropping it.
++                let refusal = self.display.lock().await.refusal();
++                if let Some(refusal) = refusal {
++                    let code = match refusal {
++                        crate::Refusal::OutOfMemory => ProtocolIndependentCode::OutOfMemory,
++                        crate::Refusal::Denied => ProtocolIndependentCode::ServerDeniedConnection,
++                    };
++                    send_error_info(io_channel_id, user_channel_id, writer, code).await?;
++                    // Closing at once makes the client fail on its next write before it has read the code.
++                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
++                }
++                return Err(e);
++            }
++        };
+         let mut writer = SharedWriter::new(writer);
+         let mut display_writer = writer.clone();
+         let mut event_writer = writer.clone();
+@@ -1374,6 +1428,8 @@
              }
          }
-+
-+        self.handler.lock().await.keyboard_layout(result.keyboard_layout);
  
++        self.handler.lock().await.keyboard_layout(result.keyboard_layout);
++
          if !result.input_events.is_empty() {
              debug!("Handling input event backlog from acceptor sequence");
+             self.handle_input_backlog(
+@@ -1823,10 +1879,29 @@
+     user_channel_id: u16,
+     writer: &mut impl FramedWrite,
+ ) -> Result<(), anyhow::Error> {
+-    let info = ServerSetErrorInfoPdu(ErrorInfo::ProtocolIndependentCode(
+-        ProtocolIndependentCode::ServerDeniedConnection,
+-    ));
+-    let user_data = encode_vec(&info)?.into();
++    send_error_info(io_channel_id, user_channel_id, writer, ProtocolIndependentCode::ServerDeniedConnection).await
++}
++
++/// Send a `ServerSetErrorInfoPdu` with this code; the client shows it as the reason the connection ended.
++async fn send_error_info(
++    io_channel_id: u16,
++    user_channel_id: u16,
++    writer: &mut impl FramedWrite,
++    code: ProtocolIndependentCode,
++) -> Result<(), anyhow::Error> {
++    let info = ServerSetErrorInfoPdu(ErrorInfo::ProtocolIndependentCode(code));
++    // A Set Error Info PDU is a Share Data PDU: the bare code is not understood by the clients (FreeRDP, the Windows App).
++    let pdu = rdp::headers::ShareControlHeader {
++        share_id: 0,
++        pdu_source: io_channel_id,
++        share_control_pdu: ShareControlPdu::Data(rdp::headers::ShareDataHeader {
++            share_data_pdu: rdp::headers::ShareDataPdu::ServerSetErrorInfo(info),
++            stream_priority: rdp::headers::StreamPriority::Low,
++            compression_flags: rdp::headers::CompressionFlags::empty(),
++            compression_type: rdp::client_info::CompressionType::K8,
++        }),
++    };
++    let user_data = encode_vec(&pdu)?.into();
+     let pdu = SendDataIndication {
+         initiator_id: user_channel_id,
+         channel_id: io_channel_id,
+Only in orig/ironrdp-server/src: server.rs.orig

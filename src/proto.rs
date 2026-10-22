@@ -353,7 +353,13 @@ pub enum HelperResp {
     /// The session is running; a file descriptor follows (see `fdpass`).
     Started,
     Error { message: String },
+    /// The machine will not take a new session now; `reason` is one of the `REFUSED_*` values, `message` is for the log.
+    Refused { reason: u8, message: String },
 }
+
+/// Why a new session was refused (`HelperResp::Refused`).
+pub const REFUSED_MEMORY: u8 = 1;
+pub const REFUSED_USERS: u8 = 2;
 
 impl HelperReq {
     pub fn encode(&self) -> Vec<u8> {
@@ -396,6 +402,11 @@ impl HelperResp {
                 // Never longer than a string may be.
                 o.str(&message.chars().take(200).collect::<String>());
             }
+            HelperResp::Refused { reason, message } => {
+                o.u8(5);
+                o.u8(*reason);
+                o.str(&message.chars().take(200).collect::<String>());
+            }
         }
         o.0
     }
@@ -407,6 +418,7 @@ impl HelperResp {
             2 => HelperResp::AuthFail,
             3 => HelperResp::Started,
             4 => HelperResp::Error { message: i.str()? },
+            5 => HelperResp::Refused { reason: i.u8()?, message: i.str()? },
             t => return Err(ProtoError::UnknownTag(t)),
         };
         i.finish()?;
@@ -583,7 +595,7 @@ mod tests {
                 assert!(HelperReq::decode(&b[..cut]).is_err());
             }
         }
-        for r in [HelperResp::AuthOk, HelperResp::AuthFail, HelperResp::Started, HelperResp::Error { message: "no".into() }] {
+        for r in [HelperResp::AuthOk, HelperResp::AuthFail, HelperResp::Started, HelperResp::Error { message: "no".into() }, HelperResp::Refused { reason: REFUSED_MEMORY, message: "full".into() }] {
             assert_eq!(HelperResp::decode(&r.encode()).unwrap(), r);
         }
         // a string longer than allowed

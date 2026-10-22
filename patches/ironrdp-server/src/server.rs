@@ -1270,7 +1270,24 @@ impl RdpServer {
         W: FramedWrite,
     {
         debug!("Starting client loop");
-        let mut display_updates = self.display.lock().await.updates().await?;
+        let updates = self.display.lock().await.updates().await;
+        let mut display_updates = match updates {
+            Ok(u) => u,
+            Err(e) => {
+                // waydesk-server patch: tell the client why there is no session (memory, limit) instead of dropping it.
+                let refusal = self.display.lock().await.refusal();
+                if let Some(refusal) = refusal {
+                    let code = match refusal {
+                        crate::Refusal::OutOfMemory => ProtocolIndependentCode::OutOfMemory,
+                        crate::Refusal::Denied => ProtocolIndependentCode::ServerDeniedConnection,
+                    };
+                    send_error_info(io_channel_id, user_channel_id, writer, code).await?;
+                    // Closing at once makes the client fail on its next write before it has read the code.
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                }
+                return Err(e);
+            }
+        };
         let mut writer = SharedWriter::new(writer);
         let mut display_writer = writer.clone();
         let mut event_writer = writer.clone();
@@ -1862,10 +1879,29 @@ async fn send_access_denied(
     user_channel_id: u16,
     writer: &mut impl FramedWrite,
 ) -> Result<(), anyhow::Error> {
-    let info = ServerSetErrorInfoPdu(ErrorInfo::ProtocolIndependentCode(
-        ProtocolIndependentCode::ServerDeniedConnection,
-    ));
-    let user_data = encode_vec(&info)?.into();
+    send_error_info(io_channel_id, user_channel_id, writer, ProtocolIndependentCode::ServerDeniedConnection).await
+}
+
+/// Send a `ServerSetErrorInfoPdu` with this code; the client shows it as the reason the connection ended.
+async fn send_error_info(
+    io_channel_id: u16,
+    user_channel_id: u16,
+    writer: &mut impl FramedWrite,
+    code: ProtocolIndependentCode,
+) -> Result<(), anyhow::Error> {
+    let info = ServerSetErrorInfoPdu(ErrorInfo::ProtocolIndependentCode(code));
+    // A Set Error Info PDU is a Share Data PDU: the bare code is not understood by the clients (FreeRDP, the Windows App).
+    let pdu = rdp::headers::ShareControlHeader {
+        share_id: 0,
+        pdu_source: io_channel_id,
+        share_control_pdu: ShareControlPdu::Data(rdp::headers::ShareDataHeader {
+            share_data_pdu: rdp::headers::ShareDataPdu::ServerSetErrorInfo(info),
+            stream_priority: rdp::headers::StreamPriority::Low,
+            compression_flags: rdp::headers::CompressionFlags::empty(),
+            compression_type: rdp::client_info::CompressionType::K8,
+        }),
+    };
+    let user_data = encode_vec(&pdu)?.into();
     let pdu = SendDataIndication {
         initiator_id: user_channel_id,
         channel_id: io_channel_id,

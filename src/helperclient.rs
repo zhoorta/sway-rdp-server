@@ -14,6 +14,21 @@ use tracing::warn;
 use crate::fdpass;
 use crate::proto::{self, HelperReq, HelperResp};
 
+/// The helper refused a new session on purpose (see `proto::REFUSED_*`).
+#[derive(Debug)]
+pub struct SessionRefused {
+    pub reason: u8,
+    pub message: String,
+}
+
+impl std::fmt::Display for SessionRefused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "helper: {}", self.message)
+    }
+}
+
+impl std::error::Error for SessionRefused {}
+
 /// One connection to the helper, for one client of the daemon.
 pub struct HelperConn {
     sock: Mutex<UnixStream>,
@@ -47,6 +62,7 @@ impl HelperConn {
         match self.call(&mut sock, &HelperReq::StartSession)? {
             HelperResp::Started => {}
             HelperResp::Error { message } => bail!("helper: {message}"),
+            HelperResp::Refused { reason, message } => return Err(SessionRefused { reason, message }.into()),
             other => bail!("unexpected answer to a session request: {other:?}"),
         }
         Ok(UnixStream::from(fdpass::recv_fd(&sock).context("receiving the session socket")?))

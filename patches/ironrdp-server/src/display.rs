@@ -249,6 +249,16 @@ pub trait RdpServerDisplayUpdates {
     async fn next_update(&mut self) -> Result<Option<DisplayUpdate>>;
 }
 
+/// Why a display could not give a client a session: the client is told with an error code before the connection closes.
+/// (waydesk-server patch.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refusal {
+    /// The machine has no memory for another session.
+    OutOfMemory,
+    /// The server refuses this connection.
+    Denied,
+}
+
 /// Display for an RDP server
 ///
 /// # Example
@@ -295,6 +305,12 @@ pub trait RdpServerDisplay: Send {
     async fn request_initial_size(&mut self, client_size: DesktopSize) -> DesktopSize {
         debug!(?client_size, "Requesting initial size");
         self.size().await
+    }
+
+    /// Why `updates` has no session to give, when the refusal was on purpose: the server sends it to the client as an
+    /// error code before it closes the connection. (waydesk-server patch.)
+    fn refusal(&mut self) -> Option<Refusal> {
+        None
     }
 
     /// Return a display updates receiver

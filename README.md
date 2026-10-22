@@ -157,7 +157,8 @@ that account with windows and no bar). The package prevents it in four layers, n
 1. **A new session is refused when the machine cannot take one more.** The root helper checks the available memory before it starts a session for an account
    that has none: by default it needs the larger of 900 MB and 15 % of the memory (swap is not counted: an account that is swapping is not working). The
    account's running session is never refused, so nobody is thrown out for a newcomer. The refusal is in the journal (`session refused: the machine is short of
-   memory`); the RDP client only sees that the login failed. Change it with `--min-available-mb N` (0 = off) and `--max-active-users N` in `WAYDESK_HELPER_ARGS`
+   memory`); the client is sent a reason before the connection closes ("The server ran out of available memory resources" for the memory check, "The server denied
+the connection" for `--max-active-users`; FreeRDP shows it, tested; other clients show their own text for the same RDP error codes). Change it with `--min-available-mb N` (0 = off) and `--max-active-users N` in `WAYDESK_HELPER_ARGS`
    (see `/etc/default/waydesk`).
 2. **Every account has ceilings** (`user-.slice.d/10-waydesk.conf`): at most 35 % of the machine's memory before the kernel reclaims from that account first, 50 % at
    the most (then only that account's biggest process is killed), no more than half of the memory in swap, 8192 tasks. They are ceilings, not shares: they do
