@@ -472,7 +472,7 @@ with open(dst, "w") as f:
 PY
     fi
     # The power menu: the custom button ("Change password") acts at once, without the hold to confirm (it is harmless), and sits in
-    # a group of its own below "Log out", with a line between the two.
+    # a group of its own below "Log out": the hint ("Hold to confirm") is right under "Log out", then a line, then the button.
     menu=Modules/PowerMenu/PowerMenuContent.qml
     view=DCommon/Session/PowerMenuView.qml
     if [ -f "$dms_src/$menu" ] && [ -f "$dms_src/$view" ]; then
@@ -500,7 +500,7 @@ rule = """    // The line between "Log out" and the custom group (in the menu it
         readonly property int first: root.actions.findIndex(a => a.startsWith("custom:"))
         visible: root.groupGap > 0 && first > 0
         x: Style.spacingL + Style.spacingM
-        y: Style.spacingL + first * (Style.listItemHeight + root.itemGap) + (root.groupGap - root.itemGap) / 2 - 0.5
+        y: Style.spacingL + first * (Style.listItemHeight + root.itemGap) - root.itemGap + (root.showHint ? root.hintPad * 2 + hint.implicitHeight : root.groupGap / 2) - 0.5
         width: root.width - (Style.spacingL + Style.spacingM) * 2
         height: 1
         color: Style.withAlpha(Style.outline, 0.4)
@@ -513,12 +513,17 @@ if grid not in view:
 view = view.replace(grid, rule + grid, 1)
 gap = "    readonly property real itemGap:"
 height = "    implicitHeight: buttons.implicitHeight + Style.spacingL * 2 + (showHint"
-margin = "        anchors.topMargin: Style.spacingM\n        anchors.horizontalCenter"
+margin = "        anchors.top: buttons.bottom\n        anchors.topMargin: Style.spacingM\n"
 if gap not in view or height not in view or margin not in view:
     sys.exit(1)
-view = view.replace(gap, "    readonly property real groupGap: !gridLayout && actions.some(a => a.startsWith(\"custom:\")) ? Style.spacingM : 0\n" + gap, 1)
-view = view.replace(height, "    implicitHeight: buttons.implicitHeight + groupGap + Style.spacingL * 2 + (showHint", 1)
-view = view.replace(margin, "        anchors.topMargin: Style.spacingM + root.groupGap\n        anchors.horizontalCenter", 1)
+props = """    readonly property bool grouped: !gridLayout && actions.some(a => a.startsWith("custom:"))
+    readonly property int firstCustom: actions.findIndex(a => a.startsWith("custom:"))
+    readonly property real hintPad: Style.spacingS
+    readonly property real groupGap: !grouped ? 0 : showHint ? hint.implicitHeight + hintPad * 3 : Style.spacingM
+"""
+view = view.replace(gap, props + gap, 1)
+view = view.replace(height, "    implicitHeight: buttons.implicitHeight + groupGap + Style.spacingL * 2 + (showHint && !grouped", 1)
+view = view.replace(margin, "        y: grouped ? Style.spacingL + firstCustom * (Style.listItemHeight + itemGap) - itemGap + hintPad : buttons.y + buttons.height + Style.spacingM\n", 1)
 for dst, text in ((menu_dst, menu), (view_dst, view)):
     os.remove(dst)
     with open(dst, "w") as f:
