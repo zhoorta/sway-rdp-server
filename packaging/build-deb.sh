@@ -28,6 +28,7 @@ install -m 644 packaging/pam-waydesk-session $P/etc/pam.d/waydesk-session
 mkdir -p $P/usr/share/icons && cp -a packaging/cursors/waydesk-blank $P/usr/share/icons/   # cursors with nothing in them
 install -m 644 README.md $P/usr/share/doc/waydesk-server/README.md
 install -m 644 docs/MULTIUSER-DESIGN.md $P/usr/share/doc/waydesk-server/MULTIUSER-DESIGN.md
+install -m 644 docs/WIREGUARD.md docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md $P/usr/share/doc/waydesk-server/
 cat LICENSE-MIT > $P/usr/share/doc/waydesk-server/copyright
 for f in postinst prerm postrm conffiles; do install -m 755 packaging/debian/$f $P/DEBIAN/$f; done
 chmod 644 $P/DEBIAN/conffiles
