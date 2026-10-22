@@ -14,6 +14,7 @@ cd /src && cargo build --release
 P=/tmp/pkg; rm -rf $P; mkdir -p $P/DEBIAN $P/usr/bin $P/lib/systemd/system $P/etc/default $P/etc/pam.d $P/usr/share/doc/waydesk-server
 install -m 755 /tmp/target/release/waydesk-server $P/usr/bin/waydesk-server
 install -m 755 /tmp/target/release/waydesk-admin $P/usr/bin/waydesk-admin
+install -m 755 /tmp/target/release/waydesk-passwd $P/usr/bin/waydesk-passwd
 mkdir -p $P/usr/share/polkit-1/actions && install -m 644 packaging/org.waydesk.admin.policy $P/usr/share/polkit-1/actions/
 install -m 644 packaging/systemd/*.service $P/lib/systemd/system/   # includes waydesk-session@.service
 mkdir -p $P/lib/systemd/system/user-.slice.d && install -m 644 packaging/systemd/user-slice/10-waydesk.conf $P/lib/systemd/system/user-.slice.d/
@@ -53,6 +54,7 @@ mkdir -p $D/usr/share/waydesk/qt6ct && install -m 644 packaging/desktop/qt6ct/* 
 # /etc, not /usr/share: the Debian sway package owns /usr/share/xdg-desktop-portal/sway-portals.conf, and /etc wins over it
 mkdir -p $D/etc/xdg-desktop-portal && install -m 644 packaging/desktop/xdg-desktop-portal/*.conf $D/etc/xdg-desktop-portal/
 mkdir -p $D/usr/share/waydesk/users-panel && install -m 644 packaging/desktop/users-panel/*.qml $D/usr/share/waydesk/users-panel/
+mkdir -p $D/usr/share/waydesk/passwd-panel && install -m 644 packaging/desktop/passwd-panel/*.qml $D/usr/share/waydesk/passwd-panel/
 mkdir -p $D/usr/share/applications && install -m 644 packaging/desktop/applications/*.desktop $D/usr/share/applications/
 install -m 755 packaging/debian/postinst-desktop $D/DEBIAN/postinst
 mkdir -p $D/usr/share/waydesk/dms-plugin && cp -r packaging/desktop/dms-plugin/. $D/usr/share/waydesk/dms-plugin/ && chmod -R go-w,a+rX $D/usr/share/waydesk/dms-plugin

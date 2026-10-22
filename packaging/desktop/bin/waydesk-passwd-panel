@@ -1,0 +1,7 @@
+#!/bin/sh
+# Change password: the window where the account that is logged in changes its own password (a small Quickshell window of its own,
+# next to the shell; the work is done by waydesk-passwd, as the account itself). It is in the shell's power menu, next to "log out".
+# The window's app id is the name of the launcher entry (waydesk-passwd.desktop), so the dock shows its own icon and name.
+export QS_APP_ID=waydesk-passwd
+export QT_QPA_PLATFORMTHEME=qt6ct QT_QUICK_CONTROLS_STYLE=Fusion
+exec quickshell -p /usr/share/waydesk/passwd-panel

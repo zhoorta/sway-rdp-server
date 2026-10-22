@@ -417,7 +417,7 @@ fn users_add(name: &str, rest: &[&str], json_out: bool) -> Result<()> {
     } else {
         println!("made {} (uid {}), groups: {}", a.name, a.uid, if granted.is_empty() { "none".into() } else { granted.join(", ") });
         println!("temporary password (shown once): {password}");
-        println!("The account can change it at once: open a terminal on the desktop and run passwd.");
+        println!("The account can change it at once: Change password, in the desktop's power menu (or passwd in a terminal).");
     }
     Ok(())
 }

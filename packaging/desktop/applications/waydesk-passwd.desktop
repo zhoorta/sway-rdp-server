@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Change password
+Comment=Change the password of your account
+Exec=waydesk-passwd-panel
+Icon=dialog-password
+Categories=System;Settings;
+NoDisplay=true
+Terminal=false

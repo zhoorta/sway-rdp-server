@@ -114,6 +114,15 @@ if settings is not None and not os.path.exists(marker):
         bars[0]["rightWidgets"] = [w for w in right if not is_power(w)] + kept[:1]
         changed = True
     open(marker, "w").close()
+# "Change password" in the power menu, next to "log out" (a custom button: DMS lists these after its own actions).
+marker = os.path.join(d, ".password-button")
+if settings is not None and not os.path.exists(marker):
+    buttons = settings.get("customPowerButtons") or []
+    if not any(b.get("command") == "waydesk-passwd-panel" for b in buttons if isinstance(b, dict)):
+        buttons.append({"label": "Change password", "icon": "key", "command": "waydesk-passwd-panel"})
+        settings["customPowerButtons"] = buttons
+        changed = True
+    open(marker, "w").close()
 # A remote desktop has no network, Bluetooth, battery or power profile of its own to manage, the audio devices are the
 # session's dummy ones, and the clipboard history is not wanted: take them out of the bar and the control center (once
 # per account, so what an account adds back stays).
