@@ -184,3 +184,19 @@ Idle `qs` (the shell), RSS / PSS / anonymous memory:
   rounded corners it leaves dark square halos behind the bar's pills and the clock; a screenshot of both is why new accounts get square corners in that mode).
 - `MALLOC_ARENA_MAX`, `LP_NUM_THREADS` and the render loop were tried by restarting only `dms.service` of a running session; "PSS" counts shared library pages
   divided among the processes that map them, so with several accounts the 48 MB `libLLVM` costs each of them less than here.
+
+## Hetzner 8 GB / 4 vCPU x86 (AMD EPYC Genoa), Debian 13 amd64 (2026-10-22)
+The amd64 packages built natively on this server (server and desktop 2 min, patched sway 1.5 min, file manager 1.5 min, shell 1 min, the three helpers 2.5 min: 9 minutes in all, against hours under
+emulation on the Mac), installed from their build folder (quickshell from Debian's backports), first administrator made with `waydesk-setup-admin`, RDP reached through an SSH tunnel.
+
+- One session, idle desktop: 600 MB (the 4 GB arm64 server: about 520 MB), `qs` 438 MB, the four bar plugins loaded, the screenshot looks like the arm64 one.
+- Starting a session takes 0.7-1.4 s from the login (0.25-0.34 s inside the helper once the login is accepted).
+- **Browser users on 8 GB: 9** (Chromium with three pages each). The tenth login was refused: "1046 MB available, 1162 MB needed" (15 % of the memory). No out-of-memory kill; zram (3.8 GB) held 584 MB.
+  Per account at the end: 600-790 MB of the account's cgroup, Chromium about 1.2-1.3 GB resident (shared pages counted for each process). Load average 0.4 on 4 cores with everyone idle after loading.
+- Expected from the 4 GB arm64 run (4 users): about 8; measured: 9.
+
+How it was measured (a trap): the first attempt logged in through an SSH tunnel from the Mac with `sdl-freerdp`. Five of ten logins failed with "no login within 30 s" or "failed to accept client", even with the
+Mac idle: all the clients' video streams share one tunnel over the Mac's connection (55-450 KB/s measured that day), so a new connection cannot finish its handshake once five or six Chromium sessions are
+streaming. The server was fine (the same accounts logged in within 1.4 s from the server's own loopback). The test was redone with a short-lived `xfreerdp3` on the server itself under Xvfb, one per account:
+the session stays after the client leaves, exactly as for a user who closes the window. Use that for capacity tests, not a tunnel.
+- Not measured on x86: CPU with moving screens (video), and the frame rate.
