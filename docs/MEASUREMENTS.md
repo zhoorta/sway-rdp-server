@@ -100,3 +100,21 @@ server, 65 s after each login.
   On two cores the encoder, not memory, is likely to be the limit with several active users. Not measured yet with several busy sessions.
 - Found on the way: Software (gnome-software) crashed at start because `librsvg2-common` (the SVG loader of GTK) was not installed after a
   `--no-install-recommends` install; fixed by making it a dependency of `waydesk-desktop` (4960315).
+
+### CPU with moving screens (same server, same day)
+Load: `mpv --vo=wlshm --fs` playing a generated 720p30 test pattern (`av://lavfi:testsrc2`) in each session (alone it runs in real time on this machine), clients
+`sdl-freerdp` on the Mac over the tunnel; `tester1` had Software open at the same time (flatpak work), which adds some load. Frame rate counted from the server's
+acknowledgement log (one line per 200 frames).
+
+| Sessions playing the pattern | Machine busy (both cores) | Session process (capture + H.264) per session | Frame rate per session |
+|---|---|---|---|
+| 1 | 62 % | about 36 % of a core | 14 fps |
+| 2 | 89 % | 20-30 % | 15 fps each |
+| 3 | 99 % | 20-23 % | about 5 fps each (4 sessions open) |
+
+- With three moving screens the two cores are used up and the frame rate falls to about a third; the frames still arrive (acknowledged = sent, queue depth 0): the picture gets
+  choppy, it does not lag behind.
+- One or two moving screens give 14-15 fps, well under the 30 fps of the capture loop (`session.rs`: 30 ms sleep after each frame). Not profiled; a likely cause is the time one
+  capture takes (sway renders without a GPU) on top of that sleep. This is the first thing to look at if smoothness for video matters.
+- Window work, scrolling and typing were fine in the desktop session over the same link (the session on `tester1`, "looks great").
+- Rule of thumb for 2 vCPU: memory allows 4 browser users; two of them with continuous motion already use about 90 % of the CPU.
