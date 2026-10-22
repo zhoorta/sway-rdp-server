@@ -2,6 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
+import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
 
 // The session's volume without a panel: click mutes, the wheel changes it.
@@ -9,7 +10,7 @@ PluginComponent {
     id: root
 
     horizontalBarPill: Component {
-        DankIcon {
+        DCommon.DIcon {
             name: AudioService.sinkVolumeIconName
             size: Theme.iconSize - 4
             color: AudioService.sinkSilent ? Theme.surfaceVariantText : Theme.surfaceText

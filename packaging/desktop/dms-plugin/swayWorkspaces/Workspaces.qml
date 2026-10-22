@@ -3,6 +3,7 @@ import Quickshell
 import qs.Common
 import qs.Services
 import qs.Widgets
+import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
 
 // Workspaces of a waydesk session, next to the shell's own workspace switcher (which switches between the ones that exist but cannot
@@ -50,7 +51,7 @@ PluginComponent {
                 height: 22
                 anchors.verticalCenter: parent.verticalCenter
 
-                DankIcon {
+                DCommon.DIcon {
                     anchors.centerIn: parent
                     name: "add"
                     size: 18
@@ -71,7 +72,7 @@ PluginComponent {
                 height: 22
                 anchors.verticalCenter: parent.verticalCenter
 
-                DankIcon {
+                DCommon.DIcon {
                     anchors.centerIn: parent
                     name: "expand_more"
                     size: 16
@@ -181,7 +182,7 @@ PluginComponent {
                                                 sourceSize: Qt.size(36, 36)
                                                 fillMode: Image.PreserveAspectFit
                                             }
-                                            DankIcon {
+                                            DCommon.DIcon {
                                                 anchors.centerIn: parent
                                                 visible: winIcon.status !== Image.Ready
                                                 name: "web_asset"
@@ -287,7 +288,7 @@ PluginComponent {
                     Row {
                         anchors.centerIn: parent
                         spacing: Theme.spacingS
-                        DankIcon { anchors.verticalCenter: parent.verticalCenter; name: "add"; size: 18; color: Theme.surfaceText }
+                        DCommon.DIcon { anchors.verticalCenter: parent.verticalCenter; name: "add"; size: 18; color: Theme.surfaceText }
                         StyledText { anchors.verticalCenter: parent.verticalCenter; text: I18n.tr("New workspace"); color: Theme.surfaceText; font.pixelSize: Theme.fontSizeMedium }
                     }
                     MouseArea {

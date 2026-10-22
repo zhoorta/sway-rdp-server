@@ -3,6 +3,7 @@ import Quickshell
 import qs.Common
 import qs.Services
 import qs.Widgets
+import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
 
 // Window buttons for the focused window in the Mac style (red closes, yellow minimizes, green maximizes), on top of
@@ -81,7 +82,7 @@ PluginComponent {
                     color: modelData.tone
                     opacity: area.containsMouse ? 1 : 0.7
 
-                    DankIcon {
+                    DCommon.DIcon {
                         anchors.centerIn: parent
                         visible: area.containsMouse
                         name: modelData.icon
@@ -116,7 +117,7 @@ PluginComponent {
                         color: arrowArea.containsMouse ? Theme.surfaceText : Theme.surfaceVariantText
                     }
 
-                    DankIcon {
+                    DCommon.DIcon {
                         anchors.verticalCenter: parent.verticalCenter
                         name: "expand_more"
                         size: 16
@@ -185,7 +186,7 @@ PluginComponent {
                                     fillMode: Image.PreserveAspectFit
                                 }
 
-                                DankIcon {
+                                DCommon.DIcon {
                                     anchors.centerIn: parent
                                     visible: appIcon.status !== Image.Ready
                                     name: "web_asset"
