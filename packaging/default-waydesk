@@ -24,7 +24,8 @@ WAYDESK_SESSION_ARGS=
 #WAYDESK_HELPER_ARGS=--require-group waydesk-users
 
 # Memory: a session costs about 0.5 GB for the desktop itself (see the README, "Sizing"), most of it the shell (DankMaterialShell).
-# 1 makes the shell use Qt's software renderer: about 170 MB less per session, but square corners and some blank previews.
+# 1 makes the shell use Qt's software renderer: about 110 MB less per session (249 MB against 360 MB resident, DMS 2.0). Elements cannot be
+# rounded or shaded then, so new accounts start with square corners; some previews stay blank.
 #WAYDESK_DMS_SOFTWARE=1
 
 # A new session is refused when the machine cannot take one more (the account's running session is never refused: it reconnects).

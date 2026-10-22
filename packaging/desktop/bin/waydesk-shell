@@ -30,6 +30,26 @@ dms_settings="$dms_dir/settings.json"
 if [ ! -e "$dms_settings" ]; then
     mkdir -p "$dms_dir" && printf '%s\n' '{"animationSpeed":0,"syncComponentAnimationSpeeds":true,"popoutAnimationSpeed":0,"modalAnimationSpeed":0,"notificationAnimationSpeed":0}' > "$dms_settings"
 fi
+# The low-memory mode (WAYDESK_DMS_SOFTWARE=1, below) draws without the GPU effects that round and shade the shell's elements, which
+# leaves square halos behind rounded ones. Square corners everywhere look right in it: set once, on the account's first start in this
+# mode, and only when the account has no corner setting of its own (it can change it in the shell's settings afterwards).
+if [ "${WAYDESK_DMS_SOFTWARE:-}" = 1 ] && [ ! -e "$dms_dir/.square-corners" ] && command -v python3 >/dev/null 2>&1; then
+    python3 - "$dms_settings" <<'PY' && touch "$dms_dir/.square-corners"
+import json, os, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        settings = json.load(f)
+except (OSError, ValueError):
+    settings = {}
+settings.setdefault("radiusMode", "fixed")
+settings.setdefault("fixedRadius", 0)
+tmp = path + ".tmp"
+with open(tmp, "w") as f:
+    json.dump(settings, f, indent=2)
+os.replace(tmp, path)
+PY
+fi
 # Window buttons (minimize, maximize, close): sway's title bars have none, so a DMS bar plugin provides them. An account that
 # already has its own bar layout keeps it and can add the widget "Window Controls" in the shell's settings.
 plugins=/usr/share/waydesk/dms-plugin

@@ -144,8 +144,10 @@ video calls, office suites) cost much more per user; count on 3 users per 4 GB f
 Plan on about 0.4-0.5 GB per logged-in session for the desktop itself, plus what the programs use, plus about 1 GB
 for the system. Sessions stay until they time out (`--idle-timeout`, 8 h by default; `--end-on-disconnect` ends them when the
 client leaves), so the number that counts is the accounts logged in, not the ones connected. `WAYDESK_DMS_SOFTWARE=1` in `/etc/default/waydesk` takes about
-170 MB off each session by drawing the shell without OpenGL (the bar, the dock and the launcher look right; rounded corners in the settings window
-and some previews do not).
+110 MB off each session (the shell measured 249 MB resident against 360 MB, DMS 2.0) by drawing it without OpenGL. That mode cannot round or shade
+elements, so new accounts start with square corners in it (a flat but coherent look; an account can change that in the shell's settings), and some previews
+stay blank. The shell's own floor is high: a bare quickshell with one empty bar window is already 283 MB resident with OpenGL, so trimming the shell's
+parts can only save the part above that (see `docs/MEASUREMENTS.md`).
 
 ### Running out of memory
 

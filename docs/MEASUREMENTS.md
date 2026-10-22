@@ -159,3 +159,28 @@ Where the 396 MB went (default flags): renderers 5 processes 146 MB, browser 116
 - The first rows were measured while a fullscreen terminal from an earlier test covered the browser window (Chromium does not paint a covered window), so they
   are indicative; the default and `--disable-gpu` rows were repeated with the window visible. The low-end and process-limit flags were not repeated.
 - Not tried: `--disable-site-per-process` (fewer renderers, but it weakens the isolation between sites: not recommended), Firefox ESR.
+
+## Where the shell's memory goes, and what trimming can save (2026-10-22, dev VM, one account, DMS 2.0.0 as package waydesk-shell, 45 s after start)
+Idle `qs` (the shell), RSS / PSS / anonymous memory:
+
+| Variant | RSS | PSS | anon |
+|---|---|---|---|
+| installed shell (baseline, three runs) | 360 / 360 / 363 MB | 321-326 MB | 234-237 MB |
+| `MALLOC_ARENA_MAX=1` | 357 | 317 | 231 |
+| `LP_NUM_THREADS=1` (Mesa's software rasteriser threads) | 354 | 317 | 233 |
+| `QSG_RENDER_LOOP=basic` | 360 | 323 | 235 |
+| `GALLIUM_DRIVER=softpipe` | **530** | 495 | 415 |
+| without the desktop widget layer, its editor and menu | 353 | 316 | 228 |
+| without the lock screen | 361 | 325 | 236 |
+| without desktop widgets + MuxModal + ClipboardHistoryModal + ColorPickerModal | 338 | 303 | 215 |
+| **lean patch** (`70-lean-shell.py`: desktop widgets + clipboard history) | **341** | 306 | 217 |
+| Qt software renderer (`WAYDESK_DMS_SOFTWARE=1`) | **239** | 208 | 171 |
+| software renderer + square corners | **249** | | |
+| **floor**: bare quickshell, one 32 px bar window, no DMS | **283** | 220 | 179 |
+
+- Of the shell's 360 MB, 283 MB is the floor (Qt Quick plus Mesa's software OpenGL, with its 48 MB `libLLVM`, shared between accounts). Everything DMS adds
+  is about 77 MB; the cuts that are free of feature loss save 19 MB of it. The environment knobs change nothing (4-6 MB, noise); `softpipe` is much worse.
+- The one big lever is the renderer: the Qt software backend saves about 110 MB per account, with a flat look (rounded corners and shadows cannot be drawn: with
+  rounded corners it leaves dark square halos behind the bar's pills and the clock; a screenshot of both is why new accounts get square corners in that mode).
+- `MALLOC_ARENA_MAX`, `LP_NUM_THREADS` and the render loop were tried by restarting only `dms.service` of a running session; "PSS" counts shared library pages
+  divided among the processes that map them, so with several accounts the 48 MB `libLLVM` costs each of them less than here.

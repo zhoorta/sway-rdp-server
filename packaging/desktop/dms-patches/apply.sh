@@ -27,5 +27,6 @@ try 20-launcher-pin.py Modals/DLauncherV2/LauncherContextMenu.qml
 try 30-header-edit.py Modules/ControlCenter/Components/HeaderPane.qml
 try 40-settings-tabs.py Common/SettingsTabs.qml
 try 50-material-wallpapers.py Modules/Settings/WallpaperColorsTab.qml
+try 70-lean-shell.py DMSShell.qml
 try 60-power-menu.py Modules/PowerMenu/PowerMenuContent.qml DCommon/Session/PowerMenuView.qml
 [ "$applied" -gt 0 ]
