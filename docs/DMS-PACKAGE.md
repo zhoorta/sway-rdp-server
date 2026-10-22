@@ -57,6 +57,24 @@ Things found on the way:
   .../dms-shell/shell.qml" once and then recovered (the unit's own setting wins).
 - Debian's `quickshell`, `cava`, the Qt modules and the other helpers (`danksearch`, `dgop`, `matugen`) are still installed from where they were.
 
+## Stage 2 status (2026-10-22): trimming measured, mostly not worth cutting
+
+Measured on the dev VM (tables in `docs/MEASUREMENTS.md`, "Where the shell's memory goes"):
+- The shell is 360 MB resident when idle; a bare quickshell with one empty bar window is already **283 MB**. The renderer (Qt Quick plus Mesa's
+  software OpenGL) is the floor; everything DMS adds on top is about 77 MB.
+- Free cuts: a new patch (`70-lean-shell.py`) leaves out the desktop widget layer (settings already hidden) and the clipboard history window
+  (unavailable on sway): **-19 MB per session**, nothing lost. The lock screen is 1 MB, not worth it. MuxModal and the colour picker add a few MB
+  each and would take features away: left in.
+- Environment knobs (`MALLOC_ARENA_MAX`, `LP_NUM_THREADS`, the Qt render loop) change nothing; `GALLIUM_DRIVER=softpipe` is much worse (530 MB).
+- The big lever is the Qt software renderer (`WAYDESK_DMS_SOFTWARE=1`): **-110 MB per session**, flat look. With rounded corners it leaves square halos, so
+  `waydesk-shell` now gives new accounts square corners in that mode. End to end on a new account: whole session 355 MB, against about 520 MB
+  for a default one.
+- The 48 MB `libLLVM` is shared between accounts: a second account does not pay for it again.
+
+So the realistic shell budget is about 340 MB (default) or about 230 MB (low-memory mode). Going below needs a shell that does not use OpenGL
+at all (a different shell, not a trimmed DMS). Not done: patch 70 is in the repository but the `waydesk-shell` `.deb` has not been rebuilt with it (the
+network was too slow); it was applied in place on the VM for the test above.
+
 ## Runtime patches that would move into the build
 
 `waydesk-shell` makes a per-account copy of the shell (`~/.cache/waydesk/dms-shell`, a tree of symlinks to `/usr/share/quickshell/dms` in which
