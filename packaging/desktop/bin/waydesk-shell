@@ -549,6 +549,9 @@ fi
 # reading dconf, so Flatpak apps never saw the dark preference. This session has the bus, so drop it.
 [ -z "${GSETTINGS_BACKEND:-}" ] && systemctl --user unset-environment GSETTINGS_BACKEND 2>/dev/null
 dbus-update-activation-environment --systemd --all 2>/dev/null
+# When the last session ended, the shell was restarted over and over (there was no display) until systemd gave up, and a unit that
+# gave up is not started again: clear that, or the next login has no bar.
+systemctl --user reset-failed dms.service 2>/dev/null
 if command -v dms >/dev/null 2>&1 && systemctl --user start sway-session.target 2>/dev/null; then
     exit 0
 fi
