@@ -7,7 +7,8 @@
 # Environment:
 #   WAYDESK_REPO_KEY      id of the signing key (required). WAYDESK_GNUPGHOME: its keyring (default ~/.gnupg).
 #   WAYDESK_REPO_SUITE    suite and codename of the repository (default trixie: the packages are built for Debian 13).
-# Layout of OUTDIR (serve it as it is, any static web server): pool/main/*.deb, dists/<suite>/main/binary-<arch>/Packages{,.gz,.xz},
+# Order: make-key.sh, build-repo-package.sh with the public key, then this, then publish.sh. Layout of OUTDIR (serve it as it is, any static web
+# server): waydesk-repo.deb, pool/main/*.deb, dists/<suite>/main/binary-<arch>/Packages{,.gz,.xz},
 # dists/<suite>/{Release,InRelease,Release.gpg}, waydesk-archive-keyring.gpg (the public key, binary).
 # Only the newest version of each package and architecture goes in.
 set -eu
@@ -42,6 +43,8 @@ while read pkg arch ver file; do
 done < /tmp/all.txt
 pick
 cd /out
+# the repository package also goes at the top, where the install instructions download it
+ls pool/main/waydesk-repo_*_all.deb >/dev/null 2>&1 && cp "$(ls pool/main/waydesk-repo_*_all.deb | tail -1)" /out/waydesk-repo.deb
 for arch in arm64 amd64; do
     d=dists/'"$SUITE"'/main/binary-$arch
     mkdir -p $d

@@ -48,8 +48,18 @@ write_files:
 - **The key is yours and stays with you.** `packaging/repo/make-key.sh` makes it (ed25519, signing only, 3 years, passphrase asked by gpg, a revocation certificate
   moved out of the key directory: keep that on a USB stick, offline). Nothing in this repository ever holds the real private key; the keys used in the tests
   were throwaway keys in `/tmp`.
-- Publishing: `WAYDESK_REPO_KEY=<fingerprint> WAYDESK_GNUPGHOME=<dir> packaging/repo/make-repo.sh OUTDIR`, then upload OUTDIR to the host.
-  `packaging/repo/build-repo-package.sh waydesk-archive-keyring.gpg` makes `waydesk-repo_1.0_all.deb`; publish it as `https://waydesk.stackcare.pt/apt/waydesk-repo.deb`.
+- The server (done 2026-10-22): the cPanel host `cp16.webcloud.pt` (ssh alias `focinhos`). `waydesk.stackcare.pt` is a cPanel subdomain whose document root is the same as
+  `stackcare.pt`'s, `~/stackcare.pt/public`; the Laravel app tells the hosts apart. The packages are **outside the app**, in `~/waydesk-apt`, and `~/stackcare.pt/public/apt` is a symlink to it
+  (ignored by git, so deploys leave it alone). Checked live: DNS, a valid Let's Encrypt certificate, the page in draft mode, http redirecting to https, the subdomain's own robots.txt,
+  directory listing off, files served through the link. The same files are also reachable at `https://stackcare.pt/apt/` (shared document root): harmless, but a rewrite that returns 404
+  for `/apt` on the main host would keep one URL.
+- Publishing, in this order (the key stays with you):
+  1. `packaging/repo/make-key.sh` (once), then `packaging/repo/build-repo-package.sh ~/.../waydesk-archive-keyring.gpg` (makes `waydesk-repo_1.0_all.deb` in `packaging/out`);
+  2. `WAYDESK_REPO_KEY=<fingerprint> WAYDESK_GNUPGHOME=<dir> packaging/repo/make-repo.sh OUTDIR` (it also puts `waydesk-repo.deb` at the top);
+  3. `packaging/repo/publish.sh OUTDIR` is a dry run; `packaging/repo/publish.sh OUTDIR --really --key <fingerprint>` publishes. It refuses unless `InRelease` verifies with the keyring, the
+     `waydesk-repo` package carries the same key, and you typed that key's fingerprint (so a test key cannot go out by accident; tested, with a throwaway key and a mismatching package).
+     It uses `tar` over ssh because the server has no rsync: new packages first, then the index files one by one with the signed ones last, then removes packages that are no longer named.
+  4. Set `WAYDESK_KEY_FINGERPRINT` in `~/stackcare.pt/.env` on the server and run `php artisan config:cache` there: the page leaves draft mode.
 - A server joins with: `curl -fsSLO https://waydesk.stackcare.pt/apt/waydesk-repo.deb && sudo apt install ./waydesk-repo.deb && sudo apt update`. The fingerprint of the key
   is published on the same site; check it before trusting (the first install cannot be verified by the repository itself).
 - Tested with a throwaway key: signed repository accepted; tampered index, missing signature and a signature by another key all refused; the pin makes our
