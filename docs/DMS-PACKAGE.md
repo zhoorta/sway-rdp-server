@@ -79,9 +79,15 @@ network was too slow); it was applied in place on the VM for the test above.
 
 **Helpers.** None of `danksearch`, `dgop`, `matugen` runs while a session is idle (no process in any account); DMS calls `dsearch`, `dgop` and `matugen` on
 demand. Upstream has `v2.0.0` for `danksearch` and `dgop` (we ran 1.6.0 and 1.6.2) and `v4.2.0` for `matugen` (we ran 4.0.0).
-`packaging/dms/build-helpers.sh` builds all three from those tags in a Debian 13 container (Go 1.27.3 pinned and checksummed; Rust from Debian with
+`packaging/dms/build-helpers.sh` (built and tested on the dev VM, see below) builds all three from those tags in a Debian 13 container (Go 1.27.3 pinned and checksummed; Rust from Debian with
 `cargo build --locked`) and packs them under the **same package names** with the version `<upstream>+waydesk1`, so they replace the OBS packages
 by version and need no change in the `Depends` of `waydesk-shell`. Licences: `danksearch` and `dgop` MIT; `matugen` GPL-2.0-or-later.
+
+Built and tested (arm64): `danksearch` 2.0.0, `dgop` 2.0.0 and `matugen` 4.2.0 replaced the OBS 1.6.0 / 1.6.2 / 4.0.0 with a plain `apt install`, all three run, and a
+restarted shell connected with `dgop`, ran the theming through `matugen` ("worker completed successfully"), loaded all four plugins and logged no errors about them.
+`matugen` needs rustc 1.88 (Debian 13 has 1.85), so the script installs a pinned Rust 1.90.0 with `rustup-init`, checked against its published sha256 (the first
+attempt with Debian's compiler failed on the `image` crate). The new `matugen` is 11.7 MB against 5.4 MB: upstream's default features (`jxl-image`, `dump-json`),
+which the OBS build probably left out. It links only `libc` and `libgcc`, no X11.
 
 **Repository.** `packaging/repo/make-repo.sh OUTDIR` makes a signed apt repository from `packaging/out` (newest version of each package and
 architecture; `Packages` gz/xz; `Release` with SHA-256 hashes; `InRelease` and `Release.gpg`; the public key as `waydesk-archive-keyring.gpg`).
