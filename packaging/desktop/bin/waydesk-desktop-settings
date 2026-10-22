@@ -1,4 +1,4 @@
 #!/bin/sh
-# "Desktop" in the launcher: the shell's own wallpaper settings. The file manager's desktop dialog (pcmanfm-qt) is the fallback for
+# "Settings" in the launcher: the shell's own settings (the gear in the bar). The file manager's desktop dialog (pcmanfm-qt) is the fallback for
 # when the shell is not running.
-dms ipc call settings openWith wallpaper >/dev/null 2>&1 || exec pcmanfm-qt --desktop-pref=general
+dms ipc call settings open >/dev/null 2>&1 || exec pcmanfm-qt --desktop-pref=general

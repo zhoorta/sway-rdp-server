@@ -271,11 +271,11 @@ if [ -e /usr/share/applications/pcmanfm-qt.desktop ] && { [ ! -e "$fm_entry" ] |
     mkdir -p "$apps_dir"
     { echo '# waydesk: the name is File Manager'; sed -e '/^Name\[/d' -e 's/^Name=.*/Name=File Manager/' -e 's/^Icon=.*/Icon=waydesk-file-manager/' /usr/share/applications/pcmanfm-qt.desktop; } > "$fm_entry.new" && mv "$fm_entry.new" "$fm_entry"
 fi
-# "Desktop" in the launcher opens the shell's wallpaper settings, not the file manager's desktop dialog (same rule: our first line).
+# "Settings" in the launcher opens the shell's settings (the same as the gear in the bar), not the file manager's desktop dialog (same rule: our first line).
 desktop_entry="$apps_dir/pcmanfm-qt-desktop-pref.desktop"
 if [ ! -e "$desktop_entry" ] || grep -q '^# waydesk:' "$desktop_entry"; then
     mkdir -p "$apps_dir"
-    printf '# waydesk: opens the wallpaper settings of the shell\n[Desktop Entry]\nType=Application\nName=Desktop\nGenericName=Desktop Settings\nComment=Wallpaper and look of the desktop\nExec=waydesk-desktop-settings\nIcon=user-desktop\nCategories=Settings;\nStartupNotify=true\n' > "$desktop_entry"
+    printf '# waydesk: opens the settings of the shell\n[Desktop Entry]\nType=Application\nName=Settings\nGenericName=Desktop Settings\nComment=Wallpaper, look and behaviour of the desktop\nExec=waydesk-desktop-settings\nIcon=waydesk-settings\nCategories=Settings;\nStartupNotify=true\n' > "$desktop_entry"
 fi
 # Users & Access and the Task Manager are for administrators (the group sudo, which is who polkit asks for a password): the others do
 # not see them in the launcher. Looked up in the account database, so a change shows at the next start of the shell.
@@ -469,6 +469,60 @@ if "visible: root.materialWallpaper\n" not in text:
 os.remove(dst)
 with open(dst, "w") as f:
     f.write(text.replace("visible: root.materialWallpaper\n", "visible: false\n"))
+PY
+    fi
+    # The power menu: the custom button ("Change password") acts at once, without the hold to confirm (it is harmless), and sits in
+    # a group of its own below "Log out", with a line between the two.
+    menu=Modules/PowerMenu/PowerMenuContent.qml
+    view=DCommon/Session/PowerMenuView.qml
+    if [ -f "$dms_src/$menu" ] && [ -f "$dms_src/$view" ]; then
+        python3 - "$dms_src/$menu" "$dms_copy/$menu" "$dms_src/$view" "$dms_copy/$view" <<'PY' && patched=1
+import os, sys
+menu_src, menu_dst, view_src, view_dst = sys.argv[1:]
+menu = open(menu_src).read()
+view = open(view_src).read()
+confirm = 'return action !== "lock" && action !== "restart";'
+first = "firstInGroup: root.gridLayout || index === 0\n"
+last = "lastInGroup: root.gridLayout || index === root.actions.length - 1\n"
+anchor = "                focusPolicy: Qt.NoFocus\n"
+if confirm not in menu or first not in view or last not in view or anchor not in view:
+    sys.exit(1)
+menu = menu.replace(confirm, 'return action !== "lock" && action !== "restart" && !String(action).startsWith("custom:");', 1)
+is_custom = 'modelData.startsWith("custom:")'
+view = view.replace(first, "firstInGroup: root.gridLayout || index === 0 || (" + is_custom + " && !root.actions[index - 1].startsWith(\"custom:\"))\n", 1)
+view = view.replace(last, "lastInGroup: root.gridLayout || index === root.actions.length - 1 || (index + 1 < root.actions.length && root.actions[index + 1].startsWith(\"custom:\") && !" + is_custom + ")\n", 1)
+line = anchor + """                // The "Change password" group sits a little lower, with a line in the space between it and "Log out".
+                transform: Translate { y: !root.gridLayout && button.modelData.startsWith("custom:") ? root.groupGap : 0 }
+"""
+view = view.replace(anchor, line, 1)
+rule = """    // The line between "Log out" and the custom group (in the menu itself: the list items clip what they draw outside themselves).
+    Rectangle {
+        readonly property int first: root.actions.findIndex(a => a.startsWith("custom:"))
+        visible: root.groupGap > 0 && first > 0
+        x: Style.spacingL + Style.spacingM
+        y: Style.spacingL + first * (Style.listItemHeight + root.itemGap) + (root.groupGap - root.itemGap) / 2 - 0.5
+        width: root.width - (Style.spacingL + Style.spacingM) * 2
+        height: 1
+        color: Style.withAlpha(Style.outline, 0.4)
+    }
+
+"""
+grid = "    Grid {\n        id: buttons\n"
+if grid not in view:
+    sys.exit(1)
+view = view.replace(grid, rule + grid, 1)
+gap = "    readonly property real itemGap:"
+height = "    implicitHeight: buttons.implicitHeight + Style.spacingL * 2 + (showHint"
+margin = "        anchors.topMargin: Style.spacingM\n        anchors.horizontalCenter"
+if gap not in view or height not in view or margin not in view:
+    sys.exit(1)
+view = view.replace(gap, "    readonly property real groupGap: !gridLayout && actions.some(a => a.startsWith(\"custom:\")) ? Style.spacingM : 0\n" + gap, 1)
+view = view.replace(height, "    implicitHeight: buttons.implicitHeight + groupGap + Style.spacingL * 2 + (showHint", 1)
+view = view.replace(margin, "        anchors.topMargin: Style.spacingM + root.groupGap\n        anchors.horizontalCenter", 1)
+for dst, text in ((menu_dst, menu), (view_dst, view)):
+    os.remove(dst)
+    with open(dst, "w") as f:
+        f.write(text)
 PY
     fi
     if [ "$patched" = 1 ]; then
