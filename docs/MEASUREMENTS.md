@@ -141,3 +141,21 @@ conversion, H.264) was profiled with `perf record -F 999 -g` while a full-screen
 - Not done: the same comparison on the CAX11 itself (the server was deleted before this), the picture quality of camera mode on text (not looked at), a switch
   that picks the mode by itself when the CPU is short.
 - Trap while measuring: logging in again right after `loginctl terminate-user` can time out on `user@UID.service` (90 s); wait until the old user manager has stopped.
+
+## Chromium memory flags (2026-10-22, dev VM, one account, fresh profile, Wikipedia + Hacker News + debian.org, PSS 75 s after start)
+Where the 396 MB went (default flags): renderers 5 processes 146 MB, browser 116 MB, GPU process 60 MB, utility 36 MB, zygotes 26 MB.
+
+| Flags | Processes | PSS |
+|---|---|---|
+| none (default) | 14 | 396 MB, 399 MB (two runs) |
+| `--enable-low-end-device-mode` | 13 | 384 MB (window hidden, see below) |
+| `--enable-low-end-device-mode --renderer-process-limit=2` | 13 | 396 MB (window hidden) |
+| `--in-process-gpu` | 13 | 401 MB (window hidden) |
+| **`--disable-gpu`** | 15 | **357 MB, 363 MB (two runs)** |
+
+- Only `--disable-gpu` helps: about 38 MB (10 %) per account that browses. On an animated page (canvas plus a CSS animation) Chromium used 16 % of a core
+  and the encoder 14-16 % with or without it, and a screenshot of the session shows the same picture. The hosts have no GPU (headless sway), so the GPU process
+  only did software rendering. It is shipped as `/etc/chromium.d/waydesk` (a conffile of `waydesk-desktop`), which Debian's wrapper reads on every start.
+- The first rows were measured while a fullscreen terminal from an earlier test covered the browser window (Chromium does not paint a covered window), so they
+  are indicative; the default and `--disable-gpu` rows were repeated with the window visible. The low-end and process-limit flags were not repeated.
+- Not tried: `--disable-site-per-process` (fewer renderers, but it weakens the isolation between sites: not recommended), Firefox ESR.

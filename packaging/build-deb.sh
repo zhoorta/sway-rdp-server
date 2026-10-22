@@ -45,6 +45,7 @@ mkdir -p $D/usr/share/icons/hicolor/scalable/apps && install -m 644 packaging/de
 # Chromium and Firefox use the title bar of sway (window buttons), Chromium is the default browser
 mkdir -p $D/etc/chromium $D/usr/lib/firefox-esr/defaults/pref $D/etc/xdg
 install -m 644 packaging/desktop/browsers/chromium-initial_preferences $D/etc/chromium/initial_preferences
+mkdir -p $D/etc/chromium.d && install -m 644 packaging/desktop/browsers/chromium-waydesk-flags $D/etc/chromium.d/waydesk
 install -m 644 packaging/desktop/browsers/firefox-waydesk.js $D/usr/lib/firefox-esr/defaults/pref/waydesk.js
 install -m 644 packaging/desktop/browsers/sway-mimeapps.list $D/etc/xdg/sway-mimeapps.list
 install -m 644 packaging/desktop/environment.d/*.conf $D/usr/lib/environment.d/
@@ -61,7 +62,7 @@ mkdir -p $D/usr/share/waydesk/dms-plugin && cp -r packaging/desktop/dms-plugin/.
 install -m 644 packaging/desktop/systemd-user/sway-session.target $D/usr/lib/systemd/user/sway-session.target
 ln -s ../dms.service $D/usr/lib/systemd/user/sway-session.target.wants/dms.service
 cat LICENSE-MIT > $D/usr/share/doc/waydesk-desktop/copyright
-echo /etc/xdg/waydesk/sway.conf > $D/DEBIAN/conffiles
+printf "/etc/xdg/waydesk/sway.conf\n/etc/chromium.d/waydesk\n" > $D/DEBIAN/conffiles
 sed -e "s/@VERSION@/$VERSION/g" packaging/debian/control-desktop > $D/DEBIAN/control
 echo "Installed-Size: $(du -sk $D | cut -f1)" >> $D/DEBIAN/control
 dpkg-deb --root-owner-group -Zxz -b $D /src/packaging/out/ >/dev/null
