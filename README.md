@@ -35,6 +35,13 @@ account replaces the first, only after logging in. Sessions end after 8 hours wi
 when the account quits its sway. Accounts cannot reach each other's sockets. The self-signed certificate is made at
 install time and its fingerprint is printed.
 
+**The server works on its own.** `waydesk-server` needs only sway, foot, PAM, openssl, systemd and `libopenh264`; it does not need
+`waydesk-desktop`. Installed alone you get the RDP login with the account's password, persistent per-account sessions, the memory
+protection (admission check, per-account caps, zram) and `waydesk-admin`; the session itself is plain sway: the account's `~/.config/waydesk/config` if it has one, otherwise sway's usual lookup
+(`~/.config/sway/config`, then `/etc/sway/config`). Install `waydesk-desktop` (or `waydesk`, which pulls in both)
+only if you want the Windows-like desktop below. Only Debian 13 (arm64 and amd64) is tested; other distros, Debian-based ones
+included, have not been tried, and the packages are `.deb` only.
+
 `waydesk-desktop` (second package, same build) makes those sessions a Windows-like desktop: a system sway config
 (`/etc/xdg/waydesk/sway.conf`: floating windows with title bars, Alt+Tab, Alt+F4, `Super+d` launcher, screenshots;
 an account's `~/.config/waydesk/config` replaces it), the glue that starts [DankMaterialShell](https://duxlabs.dev)
