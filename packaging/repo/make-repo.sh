@@ -45,7 +45,8 @@ pick
 cd /out
 # the repository package also goes at the top, where the install instructions download it
 ls pool/main/waydesk-repo_*_all.deb >/dev/null 2>&1 && cp "$(ls pool/main/waydesk-repo_*_all.deb | tail -1)" /out/waydesk-repo.deb
-for arch in arm64 amd64; do
+# only the architectures that have packages of their own ("all" packages do not make an architecture)
+for arch in $(ls pool/main | sed -n "s/.*_\\([a-z0-9-]*\\)\\.deb\$/\\1/p" | grep -v "^all\$" | sort -u); do
     d=dists/'"$SUITE"'/main/binary-$arch
     mkdir -p $d
     # packages of this architecture and the architecture-independent ones
@@ -69,7 +70,7 @@ for root, _, names in os.walk(base):
 lines = [
     "Origin: Waydesk", "Label: Waydesk", "Suite: " + suite, "Codename: " + suite,
     "Date: " + time.strftime("%a, %d %b %Y %H:%M:%S UTC", time.gmtime()),
-    "Architectures: arm64 amd64", "Components: main",
+    "Architectures: " + " ".join(sorted(d.replace("binary-", "") for d in os.listdir(os.path.join(base, "main")) if d.startswith("binary-"))), "Components: main",
     "Description: Waydesk packages (server, desktop, shell and helpers)",
     "SHA256:",
 ]

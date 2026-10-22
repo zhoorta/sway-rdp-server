@@ -9,7 +9,7 @@
 # accident. REPO-DIR is the OUTDIR of make-repo.sh; put waydesk-repo.deb in it
 # first (packaging/repo/build-repo-package.sh makes it) and check that waydesk-archive-keyring.gpg is the key you mean to publish.
 # Environment: WAYDESK_PUBLISH_HOST (ssh host, default focinhos), WAYDESK_PUBLISH_DIR (default waydesk-apt, relative to the home directory).
-# The server has tar but no rsync, so this uses tar over ssh.
+# The server has tar but no rsync, so this uses tar over ssh (COPYFILE_DISABLE: macOS tar would otherwise add ._* metadata files to the upload).
 #
 # Order, for servers that update while this runs: 1. packages that are not on the server yet (and the key and waydesk-repo.deb); 2. the index
 # files, one by one, each replaced atomically with the signature files (Release, InRelease, Release.gpg) last; 3. packages that the new indexes
@@ -57,10 +57,10 @@ fi
 
 # 1. packages, the key and the repository package
 { cat "$tmp/upload.txt"; for f in waydesk-archive-keyring.gpg waydesk-repo.deb; do [ -f "$SRC/$f" ] && echo "$f"; done; } > "$tmp/first.txt"
-if [ -s "$tmp/first.txt" ]; then tar -C "$SRC" -cf - -T "$tmp/first.txt" | ssh "$HOST" "cd '$DIR' && tar -xf - && find pool -type d -exec chmod 755 {} + && find pool -type f -exec chmod 644 {} +; chmod 644 waydesk-* 2>/dev/null; true"; fi
+if [ -s "$tmp/first.txt" ]; then COPYFILE_DISABLE=1 tar --exclude="._*" --exclude=.DS_Store -C "$SRC" -cf - -T "$tmp/first.txt" | ssh "$HOST" "cd '$DIR' && tar -xf - && find pool -type d -exec chmod 755 {} + && find pool -type f -exec chmod 644 {} +; chmod 644 waydesk-* 2>/dev/null; true"; fi
 # 2. the indexes: unpack next to the real ones, then move each into place; the signed files last
 ssh "$HOST" "cd '$DIR' && rm -rf .incoming && mkdir .incoming"
-tar -C "$SRC" -cf - dists | ssh "$HOST" "cd '$DIR/.incoming' && tar -xf -"
+COPYFILE_DISABLE=1 tar --exclude="._*" --exclude=.DS_Store -C "$SRC" -cf - dists | ssh "$HOST" "cd '$DIR/.incoming' && tar -xf -"
 ssh "$HOST" "cd '$DIR/.incoming' && find dists -type d -exec chmod 755 {} + && find dists -type f -exec chmod 644 {} + && cd '$DIR' 2>/dev/null || cd ~/'$DIR'
 cd ~/'$DIR' && find .incoming/dists -type d | sed 's|^.incoming/||' | while read -r d; do mkdir -p \"\$d\"; done
 for pass in index signed; do
@@ -70,8 +70,10 @@ for pass in index signed; do
   done
 done
 rm -rf .incoming
-# indexes of architectures or suites that are not in the new repository any more
-find dists -type f | while read -r f; do :; done"
+true"
+# index files that the new repository does not have any more (an architecture that was dropped): everything under dists/ that is not in the new set
+(cd "$SRC" && find dists -type f | sort) > "$tmp/dists-wanted.txt"
+ssh "$HOST" "cd ~/'$DIR' && find dists -type f | sort > .dists-have && comm -23 .dists-have - | xargs -r rm -f -- ; rm -f .dists-have; find dists -type d -empty -delete" < "$tmp/dists-wanted.txt"
 # 3. packages the new indexes no longer name
 if [ -s "$tmp/delete.txt" ]; then ssh "$HOST" "cd ~/'$DIR' && xargs rm -f --" < "$tmp/delete.txt"; fi
 echo "published. Check: curl -s https://waydesk.stackcare.pt/apt/dists/trixie/InRelease | head -3"
