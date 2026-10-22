@@ -15,7 +15,8 @@ RUST_VERSION=1.90.0
 case "$ARCH" in
     arm64) GO_SHA256=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49
            RUSTUP_TRIPLE=aarch64-unknown-linux-gnu; RUSTUP_SHA256=a9c168dbea81a84671c6b7a5c1795cb0eb699020110d107ddfca427bd797e697 ;;
-    amd64) echo "amd64: put the sha256 of go$GO_VERSION.linux-amd64.tar.gz from https://go.dev/dl/ here first" >&2; exit 1 ;;
+    amd64) GO_SHA256=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40
+           RUSTUP_TRIPLE=x86_64-unknown-linux-gnu; RUSTUP_SHA256=5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4 ;;
     *) echo "arm64 or amd64" >&2; exit 1 ;;
 esac
 DANKSEARCH_TAG=v2.0.0

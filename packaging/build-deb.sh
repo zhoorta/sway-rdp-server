@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")/.."
 ARCH=${1:-arm64}
-VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)~$(date +%Y%m%d%H%M).git$(git rev-parse --short HEAD 2>/dev/null || echo local)"
+VERSION="${WAYDESK_VERSION:-$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)~$(date +%Y%m%d%H%M).git$(git rev-parse --short HEAD 2>/dev/null || echo local)}"
 mkdir -p packaging/out
 docker build --platform linux/$ARCH -t waydesk-build-$ARCH -f packaging/Dockerfile.build packaging
 docker run --rm --platform linux/$ARCH -v "$PWD:/src" -v waydesk-cargo:/opt/cargo/registry -e CARGO_TARGET_DIR=/tmp/target \

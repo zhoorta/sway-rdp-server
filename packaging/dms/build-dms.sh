@@ -13,7 +13,7 @@ DMS_TAG=v2.0.0
 GO_VERSION=1.27.3   # go.mod of DMS 2.0.0 asks for 1.27.1 or newer; Debian 13 has 1.24
 case "$ARCH" in
     arm64) GO_SHA256=a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49 ;;
-    amd64) echo "amd64: put the sha256 of go$GO_VERSION.linux-amd64.tar.gz from https://go.dev/dl/ here first" >&2; exit 1 ;;
+    amd64) GO_SHA256=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40 ;;
     *) echo "arm64 or amd64" >&2; exit 1 ;;
 esac
 cd "$(dirname "$0")/../.."
