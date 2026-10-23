@@ -30,7 +30,8 @@ set -eu
 cd /in
 for f in *.deb; do
     # read the whole archive: the control data is at the start, so a file that is still being copied (or was cut short) looks fine without this
-    dpkg-deb -c "$f" >/dev/null 2>&1 || { echo "make-repo.sh: $f is not a complete .deb (still being copied?): nothing was published" >&2; exit 1; }
+    # (dpkg-deb tolerates an ar member whose declared size is wrong, as when two builds write the same file; `ar` and apt do not: 2026-10-23)
+    dpkg-deb -c "$f" >/dev/null 2>&1 && ar t "$f" >/dev/null 2>&1 || { echo "make-repo.sh: $f is not a valid, complete .deb (still being copied? written by two builds at once?): nothing was made" >&2; exit 1; }
     printf "%s %s %s %s\n" "$(dpkg-deb -f "$f" Package)" "$(dpkg-deb -f "$f" Architecture)" "$(dpkg-deb -f "$f" Version)" "$f"
 done | sort -k1,1 -k2,2 > /tmp/all.txt
 TAGS=""; for e in $SUITES; do TAGS="$TAGS ${e##*:}"; done
