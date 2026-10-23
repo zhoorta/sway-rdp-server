@@ -28,12 +28,12 @@ while [ $# -gt 0 ]; do
     esac
 done
 SRC=$(cd "$SRC" && pwd)
-[ -f "$SRC/dists/trixie/InRelease" ] && [ -d "$SRC/pool" ] || { echo "publish.sh: $SRC does not look like a repository from make-repo.sh" >&2; exit 1; }
+ls "$SRC"/dists/*/InRelease >/dev/null 2>&1 && [ -d "$SRC/pool" ] || { echo "publish.sh: $SRC does not look like a repository from make-repo.sh" >&2; exit 1; }
 [ -f "$SRC/waydesk-repo.deb" ] || echo "note: $SRC/waydesk-repo.deb is missing (the install instructions on the page need it)" >&2
 fp=$(gpg --show-keys --with-colons "$SRC/waydesk-archive-keyring.gpg" 2>/dev/null | awk -F: '/^fpr/ {print $10; exit}')
 echo "key in this repository: ${fp:-unknown}"
 # The repository must verify with the key it ships, and the repository package must carry that key too.
-gpgv --keyring "$SRC/waydesk-archive-keyring.gpg" "$SRC/dists/trixie/InRelease" >/dev/null 2>&1 || { echo "publish.sh: InRelease does not verify with waydesk-archive-keyring.gpg: refusing" >&2; exit 1; }
+for rel in "$SRC"/dists/*/InRelease; do gpgv --keyring "$SRC/waydesk-archive-keyring.gpg" "$rel" >/dev/null 2>&1 || { echo "publish.sh: InRelease does not verify with waydesk-archive-keyring.gpg: refusing" >&2; exit 1; }; done
 if [ -f "$SRC/waydesk-repo.deb" ]; then
     pkgfp=$(tar -xOf "$SRC/waydesk-repo.deb" data.tar.xz 2>/dev/null | tar -xOf - ./usr/share/keyrings/waydesk-archive-keyring.gpg 2>/dev/null | gpg --show-keys --with-colons 2>/dev/null | awk -F: '/^fpr/ {print $10; exit}')
     [ "$pkgfp" = "$fp" ] || { echo "publish.sh: waydesk-repo.deb carries key ${pkgfp:-unreadable}, not $fp: rebuild it with build-repo-package.sh" >&2; exit 1; }
@@ -97,4 +97,4 @@ echo "checking every package at $BASE ..."
 done > "$tmp/httpbad.txt"
 if [ -s "$tmp/httpbad.txt" ]; then cat "$tmp/httpbad.txt" >&2; echo "publish.sh: the packages above are not served: clients cannot install them (run publish.sh again)" >&2; exit 1; fi
 echo "all $(wc -l < "$tmp/local.txt" | tr -d ' ') packages answer 200"
-echo "published. Check: curl -s https://waydesk.stackcare.pt/apt/dists/trixie/InRelease | head -3"
+echo "published. Check: curl -s $BASE/dists/<suite>/InRelease | head -3   (suites: $(ls "$SRC/dists" | tr "\n" " "))"

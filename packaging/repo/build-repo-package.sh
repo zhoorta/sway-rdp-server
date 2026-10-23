@@ -9,7 +9,7 @@
 set -eu
 KEY=${1:?usage: build-repo-package.sh PUBLIC-KEY.gpg [REPO-URL]}
 URL=${2:-https://waydesk.stackcare.pt/apt}
-VERSION=${WAYDESK_REPO_PACKAGE_VERSION:-1.0}
+VERSION=${WAYDESK_REPO_PACKAGE_VERSION:-1.1}
 cd "$(dirname "$0")/../.."
 OUT="$PWD/packaging/out"
 mkdir -p "$OUT"
@@ -17,13 +17,42 @@ KEY=$(cd "$(dirname "$KEY")" && pwd)/$(basename "$KEY")
 docker run --rm -v "$PWD/packaging/repo:/repo:ro" -v "$KEY:/key.gpg:ro" -v "$OUT:/out" -e URL="$URL" -e VERSION="$VERSION" waydesk-build-arm64 sh -c '
 set -eu
 P=/tmp/pkg; rm -rf $P
-mkdir -p $P/DEBIAN $P/usr/share/keyrings $P/etc/apt/sources.list.d $P/etc/apt/preferences.d $P/usr/share/doc/waydesk-repo
+mkdir -p $P/DEBIAN $P/usr/share/keyrings $P/usr/share/waydesk-repo $P/etc/apt/preferences.d $P/usr/share/doc/waydesk-repo
 install -m 644 /key.gpg $P/usr/share/keyrings/waydesk-archive-keyring.gpg
-sed "s|https://waydesk.stackcare.pt/apt|$URL|; /^#/d" /repo/waydesk.sources.in > $P/etc/apt/sources.list.d/waydesk.sources
-chmod 644 $P/etc/apt/sources.list.d/waydesk.sources
+# the apt source depends on the system (Debian 13 is trixie, Ubuntu 26.04 is resolute): a template, written out by the postinst
+sed "s|https://waydesk.stackcare.pt/apt|$URL|; /^#/d" /repo/waydesk.sources.in > $P/usr/share/waydesk-repo/waydesk.sources.in
+chmod 644 $P/usr/share/waydesk-repo/waydesk.sources.in
 sed "/^#/d" /repo/waydesk.pref > $P/etc/apt/preferences.d/waydesk; chmod 644 $P/etc/apt/preferences.d/waydesk
-printf "/etc/apt/sources.list.d/waydesk.sources\n/etc/apt/preferences.d/waydesk\n" > $P/DEBIAN/conffiles
-echo "The public key of the Waydesk repository, its apt source ($URL) and the pin that makes our builds win over third-party repositories." > $P/usr/share/doc/waydesk-repo/README
+printf "/etc/apt/preferences.d/waydesk\n" > $P/DEBIAN/conffiles
+cat > $P/DEBIAN/postinst <<"POSTINST"
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+    f=/etc/apt/sources.list.d/waydesk.sources
+    # An existing file stays (version 1.0 shipped it as a conffile, always for trixie).
+    if [ ! -e "$f" ]; then
+        suite=""
+        [ -r /etc/os-release ] && . /etc/os-release
+        case "${VERSION_CODENAME:-}" in
+            trixie|resolute) suite=$VERSION_CODENAME ;;
+            *) echo "waydesk-repo: Waydesk has no packages for ${PRETTY_NAME:-this system} (Debian 13 and Ubuntu 26.04 only): no apt source was written." >&2 ;;
+        esac
+        if [ -n "$suite" ]; then
+            sed "s/@SUITE@/$suite/" /usr/share/waydesk-repo/waydesk.sources.in > "$f"
+            chmod 644 "$f"
+        fi
+    fi
+fi
+exit 0
+POSTINST
+cat > $P/DEBIAN/postrm <<"POSTRM"
+#!/bin/sh
+set -e
+if [ "$1" = purge ]; then rm -f /etc/apt/sources.list.d/waydesk.sources; fi
+exit 0
+POSTRM
+chmod 755 $P/DEBIAN/postinst $P/DEBIAN/postrm
+echo "The public key of the Waydesk repository, its apt source ($URL, suite trixie on Debian 13 and resolute on Ubuntu 26.04, written by the postinst) and the pin that makes our builds win over third-party repositories." > $P/usr/share/doc/waydesk-repo/README
 cat > $P/DEBIAN/control <<C
 Package: waydesk-repo
 Version: $VERSION

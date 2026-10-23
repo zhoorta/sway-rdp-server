@@ -1,4 +1,4 @@
 # /etc/apt/preferences.d/waydesk: our builds win over a third-party repository that offers the same names with a newer version.
-Package: waydesk-shell dms danksearch dgop matugen
+Package: waydesk-shell waydesk-sway waydesk-quickshell dms danksearch dgop matugen
 Pin: release o=Waydesk
 Pin-Priority: 990

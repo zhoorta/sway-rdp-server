@@ -581,11 +581,18 @@ pub fn path_with_private_first(current: Option<&std::ffi::OsStr>, dir: &std::pat
     std::env::join_paths(parts).unwrap_or_else(|_| dir.as_os_str().to_owned())
 }
 
+/// The QML modules of Waydesk's copy of Quickshell (`waydesk-quickshell`); Qt reads them from `QML_IMPORT_PATH`.
+pub const PRIVATE_QML: &str = "/usr/lib/waydesk/qml";
+
 /// Called once when a session worker starts, before any thread runs sway.
 pub fn prefer_private_bin() {
     let dir = std::path::Path::new(PRIVATE_BIN);
     if dir.is_dir() {
         std::env::set_var("PATH", path_with_private_first(std::env::var_os("PATH").as_deref(), dir));
+    }
+    let qml = std::path::Path::new(PRIVATE_QML);
+    if qml.is_dir() {
+        std::env::set_var("QML_IMPORT_PATH", path_with_private_first(std::env::var_os("QML_IMPORT_PATH").as_deref(), qml));
     }
 }
 
