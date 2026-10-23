@@ -180,8 +180,8 @@ the connection" for `--max-active-users`; FreeRDP shows it, tested; other client
    not hold anybody back while the machine has room, and CPU is not capped at all (every account has the same `CPUWeight`, so a busy one gets every idle core and
    gives way only when the others want theirs). An account that needs more, a developer with VS Code and builds for example, gets it with
    `sudo waydesk-admin users limit NAME --memory 12G [--cpu-weight 200] [--swap 4G]` (`reset` goes back to the defaults), or in the Users & Access panel, **Limits…**.
-3. **Compressed swap in RAM.** `systemd-zram-generator` is recommended; Debian's file makes a zram swap of half the RAM (at most 4 GiB), and the package
-   picks zstd for it and sets `vm.swappiness=100` and `vm.page-cluster=0` (`/usr/lib/sysctl.d/50-waydesk.conf`). A short spike is absorbed by compressing idle pages instead of
+3. **Compressed swap in RAM.** `systemd-zram-generator` is a dependency; Debian's file would make a zram swap of half the RAM (at most 4 GiB), and the package
+   makes it as large as the RAM (at most 16 GiB; the idle memory of a desktop compresses about 4.5 to 1, so full it costs about a fifth of the RAM), picks zstd for it and sets `vm.swappiness=100` and `vm.page-cluster=0` (`/usr/lib/sysctl.d/50-waydesk.conf`). A short spike is absorbed by compressing idle pages instead of
    killing a browser. A disk swap behind it works too (zram has the higher priority); disk swap alone is slow for a desktop, and on network storage worse.
 4. **Look at it.** `waydesk-admin status` shows the memory, the swap, the load, whether a new session would be accepted, and for every
    account its memory, swap, CPU and the programs that hold the most memory (resident memory, so shared pages count for each process); `--json` for scripts. The same is in
