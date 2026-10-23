@@ -263,6 +263,30 @@ PY
         mkdir -p "$dms_dir" && : > "$dms_dir/.browser-frame"
     fi
 fi
+# Chromium from Flathub (what the installer gives where the distribution has no Chromium package, as on Ubuntu) keeps its settings per account under
+# ~/.var/app, out of reach of /etc/chromium: the same ones are written there once: no GPU process (see /etc/chromium.d/waydesk) and the window manager's title bar.
+flatpak_chromium="$HOME/.var/app/org.chromium.Chromium"
+if [ ! -e "$dms_dir/.flatpak-chromium" ] && { [ -d /var/lib/flatpak/app/org.chromium.Chromium ] || [ -d "$HOME/.local/share/flatpak/app/org.chromium.Chromium" ]; }; then
+    mkdir -p "$flatpak_chromium/config/chromium/Default"
+    flags="$flatpak_chromium/config/chromium-flags.conf"
+    grep -qs -- '--disable-gpu' "$flags" || printf '%s\n' '--disable-gpu' >> "$flags"
+    prefs="$flatpak_chromium/config/chromium/Default/Preferences"
+    if ! pgrep -u "$(id -u)" -f 'org.chromium.Chromium' >/dev/null 2>&1; then
+        python3 - "$prefs" <<'PY'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        prefs = json.load(f)
+except (OSError, ValueError):
+    prefs = {}
+prefs.setdefault("browser", {})["custom_chrome_frame"] = False
+with open(path, "w") as f:
+    json.dump(prefs, f, separators=(",", ":"))
+PY
+        mkdir -p "$dms_dir" && : > "$dms_dir/.flatpak-chromium"
+    fi
+fi
 # Technical entries stay out of the launcher (an account that wants one back deletes its file in ~/.local/share/applications).
 apps_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 if [ ! -e "$dms_dir/.hidden-entries" ]; then

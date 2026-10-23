@@ -71,7 +71,7 @@ Maintainer: José Mendonça <jmendonca@gmail.com>
 Section: x11
 Priority: optional
 Installed-Size: \$(du -sk \$P | cut -f1)
-Depends: quickshell | quickshell-git, accountsservice, cava, danksearch, dgop, matugen, qml6-module-qtcore, qml6-module-qtmultimedia, qml6-module-qtqml, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-dialogs, qml6-module-qtquick-effects, qml6-module-qtquick-layouts, qml6-module-qtquick-templates, qml6-module-qtquick-window, qt6ct, python3
+Depends: waydesk-quickshell | quickshell | quickshell-git, accountsservice, cava, danksearch, dgop, matugen, qml6-module-qtcore, qml6-module-qtmultimedia, qml6-module-qtqml, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-dialogs, qml6-module-qtquick-effects, qml6-module-qtquick-layouts, qml6-module-qtquick-templates, qml6-module-qtquick-window, qt6ct, python3
 Suggests: cups-pk-helper
 Provides: dms (= ${DMS_TAG#v})
 Conflicts: dms, dms-git

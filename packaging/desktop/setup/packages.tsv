@@ -7,6 +7,7 @@
 #   flatpak target = Flathub app id
 #   mise    target = tool@version, installed globally with `mise use -g`
 #   script  target = <binary-to-check>::<shell command>   (skipped if the binary exists)
+# fallback (optional, eighth field): flatpak:<Flathub app id>, used for an apt row when this system's archive does not have the package (Ubuntu: Chromium)
 # tags (comma separated): default = pre-ticked in its layer; gpu = needs a GPU to be pleasant;
 #   x86only = hidden by the wizard on arm64 machines
 # Names are not verified against trixie yet: run `./install.sh --check`.
@@ -14,7 +15,7 @@
 # --- base ---------------------------------------------------------------
 foot	base	apt	foot	foot	Terminal emulator	default
 shell	base	apt	zsh starship tmux fzf ripgrep fd-find bat eza zoxide btop jq	Shell and CLI essentials	Modern shell tools	default
-chromium	base	apt	chromium	Chromium	Web browser (the default one of the desktop)	default
+chromium	base	apt	chromium	Chromium	Web browser (the default one of the desktop)	default	flatpak:org.chromium.Chromium
 firefox	base	apt	firefox-esr	Firefox	Second web browser
 files	base	apt	thunar	Thunar	File manager	default
 office	base	apt	libreoffice libreoffice-gtk3	LibreOffice	Office suite	default

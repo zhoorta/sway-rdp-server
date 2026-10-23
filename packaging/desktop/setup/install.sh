@@ -37,12 +37,14 @@ esac
 SELECTION="$1"
 [ -r "$SELECTION" ] || { echo "Cannot read selection file: $SELECTION" >&2; exit 1; }
 
-apt_pkgs=(); flatpaks=(); mise_tools=(); scripts=(); selected=()
-while IFS=$'\t' read -r id layer method target label _; do
+apt_pkgs=(); flatpaks=(); mise_tools=(); scripts=(); selected=(); fallbacks=()
+while IFS=$'\t' read -r id layer method target label _ _ fallback; do
   if [ "$layer" != base ] && ! grep -qxF "$id" "$SELECTION"; then continue; fi
   selected+=("$id")
   case "$method" in
-    apt)     for p in $target; do apt_pkgs+=("$p"); done ;;
+    apt)     for p in $target; do apt_pkgs+=("$p"); done
+             # an apt row may name a Flathub app (flatpak:<id>) for systems whose archive does not have the package (Ubuntu has no Chromium deb)
+             case "$fallback" in flatpak:*) fallbacks+=("$target ${fallback#flatpak:}") ;; esac ;;
     flatpak) flatpaks+=("$target") ;;
     mise)    mise_tools+=("$target") ;;
     script)  scripts+=("$label	$target") ;;
@@ -56,6 +58,20 @@ apt_pkgs+=(curl ca-certificates)
 
 echo "==> apt"
 $SUDO apt-get update
+# What the archive of this system does not have goes to Flathub instead, where the row says how.
+for fb in "${fallbacks[@]}"; do
+  app=${fb##* }; pkgs=${fb% *}; missing=""
+  for p in $pkgs; do
+    apt-cache policy "$p" 2>/dev/null | awk '/Candidate:/ { found = ($2 != "(none)") } END { exit !found }' || missing=1
+  done
+  if [ -n "$missing" ]; then
+    echo "no $pkgs in this system's archive: $app from Flathub instead"
+    for p in $pkgs; do for i in "${!apt_pkgs[@]}"; do [ "${apt_pkgs[$i]}" = "$p" ] && unset 'apt_pkgs[i]'; done; done
+    apt_pkgs=("${apt_pkgs[@]}")
+    flatpaks+=("$app")
+    case " ${apt_pkgs[*]} " in *" flatpak "*) ;; *) apt_pkgs+=(flatpak) ;; esac
+  fi
+done
 $SUDO apt-get install -y --no-install-recommends "${apt_pkgs[@]}"
 
 if [ "${#flatpaks[@]}" -gt 0 ]; then
