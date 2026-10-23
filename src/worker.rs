@@ -564,3 +564,47 @@ impl Drop for OwnSway {
         let _ = self.child.wait();
     }
 }
+
+
+/// Waydesk's own copies of the compositor and of the shell's tools (sway, swaymsg, quickshell, ...) live here when the `waydesk-sway` and
+/// `waydesk-quickshell` packages are installed: the same on every distribution, so that a distribution's own (older, newer, unpatched)
+/// versions never decide what a session runs.
+pub const PRIVATE_BIN: &str = "/usr/lib/waydesk/bin";
+
+/// `PATH` with `dir` first, once: everything the session worker starts (sway, swaymsg, and through sway the applications, the scripts
+/// and the shell's user service) then finds Waydesk's copies before the distribution's.
+pub fn path_with_private_first(current: Option<&std::ffi::OsStr>, dir: &std::path::Path) -> std::ffi::OsString {
+    let mut parts: Vec<std::path::PathBuf> = vec![dir.to_path_buf()];
+    if let Some(cur) = current {
+        parts.extend(std::env::split_paths(cur).filter(|p| p != dir));
+    }
+    std::env::join_paths(parts).unwrap_or_else(|_| dir.as_os_str().to_owned())
+}
+
+/// Called once when a session worker starts, before any thread runs sway.
+pub fn prefer_private_bin() {
+    let dir = std::path::Path::new(PRIVATE_BIN);
+    if dir.is_dir() {
+        std::env::set_var("PATH", path_with_private_first(std::env::var_os("PATH").as_deref(), dir));
+    }
+}
+
+#[cfg(test)]
+mod private_bin_tests {
+    use super::*;
+    use std::ffi::OsStr;
+    use std::path::Path;
+
+    #[test]
+    fn goes_first_and_only_once() {
+        let dir = Path::new("/usr/lib/waydesk/bin");
+        let p = path_with_private_first(Some(OsStr::new("/usr/bin:/usr/lib/waydesk/bin:/bin")), dir);
+        assert_eq!(p, OsStr::new("/usr/lib/waydesk/bin:/usr/bin:/bin"));
+    }
+
+    #[test]
+    fn works_without_a_path() {
+        let dir = Path::new("/usr/lib/waydesk/bin");
+        assert_eq!(path_with_private_first(None, dir), OsStr::new("/usr/lib/waydesk/bin"));
+    }
+}

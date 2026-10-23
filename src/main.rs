@@ -543,6 +543,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     if worker {
+        worker::prefer_private_bin();
         let tuning = (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 });
         let opts = session::Options { default_layout: layout, spawn_terminal, workspace, hook };
         return worker::run(worker::Config { opts, tuning, own_sway, register, idle_timeout: std::time::Duration::from_secs(idle_timeout), end_on_disconnect }).await;
