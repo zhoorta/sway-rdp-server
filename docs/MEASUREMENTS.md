@@ -200,3 +200,36 @@ Mac idle: all the clients' video streams share one tunnel over the Mac's connect
 streaming. The server was fine (the same accounts logged in within 1.4 s from the server's own loopback). The test was redone with a short-lived `xfreerdp3` on the server itself under Xvfb, one per account:
 the session stays after the client leaves, exactly as for a user who closes the window. Use that for capacity tests, not a tunnel.
 - Not measured on x86: CPU with moving screens (video), and the frame rate.
+
+## Heavy users on the 8 GB / 4 vCPU x86 server: Chromium, LibreOffice Calc, VS Code, and the size of the zram (2026-10-23)
+Available memory is `free`'s figure in GiB (as `waydesk-admin status` prints it). Debian 13 amd64 installed from the signed repository (`waydesk-repo.deb`, key checked), then `waydesk-setup` (shell, Chromium, LibreOffice, VS Code from Flathub, git). Every account
+logs in over RDP from a short-lived `xfreerdp3` on the server (Xvfb) and then opens: Chromium with three pages (Wikipedia, BBC News, debian.org), LibreOffice Calc with a CSV of 300,000 rows by
+10 columns (23 MB), and VS Code (Flatpak) on a copy of this repository (11 MB). 70 s after the last application started, the numbers below were taken. The applications are left idle: this is an upper bound.
+
+- **One user with all of it open: about 1.85 GB** (cgroup of the account; the shell 420 MB, Chromium about 1 GB resident, VS Code about 1.1 GB resident, Calc 250-330 MB). CPU about 2 %, load 0.4.
+- **Three users: 1.1-1.4 GB each** in their cgroups, 2.4 GB available, 4-83 MB in swap, CPU 86 % idle, no memory pressure.
+
+| Users (all heavy) | Available with zram 3.8 GB (Debian's size) | Available with zram 7.6 GB (`zram-size = ram`) |
+|---|---|---|
+| 1 | 5.4 GB | 5.4 GB |
+| 2 | 3.9 GB | 3.9 GB |
+| 3 | 2.4 GB | 2.4 GB |
+| 4 | 1.8 GB | 1.6 GB |
+| 5 | 1.7 GB | 1.7 GB |
+| 6 | 1.1 GB (a new session would be refused) | 1.6 GB |
+| 7 | refused (`ERRINFO_OUT_OF_MEMORY` on the client) | 1.6 GB |
+| 8 | | 1.1 GB (1165 MB, just above the 1162 MB a new session needs) |
+| 9 | | refused |
+
+- **The zram compresses about 4.5 to 1** with zstd on this load: 3.4 GB of data in 780 MB of RAM at six users (3.8 GB device), 6.8 GB in 1.5 GB at eight users (7.6 GB device). So a device as large as the
+  RAM costs about a fifth of the RAM when it is full, and lets the kernel swap out idle anonymous pages instead of dropping the file cache. Six users fit with Debian's size, eight with the larger one:
+  the package now makes the device as large as the RAM (at most 16 GiB).
+- No out-of-memory kill in either run (kernel log), memory pressure ("some", 60 s average) between 0.4 and 2 %, and the server still answered SSH in 1.3 s with six heavy users in the first run. The refusal at the
+  last step reached the client as "the server ran out of available memory resources" (`ERRINFO_OUT_OF_MEMORY`), as designed.
+- **Zed does not run on a server without a GPU**: "Failed to create surface for any enabled backend", also with `ZED_ALLOW_EMULATED_GPU=1`. VS Code (Electron, Wayland) and Calc are fine.
+- **LibreOffice did not start at first**: without `libreoffice-gtk3` (only a Recommends of `libreoffice`, skipped on an image that does not install Recommends) `soffice` looks for an X server ("Set DISPLAY").
+  The setup manifest now installs it. The same reason made `systemd-zram-generator`, pipewire, `whiptail` and `wmenu` hard dependencies: a fresh Hetzner Debian image installs without Recommends, and the first
+  clean install ended with no compressed swap and no audio.
+- Not measured: CPU with active work (a build, a recalculation), typing and scrolling latency, and the frame rate with moving screens on this server.
+- An earlier run of the same procedure on another server ended with that server taken over (SSH root password login, see `HETZNER-TEST.md` section 0); the capacity figures were taken before that and agree with
+  the clean rerun (six users fit, the seventh refused). The lock-up that followed was the intruder's miner, not memory.

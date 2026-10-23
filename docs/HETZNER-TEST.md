@@ -8,6 +8,20 @@ from the VM setup that did work (console Sway, two concurrent sessions) and from
 - Never publish port 3389. The RDP port stays on loopback and you reach it through SSH.
 - The Cloud Firewall allows only SSH (22), from your own IP if it is stable.
 - Throwaway server, deleted afterwards. Test password is not reused anywhere.
+- **Harden SSH before anything else (before the first apt command).** A new server on a public IP is probed within minutes, and Hetzner's Debian
+  image ships with root password login on (cloud-init writes `PasswordAuthentication yes` into `/etc/ssh/sshd_config.d/50-cloud-init.conf`).
+  On 2026-10-23 a test server left like that was taken over about 30 minutes after a clean test run: a brute-forced root login, a miner started
+  from `/var/tmp/snap` by `/etc/cron.d/system-helper`, and then every command failed for root (exit status 126). It looked like a memory
+  lock-up, which is why this rule is written down. Do it with the key you ticked at creation (no password), then check from outside:
+
+```
+printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin prohibit-password\n' > /etc/ssh/sshd_config.d/10-hardening.conf
+sshd -t && systemctl reload ssh      # the name sorts before 50-cloud-init.conf, and the first value wins
+ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no root@SERVER true    # must say: Permission denied (publickey)
+```
+
+  If the server was already reachable by password, put the Cloud Firewall (SSH from your IP only) on it first. If one is ever taken over: rebuild it,
+  do not clean it, and read the old disk only from Hetzner's rescue system (mounted read-only).
 
 ## 1. Server
 - Hetzner Cloud, arm64 **CAX11** (the binary is built for arm64; an x86 server needs an amd64 build first), Debian 13,
@@ -22,7 +36,7 @@ mkdir -p /home/jose/.ssh && cp ~/.ssh/authorized_keys /home/jose/.ssh/ && chown 
 loginctl enable-linger jose        # user manager and /run/user/<uid> without a login
 ```
 
-- Then `PermitRootLogin no` and `PasswordAuthentication no` in `/etc/ssh/sshd_config.d/`, reload sshd.
+- `PermitRootLogin` and `PasswordAuthentication` were already closed in section 0; if you made the `jose` account, make it the one you use from here on.
 
 ## 2. Packages (as jose)
 ```

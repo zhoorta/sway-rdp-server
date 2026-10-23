@@ -140,8 +140,9 @@ sudo waydesk-setup-admin</pre>
         <li><strong>Early software, one author.</strong> It has been tested mostly with FreeRDP, and with the Windows App on a Mac before the multi-user work, not since.</li>
         <li><strong>Not independently reviewed.</strong> The root helper and the login code have had two internal security passes (written down in the package documentation), no outside review yet.</li>
         <li><strong>Moving screens cost CPU.</strong> There is no hardware video encoding. On a 2-core server two busy screens use about 90&nbsp;% of the CPU, and three drop to a choppy frame rate. Memory allows more users than CPU does when they play video.</li>
-        <li><strong>Sizing.</strong> About 4 browser users per 4&nbsp;GB, about 8 with only the desktop open. A low-memory mode saves about 110&nbsp;MB per session and gives the shell a flat look.</li>
-        <li><strong>Debian 13 only.</strong> arm64 is the most tested. Ubuntu runs the server but not the shell yet, and there is no Fedora build.</li>
+        <li><strong>Sizing.</strong> On an 8&nbsp;GB, 4-core server: 9 users with a browser and three pages each, or 6 to 8 heavier users (Chromium, LibreOffice Calc and VS Code open, about 1.2&nbsp;GB each) as long as most of them are idle. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down. A low-memory mode saves about 110&nbsp;MB per session and gives the shell a flat look.</li>
+        <li><strong>Debian 13 only.</strong> Tested on arm64 and amd64. Ubuntu 26.04 runs the server and a plain desktop, but not the shell yet (no quickshell there) and has no Chromium package; there is no Fedora build.</li>
+        <li><strong>No GPU.</strong> Applications that insist on one do not start on a server without it: Zed fails with "Failed to create surface". VS Code and LibreOffice work.</li>
       </ul>
     </section>
 
