@@ -233,3 +233,30 @@ logs in over RDP from a short-lived `xfreerdp3` on the server (Xvfb) and then op
 - Not measured: CPU with active work (a build, a recalculation), typing and scrolling latency, and the frame rate with moving screens on this server.
 - An earlier run of the same procedure on another server ended with that server taken over (SSH root password login, see `HETZNER-TEST.md` section 0); the capacity figures were taken before that and agree with
   the clean rerun (six users fit, the seventh refused). The lock-up that followed was the intruder's miner, not memory.
+
+## Clean installs from the published repository, x86 and arm64 (2026-10-23)
+Two fresh Hetzner servers, Debian 13: **x86_64, 4 vCPU, 7.6 GB** and **arm64 (CAX), 2 vCPU, 3.7 GB**. SSH hardened first (key only, checked from outside). Then exactly what the site tells a user, with nothing built locally:
+`waydesk-repo.deb` from `https://waydesk.stackcare.pt/apt`, fingerprint compared (C646 72B2 5ECD 4773 196C 3958 9D8E 8874 E676 17F4), `apt update`, `apt install waydesk`,
+`waydesk-setup` (shell and Chromium, through the setup engine with a selection file), `waydesk-setup-admin`, an RDP login from `xfreerdp3` on the server.
+
+| | x86_64 | arm64 |
+|---|---|---|
+| `apt install waydesk` | exit 0 | exit 0 |
+| zram at first boot | 7.6 GB zstd | 3.7 GB zstd |
+| both services | active | active |
+| session | shell, dock (appears with the first window), Chromium with title-bar buttons | same |
+| audio | PulseAudio on PipeWire 1.4.2, default sink `waydesk-server`; the bar shows the speaker as on | same |
+| idle session with Chromium on one page | 629 MB (cgroup), 6.2 GB available | 788 MB, 2.6 GB available |
+
+**A failed first attempt that was a real bug:** the first install of the day ended with `404` for `sway` and `pcmanfm-qt`: the live repository's index named packages that were not on the server. `publish.sh` compared its file lists with `comm`
+after sorting them on two machines (the Mac and the server sort `+`, `~` and `_` differently), so it reported files that were there as missing and as extra, and its last step deleted them by name after the upload. Fixed
+(`c988000`): set differences with awk, no change to the indexes unless every package is on the server, and every package requested over HTTP at the end ("all 17 packages answer 200").
+
+**Capacity with the published packages** (clients: `xfreerdp3` on the server, one account at a time, 70 s or 55 s after the last application started, apps left idle):
+- **x86, 8 GB, heavy users (Chromium with Wikipedia, BBC News and debian.org; LibreOffice Calc with 300,000 rows; VS Code on a 25 MB source tree): 8 fit, the ninth was refused** ("994 MB available, 1162 MB needed" at the end).
+  The zram, at the new default size (7.6 GB), held 6.8 GB of data in 1.5 GB of RAM (4.5 to 1). No out-of-memory kill, memory pressure ("some", 60 s) about 1.2 %. The same result as the run with local packages.
+- **arm64, 3.7 GB, browser users (the same three pages): 4 fit, the fifth was refused** ("754 MB available, 900 MB needed"). No out-of-memory kill; zram held 871 MB of data in 182 MB. Not comparable with the earlier five users
+  on a 4 GB virtual machine, which opened lighter pages; BBC News alone is several hundred MB.
+- Observation, not changed: the admission rule looks at available memory, which does not count what the kernel could still free by moving idle pages into the (now large) zram. With 3 GB of zram free, the arm64 server
+  refused the fifth user at 754 MB available. Whether the rule should count some of that is open; it errs on the safe side.
+- Not measured: CPU with active work, latency, moving screens on these two servers.
