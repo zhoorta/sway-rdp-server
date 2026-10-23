@@ -268,6 +268,13 @@ fi
 flatpak_chromium="$HOME/.var/app/org.chromium.Chromium"
 if [ ! -e "$dms_dir/.flatpak-chromium" ] && { [ -d /var/lib/flatpak/app/org.chromium.Chromium ] || [ -d "$HOME/.local/share/flatpak/app/org.chromium.Chromium" ]; }; then
     mkdir -p "$flatpak_chromium/config/chromium/Default"
+    # Chromium from the distribution puts its own icon on the desktop (create_all_shortcuts in initial_preferences); the Flatpak build does not.
+    desk="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+    for exp in /var/lib/flatpak/exports/share/applications "$HOME/.local/share/flatpak/exports/share/applications"; do
+        if [ -f "$exp/org.chromium.Chromium.desktop" ] && [ -d "$desk" ] && [ ! -e "$desk/org.chromium.Chromium.desktop" ]; then
+            cp "$exp/org.chromium.Chromium.desktop" "$desk/" && chmod +x "$desk/org.chromium.Chromium.desktop"
+        fi
+    done
     flags="$flatpak_chromium/config/chromium-flags.conf"
     grep -qs -- '--disable-gpu' "$flags" || printf '%s\n' '--disable-gpu' >> "$flags"
     prefs="$flatpak_chromium/config/chromium/Default/Preferences"

@@ -14,21 +14,30 @@ export INSTALLER_DIR="$DIR"
 # Prints manifest rows without comments or blank lines.
 rows() { grep -vE '^\s*(#|$)' "$MANIFEST"; }
 
+# True when apt can install the package here: a name that is only mentioned by other packages ("is not available, but is referred to by another
+# package", Firefox ESR on Ubuntu) has no candidate, although apt-cache show finds it.
+has_candidate() { apt-cache policy "$1" 2>/dev/null | awk '/Candidate:/ { found = ($2 != "(none)") } END { exit !found }'; }
+# "a|b": the first of the alternatives that this system has (docker-compose on Debian, docker-compose-v2 on Ubuntu); empty when none.
+first_candidate() { local alt; for alt in ${1//|/ }; do has_candidate "$alt" && { echo "$alt"; return 0; }; done; return 1; }
+
 case "${1:-}" in
   --list)
     rows | awk -F'\t' '{printf "%-10s %-14s %s\n", $2, $1, $5}'
     exit 0 ;;
   --check)
     missing=0
-    while IFS=$'\t' read -r id layer method target _; do
+    while IFS=$'\t' read -r id layer method target _ _ _ fallback; do
       [ "$method" = apt ] || continue
       for pkg in $target; do
-        if ! apt-cache show "$pkg" >/dev/null 2>&1; then
-          echo "MISSING  $id: $pkg"; missing=1
+        if ! first_candidate "$pkg" >/dev/null; then
+          case "$fallback" in
+            flatpak:*) echo "FLATHUB  $id: no $pkg here, ${fallback#flatpak:} from Flathub instead" ;;
+            *) echo "MISSING  $id: $pkg"; missing=1 ;;
+          esac
         fi
       done
     done < <(rows)
-    [ "$missing" -eq 0 ] && echo "All apt packages found."
+    [ "$missing" -eq 0 ] && echo "All apt packages found (or have a Flathub fallback)."
     exit "$missing" ;;
   ""|-h|--help)
     sed -n '2,7p' "$0"; exit 1 ;;
@@ -58,12 +67,17 @@ apt_pkgs+=(curl ca-certificates)
 
 echo "==> apt"
 $SUDO apt-get update
+# Alternatives ("a|b") become the one this system has.
+for i in "${!apt_pkgs[@]}"; do
+  case "${apt_pkgs[$i]}" in
+    *"|"*) alt=$(first_candidate "${apt_pkgs[$i]}") && apt_pkgs[$i]=$alt || unset 'apt_pkgs[i]' ;;
+  esac
+done
+apt_pkgs=("${apt_pkgs[@]}")
 # What the archive of this system does not have goes to Flathub instead, where the row says how.
 for fb in "${fallbacks[@]}"; do
   app=${fb##* }; pkgs=${fb% *}; missing=""
-  for p in $pkgs; do
-    apt-cache policy "$p" 2>/dev/null | awk '/Candidate:/ { found = ($2 != "(none)") } END { exit !found }' || missing=1
-  done
+  for p in $pkgs; do has_candidate "$p" || missing=1; done
   if [ -n "$missing" ]; then
     echo "no $pkgs in this system's archive: $app from Flathub instead"
     for p in $pkgs; do for i in "${!apt_pkgs[@]}"; do [ "${apt_pkgs[$i]}" = "$p" ] && unset 'apt_pkgs[i]'; done; done
