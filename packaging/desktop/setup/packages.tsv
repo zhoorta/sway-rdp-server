@@ -17,7 +17,7 @@ shell	base	apt	zsh starship tmux fzf ripgrep fd-find bat eza zoxide btop jq	Shel
 chromium	base	apt	chromium	Chromium	Web browser (the default one of the desktop)	default
 firefox	base	apt	firefox-esr	Firefox	Second web browser
 files	base	apt	thunar	Thunar	File manager	default
-office	base	apt	libreoffice	LibreOffice	Office suite	default
+office	base	apt	libreoffice libreoffice-gtk3	LibreOffice	Office suite	default
 pdf	base	apt	okular	Okular	PDF and document viewer	default
 passwords	base	apt	keepassxc	KeePassXC	Password manager	default
 screenshot	base	apt	grim slurp cliphist	Screenshot and clipboard	grim, slurp and cliphist for Wayland	default
