@@ -4,8 +4,7 @@ Architecture: @ARCH@
 Maintainer: José Mendonça <jmendonca@gmail.com>
 Section: x11
 Priority: optional
-Depends: sway, foot, libopenh264-8 (>= 2.6), libpam0g, libpam-runtime, libxkbcommon0, openssl, systemd, adduser
-Recommends: systemd-zram-generator, pipewire, pipewire-pulse, pulseaudio-utils, wireplumber, wl-clipboard
+Depends: sway, foot, libopenh264-8 (>= 2.6), libpam0g, libpam-runtime, libxkbcommon0, openssl, systemd, adduser, systemd-zram-generator, pipewire, pipewire-pulse, pulseaudio-utils, wireplumber, wl-clipboard
 Description: RDP server giving each account its own sway desktop
  Accounts log in over RDP with their normal password and get a private,
  headless sway session that survives disconnects. A small root helper checks
