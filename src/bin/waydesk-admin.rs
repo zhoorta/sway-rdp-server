@@ -38,6 +38,10 @@ const MIN_UID: u32 = 1000;
 const NOBODY: u32 = 65534;
 
 fn main() {
+    // Rust ignores SIGPIPE, so `waydesk-admin status | head -3` ended in a panic ("failed printing to stdout: Broken pipe"). A command line tool
+    // should simply stop when the reader goes away, as cat does.
+    // SAFETY: restoring the default action of a signal, before any thread exists.
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     if let Err(e) = run() {
         eprintln!("waydesk-admin: {e:#}");
         std::process::exit(1);
