@@ -19,7 +19,7 @@ esac
 cd "$(dirname "$0")/../.."
 REPO="$PWD"
 OUT="$REPO/packaging/out"
-VERSION="${DMS_TAG#v}+waydesk1"
+VERSION="${DMS_TAG#v}+waydesk2"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$OUT"
