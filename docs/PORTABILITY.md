@@ -50,3 +50,20 @@ Order: finish the Debian 13 release test (clean install, app tests), then 1, the
 | Debian 13 | tested |
 | Ubuntu 26.04 LTS | server and a plain desktop; shell and browser not yet (see above) |
 | Fedora | not yet |
+
+## Result of the sway experiment (2026-10-23, evening)
+
+**Which sway.** Upstream is sway 1.12 (needs wlroots 0.20, which needs libwayland 1.24; Debian 13 has 1.23.1, so 1.12 would mean shipping libwayland as well). **Sway 1.11 with wlroots 0.19.3 builds on Debian 13 with Debian's own
+libraries**, with wlroots linked in statically (a 2 MB `sway`, no wlroots package), and it is the version Ubuntu 26.04 ships. Decision: **1.11 + wlroots 0.19.3 for every distribution**; 1.12 later.
+
+**The title-bar patch** (`packaging/sway/waydesk-titlebar-buttons.patch`, written against 1.10.1) applies to 1.11 and 1.12 with line offsets only (no conflicts, no changes) and compiles.
+
+**On a real session (Ubuntu 26.04 x86_64, our build from an `ubuntu:26.04` container, started before Ubuntu's own sway in PATH):** the RDP login works, the picture reaches the client, the compositor offers `zwlr_screencopy_manager_v1` (v3, what the
+server captures with), `ext_image_copy_capture_manager_v1`, `zwlr_data_control_manager_v1` and `ext_data_control_manager_v1` (the one DMS asked for and Debian's 1.10.1 did not have), and a window shows the three title-bar dots.
+Stock Ubuntu sway 1.11-3 gave the same picture without the dots (the baseline).
+
+**A trap for tests on Ubuntu:** `xfreerdp3` from Ubuntu 26.04 (FreeRDP 3.32.1) cannot decode the H.264 stream (`SurfaceCommand failed with error 50`, blank picture), with stock or patched sway; Debian 13's client can. Test with a
+Debian client (a `debian:13` container with `freerdp3-x11`, `--network host`, Xvfb, `xwd` + `convert` for the client's view).
+
+**Still to do for Ubuntu:** a private install path (the worker starts `sway` and `swaymsg` by name, `src/worker.rs` and `src/session.rs`, so a `waydesk-sway` package under `/usr/lib/waydesk/bin` and a lookup there first), `quickshell` and the shell
+(DMS, helpers) built in the same container, `pcmanfm-qt`, Chromium from Flatpak, a `resolute` suite in the apt repository.
