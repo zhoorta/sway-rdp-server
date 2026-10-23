@@ -46,8 +46,11 @@ tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 ssh "$HOST" "mkdir -p '$DIR' && cd '$DIR' && find pool -type f -printf '%s %p\n' 2>/dev/null | sort -k2" > "$tmp/remote.txt" || true
 (cd "$SRC" && find pool -type f | while read -r f; do printf '%s %s\n' "$(wc -c < "$f" | tr -d ' ')" "$f"; done | sort -k2) > "$tmp/local.txt"
 # to upload: local entries (same size and name) that are not on the server; to delete: server entries that are not local any more
-comm -23 "$tmp/local.txt" "$tmp/remote.txt" | cut -d' ' -f2- > "$tmp/upload.txt"
-comm -13 "$tmp/local.txt" "$tmp/remote.txt" | cut -d' ' -f2- > "$tmp/delete.txt"
+# (set differences with awk, not comm: comm needs both lists sorted the same way, and the Mac and the server sort + ~ and _ differently, which made it
+# report files that were there as missing, and then delete them by name after they had been uploaded: 2026-10-23)
+notin() { awk 'NR==FNR { seen[$0]; next } !($0 in seen)' "$2" "$1"; }   # the lines of $1 that are not in $2
+notin "$tmp/local.txt" "$tmp/remote.txt" | cut -d' ' -f2- > "$tmp/upload.txt"
+notin "$tmp/remote.txt" "$tmp/local.txt" | cut -d' ' -f2- > "$tmp/delete.txt"
 echo "packages to upload: $(wc -l < "$tmp/upload.txt" | tr -d ' ')   to remove from the server: $(wc -l < "$tmp/delete.txt" | tr -d ' ')"
 sed 's/^/  + /' "$tmp/upload.txt"; sed 's/^/  - /' "$tmp/delete.txt"
 if [ -z "$REAL" ]; then
@@ -58,6 +61,14 @@ fi
 # 1. packages, the key and the repository package
 { cat "$tmp/upload.txt"; for f in waydesk-archive-keyring.gpg waydesk-repo.deb; do [ -f "$SRC/$f" ] && echo "$f"; done; } > "$tmp/first.txt"
 if [ -s "$tmp/first.txt" ]; then COPYFILE_DISABLE=1 tar --exclude="._*" --exclude=.DS_Store -C "$SRC" -cf - -T "$tmp/first.txt" | ssh "$HOST" "cd '$DIR' && tar -xf - && find pool -type d -exec chmod 755 {} + && find pool -type f -exec chmod 644 {} +; chmod 644 waydesk-* 2>/dev/null; true"; fi
+# The packages must really be on the server before any index names them (the upload above cannot report a cut-short transfer): compare the
+# server's pool with the local one, by name and size. If anything is missing nothing else is changed; run this again and it uploads what is missing.
+ssh "$HOST" "cd '$DIR' && find pool -type f -printf '%s %p\n' | sort -k2" > "$tmp/remote2.txt"
+notin "$tmp/local.txt" "$tmp/remote2.txt" > "$tmp/missing.txt"
+if [ -s "$tmp/missing.txt" ]; then
+    echo "publish.sh: $(wc -l < "$tmp/missing.txt" | tr -d ' ') package(s) are not on the server after the upload. The indexes were NOT changed:" >&2
+    sed 's/^/  ! /' "$tmp/missing.txt" >&2; echo "Run it again: it uploads what is missing." >&2; exit 1
+fi
 # 2. the indexes: unpack next to the real ones, then move each into place; the signed files last
 ssh "$HOST" "cd '$DIR' && rm -rf .incoming && mkdir .incoming"
 COPYFILE_DISABLE=1 tar --exclude="._*" --exclude=.DS_Store -C "$SRC" -cf - dists | ssh "$HOST" "cd '$DIR/.incoming' && tar -xf -"
@@ -72,8 +83,18 @@ done
 rm -rf .incoming
 true"
 # index files that the new repository does not have any more (an architecture that was dropped): everything under dists/ that is not in the new set
-(cd "$SRC" && find dists -type f | sort) > "$tmp/dists-wanted.txt"
-ssh "$HOST" "cd ~/'$DIR' && find dists -type f | sort > .dists-have && comm -23 .dists-have - | xargs -r rm -f -- ; rm -f .dists-have; find dists -type d -empty -delete" < "$tmp/dists-wanted.txt"
+(cd "$SRC" && find dists -type f) > "$tmp/dists-wanted.txt"
+[ -s "$tmp/dists-wanted.txt" ] || { echo "publish.sh: the list of index files is empty: refusing to clean up dists/" >&2; exit 1; }
+ssh "$HOST" "cd ~/'$DIR' && find dists -type f > .dists-have && grep -vxFf - .dists-have | xargs -r rm -f -- ; rm -f .dists-have; find dists -type d -empty -delete" < "$tmp/dists-wanted.txt"
 # 3. packages the new indexes no longer name
 if [ -s "$tmp/delete.txt" ]; then ssh "$HOST" "cd ~/'$DIR' && xargs rm -f --" < "$tmp/delete.txt"; fi
+# 4. what a client will do: ask the public URL for every package in the pool (apt writes + as %2b)
+BASE=${WAYDESK_PUBLISH_URL:-https://waydesk.stackcare.pt/apt}
+echo "checking every package at $BASE ..."
+(cd "$SRC" && find pool -type f | sort) | while read -r f; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/$(printf '%s' "$f" | sed 's/+/%2b/g')")
+    [ "$code" = 200 ] || echo "  $code $f"
+done > "$tmp/httpbad.txt"
+if [ -s "$tmp/httpbad.txt" ]; then cat "$tmp/httpbad.txt" >&2; echo "publish.sh: the packages above are not served: clients cannot install them (run publish.sh again)" >&2; exit 1; fi
+echo "all $(wc -l < "$tmp/local.txt" | tr -d ' ') packages answer 200"
 echo "published. Check: curl -s https://waydesk.stackcare.pt/apt/dists/trixie/InRelease | head -3"
