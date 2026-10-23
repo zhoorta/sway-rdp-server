@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://waydesk.dev/sitemap.xml

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waydesk · A desktop for your Debian server, over RDP</title>
+<meta name="description" content="Waydesk gives every account on a Debian 13 server its own Wayland desktop, reached over RDP. Free software, signed apt repository, measured memory use.">
+<link rel="canonical" href="https://waydesk.dev/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#14171d">
+<meta property="og:title" content="Waydesk">
+<meta property="og:description" content="Your Debian server as a desktop, over RDP. One Wayland desktop per account, kept in check.">
+<meta property="og:url" content="https://waydesk.dev/">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="logo" href="/" aria-label="Waydesk">
+      <img class="l" src="/logo.svg" alt="Waydesk" width="159" height="35">
+      <img class="d" src="/logo-dark.svg" alt="" width="159" height="35">
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="#install">Install</a>
+      <a href="#access">Reach it safely</a>
+      <a href="#features">Features</a>
+      <a href="#limits">Limits</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <p class="label">Free software for Debian 13 servers</p>
+        <h1>Your server, <em>as a desktop</em> over RDP.</h1>
+        <p class="lede">Waydesk gives every account its own Wayland desktop, reached with the Windows App, Microsoft Remote Desktop or FreeRDP. Close the window, come back tomorrow, and your windows are where you left them.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#install">Install</a>
+          <a class="btn btn-ghost" href="#access">Reach it safely</a>
+        </div>
+      </div>
+      <div class="card" aria-label="Measured figures">
+        <div class="card-head">measured, not promised</div>
+        <ul>
+          <li><span>idle desktop session</span><span class="val">about 520 MB</span></li>
+          <li><span>… in the low-memory mode</span><span class="val">about 355 MB</span></li>
+          <li><span>browser users on 4 GB</span><span class="val">4 (a fifth is refused)</span></li>
+          <li><span>after a disconnect</span><span class="val">same windows</span></li>
+          <li><span>picture</span><span class="val">H.264 over RDP</span></li>
+        </ul>
+        <div class="card-foot">2 vCPU / 4 GB server, Debian 13 on arm64, Chromium with three pages per user. Early software, one author.</div>
+      </div>
+    </div>
+
+    <section id="install">
+      <div class="section-head">
+        <p class="label">Install</p>
+        <h2>Four steps and a check</h2>
+        <p>Debian 13 (trixie), arm64 or amd64. Run them as an administrator of the server.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <h3>Add the repository</h3>
+          <p>One small package: the signing key, the apt source and a pin so that these packages win over third-party builds of the same names.</p>
+          <pre>curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
+sudo apt install ./waydesk-repo.deb</pre>
+        </div>
+        <div class="step">
+          <h3>Check the key</h3>
+          <p>This first download cannot be verified by the repository itself, so compare the key you got with the fingerprint published here:</p>
+          <pre>gpg --show-keys --with-fingerprint /usr/share/keyrings/waydesk-archive-keyring.gpg</pre>
+          <div class="fp">C646 72B2 5ECD 4773 196C&nbsp; 3958 9D8E 8874 E676 17F4
+            <small>Also written as C64672B25ECD4773196C39589D8E8874E67617F4. If it differs, stop and tell us.</small>
+          </div>
+        </div>
+        <div class="step">
+          <h3>Install Waydesk</h3>
+          <p>The RDP server, the desktop and what they need.</p>
+          <pre>sudo apt update
+sudo apt install waydesk</pre>
+        </div>
+        <div class="step">
+          <h3>Add the desktop shell and the first administrator</h3>
+          <p>The wizard installs the shell (the bar, launcher and settings). Then make the account that connects over RDP and manages the others: there is no default account and no default password.</p>
+          <pre>sudo waydesk-setup
+sudo waydesk-setup-admin</pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="access">
+      <div class="section-head">
+        <p class="label">Reach it safely</p>
+        <h2>Do not put the RDP port on the internet</h2>
+        <p>The port listens on 127.0.0.1 by default, and the login is an account password sent inside TLS with a self-signed certificate. Reach it through a tunnel.</p>
+      </div>
+      <div class="grid">
+        <div class="item">
+          <h3>SSH tunnel</h3>
+          <p>Nothing to set up on the server. From your computer, then connect the RDP client to <code>localhost:13389</code>:</p>
+          <pre>ssh -N -L 13389:127.0.0.1:3389 you@server</pre>
+        </div>
+        <div class="item">
+          <h3>WireGuard</h3>
+          <p>For several people and devices: a key per device, RDP bound to the VPN address, only UDP 51820 open. The guide has the configuration, tested on a cloud server.</p>
+          <p class="mono" style="font-size:13px">/usr/share/doc/waydesk-server/WIREGUARD.md</p>
+        </div>
+        <div class="item">
+          <h3>Check the certificate</h3>
+          <p>On the first connection the client shows the server's certificate fingerprint. <code>waydesk-setup-admin</code> prints the one to expect.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="section-head">
+        <p class="label">What you get</p>
+        <h2>A desktop for each account, kept in check</h2>
+      </div>
+      <div class="grid">
+        <div class="item"><h3>Own desktop per account</h3><p>Real Linux accounts with their own password and home. A session survives a disconnect, and a second login from the same account takes it over.</p></div>
+        <div class="item"><h3>A familiar shell</h3><p>Bar, launcher, dock, window buttons, four workspaces, a software centre with Flatpak, a file manager on the desktop.</p></div>
+        <div class="item"><h3>Sharp at any size</h3><p>The desktop is sized and scaled from what the client asks for, and follows when you resize the window.</p></div>
+        <div class="item"><h3>Memory protection</h3><p>A new session is refused when the machine cannot take one more, each account has ceilings, and compressed swap is on. The user is told why with a clear message.</p></div>
+        <div class="item"><h3>Administration</h3><p>A Users &amp; Access panel and a <code>waydesk-admin</code> command: accounts, limits, who is logged in.</p></div>
+        <div class="item"><h3>Signed updates</h3><p>Packages come from a signed apt repository with a pinned key, and the shell is built from source.</p></div>
+      </div>
+    </section>
+
+    <section id="limits">
+      <div class="section-head">
+        <p class="label">Limits</p>
+        <h2>What to know before you rely on it</h2>
+      </div>
+      <ul class="limits">
+        <li><strong>Early software, one author.</strong> It has been tested mostly with FreeRDP, and with the Windows App on a Mac before the multi-user work, not since.</li>
+        <li><strong>Not independently reviewed.</strong> The root helper and the login code have had two internal security passes (written down in the package documentation), no outside review yet.</li>
+        <li><strong>Moving screens cost CPU.</strong> There is no hardware video encoding. On a 2-core server two busy screens use about 90&nbsp;% of the CPU, and three drop to a choppy frame rate. Memory allows more users than CPU does when they play video.</li>
+        <li><strong>Sizing.</strong> About 4 browser users per 4&nbsp;GB, about 8 with only the desktop open. A low-memory mode saves about 110&nbsp;MB per session and gives the shell a flat look.</li>
+        <li><strong>Debian 13 only.</strong> arm64 is the most tested. Ubuntu runs the server but not the shell yet, and there is no Fedora build.</li>
+      </ul>
+    </section>
+
+    <section id="contact">
+      <div class="contact">
+        <h2>Questions, bugs, help setting it up</h2>
+        <p>Waydesk is made by StackCare in Portugal. It is free software, licensed MIT or Apache-2.0 at your option; each package carries the licences of what it includes under <code>/usr/share/doc/</code>.</p>
+        <p><a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a> · <a href="https://github.com/zhoorta/waydesk">Source on GitHub</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>© 2026 StackCare</span>
+    <span>Commercial support and ready-made servers: <a href="https://stackcare.pt/en">StackCare</a></span>
+  </footer>
+</div>
+</body>
+</html>
