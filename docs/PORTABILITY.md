@@ -45,10 +45,10 @@ Order: finish the Debian 13 release test (clean install, app tests), then 1, the
 
 ## Support matrix to publish
 
-| Distribution | State |
+| Distribution | State (2026-10-23) |
 |---|---|
-| Debian 13 | tested |
-| Ubuntu 26.04 LTS | server and a plain desktop; shell and browser not yet (see above) |
+| Debian 13 | tested; clean install from the published repository on x86 and arm64 passed |
+| Ubuntu 26.04 LTS | packages built and installed in clean containers on x86 and arm64 from a rehearsal repository; a full RDP session with the shell, patched sway and Chromium from Flathub passed on x86; clean install from the published repository still to do |
 | Fedora | not yet |
 
 ## Result of the sway experiment (2026-10-23, evening)
@@ -67,3 +67,22 @@ Debian client (a `debian:13` container with `freerdp3-x11`, `--network host`, Xv
 
 **Still to do for Ubuntu:** a private install path (the worker starts `sway` and `swaymsg` by name, `src/worker.rs` and `src/session.rs`, so a `waydesk-sway` package under `/usr/lib/waydesk/bin` and a lookup there first), `quickshell` and the shell
 (DMS, helpers) built in the same container, `pcmanfm-qt`, Chromium from Flatpak, a `resolute` suite in the apt repository.
+
+## What was built for Ubuntu (2026-10-23, night)
+
+- **A private directory, `/usr/lib/waydesk`.** `waydesk-sway` (sway 1.11 + wlroots 0.19.3 static + the title-bar patch: `packaging/sway/build-private.sh`) and `waydesk-quickshell` (Quickshell 0.3.0 from Debian's orig tarball,
+  with `wayland-protocols` 1.47 built for the build; `packaging/quickshell/build-private.sh`) install there. The session worker (`src/worker.rs`, `prefer_private_bin`) puts `bin/` first in `PATH` and `qml/` in `QML_IMPORT_PATH`; the shell script pushes the
+  environment to the user's systemd manager, so `dms.service` finds them too. Checked in a real Ubuntu 26.04 session: `sway` and `qs` run from `/usr/lib/waydesk/bin`.
+  `waydesk-server` depends on `waydesk-sway | sway`, `waydesk-shell` on `waydesk-quickshell | quickshell | quickshell-git`.
+- **Built per distribution, in a container, tagged.** Versions end in `+deb13` or `+ubuntu26.04` (sway, quickshell, pcmanfm-qt); the dependencies come from the binaries (`dpkg-shlibdeps`: Debian needs `libdisplay-info2`, Ubuntu `libdisplay-info3`),
+  and Quickshell is tied to the exact Qt (`qt6-*-private-abi`). The server, the desktop, the shell and the helpers are the same package for both (the shell and helpers are static Go binaries plus QML).
+  `pcmanfm-qt` is rebuilt from Ubuntu's 2.3.0 with the same two patches (they applied), and pinned by `waydesk.pref`.
+- **One repository, two suites.** `make-repo.sh` builds `trixie` and `resolute` from one pool: a package whose version ends in `+<tag>` goes only into its suite. `waydesk-repo` 1.1 writes `/etc/apt/sources.list.d/waydesk.sources` from the system's `VERSION_CODENAME` in its postinst
+  (an existing file stays; an unsupported system gets a message and no source).
+- **Chromium and Firefox on Ubuntu from Flathub.** A manifest row can name a fallback (`flatpak:<id>`, eighth field) for a package the archive does not have; `waydesk-setup` checks apt's *candidate* (not `apt-cache show`: Firefox ESR is "referred to by another package" there, which broke the install); `a|b` names
+  alternatives (`docker-compose-v2`). `waydesk-shell` seeds the Flatpak Chromium per account (no GPU process, the window manager's title bar, the desktop icon, default browser).
+  Flathub's Chromium shows its terms dialog on the first start of each account.
+- **Found on the way:** two builds writing one file left a `.deb` with a wrong ar member size that `dpkg-deb` accepts and `ar`/apt reject (`make-repo.sh` now reads every package with both); a copy still in progress passed the control-data check (now read completely).
+  `waydesk-admin` was also fixed (SIGPIPE).
+
+**Still open for Ubuntu:** clean install from the published repository on fresh Ubuntu servers; the app tests (LibreOffice, VS Code) and capacity on Ubuntu; Ubuntu 24.04 (not built: a different Qt and wlroots); the Flatpak Chromium first-run dialog and its dock icon; `docker-compose` alternatives in other rows if more turn up.

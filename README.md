@@ -48,12 +48,14 @@ account replaces the first, only after logging in. Sessions end after 8 hours wi
 when the account quits its sway. Accounts cannot reach each other's sockets. The self-signed certificate is made at
 install time and its fingerprint is printed.
 
-**The server works on its own.** `waydesk-server` needs only sway, foot, PAM, openssl, systemd and `libopenh264`; it does not need
+**The server works on its own.** `waydesk-server` needs only sway (our own `waydesk-sway` where the repository has it), foot, PAM, openssl, systemd and `libopenh264`; it does not need
 `waydesk-desktop`. Installed alone you get the RDP login with the account's password, persistent per-account sessions, the memory
 protection (admission check, per-account caps, zram) and `waydesk-admin`; the session itself is plain sway: the account's `~/.config/waydesk/config` if it has one, otherwise sway's usual lookup
 (`~/.config/sway/config`, then `/etc/sway/config`). Install `waydesk-desktop` (or `waydesk`, which pulls in both)
-only if you want the Windows-like desktop below. Only Debian 13 (arm64 and amd64) is tested; other distros, Debian-based ones
-included, have not been tried, and the packages are `.deb` only.
+only if you want the Windows-like desktop below. **Debian 13 and Ubuntu 26.04 LTS, arm64 and amd64**, from one signed repository with a suite for each (`trixie`,
+`resolute`; `waydesk-repo` picks the right one). Both run the same compositor and shell stack from `/usr/lib/waydesk` (`waydesk-sway`: sway 1.11 with wlroots 0.19.3 and the
+title-bar patch; `waydesk-quickshell`), built per distribution in a container; see `docs/PORTABILITY.md`. On Ubuntu, Chromium and Firefox come from Flathub (Ubuntu has no deb). Other distros,
+Debian-based ones included, have not been tried (Fedora: not yet), and the packages are `.deb` only.
 
 `waydesk-desktop` (second package, same build) makes those sessions a Windows-like desktop: a system sway config
 (`/etc/xdg/waydesk/sway.conf`: floating windows with title bars, Alt+Tab, Alt+F4, `Super+d` launcher, screenshots;
