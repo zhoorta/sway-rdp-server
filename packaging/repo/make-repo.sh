@@ -29,6 +29,8 @@ docker run --rm -v "$SRC:/in:ro" -v "$OUT:/out" -e SUITES="$SUITES" waydesk-buil
 set -eu
 cd /in
 for f in *.deb; do
+    # read the whole archive: the control data is at the start, so a file that is still being copied (or was cut short) looks fine without this
+    dpkg-deb -c "$f" >/dev/null 2>&1 || { echo "make-repo.sh: $f is not a complete .deb (still being copied?): nothing was published" >&2; exit 1; }
     printf "%s %s %s %s\n" "$(dpkg-deb -f "$f" Package)" "$(dpkg-deb -f "$f" Architecture)" "$(dpkg-deb -f "$f" Version)" "$f"
 done | sort -k1,1 -k2,2 > /tmp/all.txt
 TAGS=""; for e in $SUITES; do TAGS="$TAGS ${e##*:}"; done
