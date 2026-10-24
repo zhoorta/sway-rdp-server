@@ -2,7 +2,7 @@
 //! The Windows App on macOS is built around this path and mishandles the older bitmap updates.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use anyhow::{Context as _, Result};
 use ironrdp_egfx::pdu::{Avc420Region, CapabilitySet};
@@ -27,9 +27,16 @@ pub struct EgfxState {
     sender: Mutex<Option<UnboundedSender<ServerEvent>>>,
 }
 
-/// Frames the session may have in flight (sent, not acknowledged yet). Matches the pipeline's own default
-/// (`ironrdp_egfx` DEFAULT_MAX_FRAMES_IN_FLIGHT), which our handler does not change.
-pub const MAX_CREDITS: u16 = 3;
+/// Frames the session may have in flight (sent, not acknowledged yet): 3, the pipeline's own default
+/// (`ironrdp_egfx` DEFAULT_MAX_FRAMES_IN_FLIGHT), which suits a local network. The frame rate cannot exceed the frames in
+/// flight divided by the round trip time, so a client far away (100 ms: about 30 frames a second at 3, less with a busy tunnel)
+/// needs more frames in the air; `WAYDESK_FRAMES_IN_FLIGHT` (1 to 32) sets it for the daemon and the pipeline alike.
+pub fn max_credits() -> u16 {
+    static VALUE: OnceLock<u16> = OnceLock::new();
+    *VALUE.get_or_init(|| {
+        std::env::var("WAYDESK_FRAMES_IN_FLIGHT").ok().and_then(|v| v.trim().parse::<u16>().ok()).map_or(3, |n| n.clamp(1, 32))
+    })
+}
 /// The client's queue depth when it has switched acknowledgements off: it will never give a credit back.
 const ACKS_SUSPENDED: u32 = 0xFFFF_FFFF;
 
@@ -82,10 +89,14 @@ impl GraphicsPipelineHandler for Handler {
         debug!(?pdu, "client EGFX capabilities");
     }
 
+    fn max_frames_in_flight(&self) -> u32 {
+        u32::from(max_credits())
+    }
+
     fn on_ready(&mut self, negotiated: &CapabilitySet) {
-        info!(?negotiated, "EGFX ready");
+        info!(?negotiated, frames_in_flight = max_credits(), "EGFX ready");
         self.st.ready.store(true, Ordering::Release);
-        self.st.grant(MAX_CREDITS);
+        self.st.grant(max_credits());
     }
 
     fn on_frame_ack(&mut self, frame_id: u32, queue_depth: u32, total_frames_decoded: u32) {

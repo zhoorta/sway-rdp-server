@@ -375,7 +375,7 @@ impl RdpServerDisplay for Handler {
         // A new connection gets its first credits when the channel reports ready.
         if let Some((st, _)) = &self.egfx {
             if st.is_ready() {
-                st.grant(egfx::MAX_CREDITS);
+                st.grant(egfx::max_credits());
             }
         }
         let egfx = self.egfx.as_ref().map(|(st, _)| EgfxLink { st: st.clone(), out: egfx::Out::new(st.clone(), size.0, size.1) });

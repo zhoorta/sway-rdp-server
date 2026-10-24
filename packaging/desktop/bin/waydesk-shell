@@ -300,6 +300,43 @@ PY
         mkdir -p "$dms_dir" && : > "$dms_dir/.flatpak-chromium"
     fi
 fi
+# VS Code draws its own title bar by default (client-side decoration): sway then gives it no title bar, so no window buttons and no
+# resize border, and its own minimize and maximize requests do nothing on a floating window. "native" makes it ask the window manager for the
+# title bar, like Chromium and Firefox above. Only when VS Code is installed (Flatpak or deb) and the account's settings do not choose a style.
+vs_settings=""
+for vs_flatpak in /var/lib/flatpak/app/com.visualstudio.code "$HOME/.local/share/flatpak/app/com.visualstudio.code"; do
+    [ -d "$vs_flatpak" ] && vs_settings="$vs_settings $HOME/.var/app/com.visualstudio.code/config/Code/User/settings.json" && break
+done
+if [ -d "$HOME/.config/Code" ] || command -v code >/dev/null 2>&1; then
+    vs_settings="$vs_settings $HOME/.config/Code/User/settings.json"
+fi
+if [ -n "$vs_settings" ]; then
+    # shellcheck disable=SC2086
+    python3 - $vs_settings <<'PY'
+import os, re, sys
+for path in sys.argv[1:]:
+    try:
+        with open(path) as f:
+            text = f.read()
+    except OSError:
+        text = ""
+    if '"window.titleBarStyle"' in text:
+        continue
+    if not text.strip():
+        text = '{ "window.titleBarStyle": "native" }\n'
+    else:
+        # the settings file may start with // comments: insert after the first line that opens the object
+        m = re.search(r"^[ \t]*\{", text, re.M)
+        if not m:
+            continue
+        rest = text[m.end():]
+        comma = "" if rest.lstrip().startswith("}") else ","
+        text = text[:m.end()] + ' "window.titleBarStyle": "native"' + comma + rest
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(text)
+PY
+fi
 # Technical entries stay out of the launcher (an account that wants one back deletes its file in ~/.local/share/applications).
 apps_dir="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 if [ ! -e "$dms_dir/.hidden-entries" ]; then
