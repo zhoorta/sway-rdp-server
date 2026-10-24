@@ -311,3 +311,9 @@ compared, `apt install waydesk`, `waydesk-setup-admin`), then the setup engine w
 
 - The Ubuntu x86 and Debian arm64 combinations were exercised earlier the same day from locally built packages of the same sources (`...1657`, one commit older: the Chromium seeding was added after), Debian arm64 also from the repository on 2026-10-23. They were not reinstalled from the final repository.
 - The arm64 server's stream was decoded with the x86 Debian client through two ssh tunnels: the arm64 `xfreerdp3` on Xvfb shows a shifted double image of the same correct stream (it does the same with the previous server build), so pictures of arm64 servers are taken from an x86 client.
+
+## From the new address, waydesk.dev/apt (2026-10-24, evening)
+- **Clean install on Debian 13 x86_64, 2 vCPU, 3.7 GB**, a freshly created server (SSH hardened first): `waydesk-repo.deb` from `https://waydesk.dev/apt`, key fingerprint compared, `apt install waydesk` and the setup engine
+  (`dms`, `vscode`) both exit 0, suite `trixie`, no backports, shell 2.0.0+waydesk2 with quickshell 0.3.0+deb13; RDP login with the shell, bar and desktop icons (idle session 593 MB with the shell).
+- **Upgrade path on Ubuntu 26.04 arm64**: a server with `waydesk-repo` 1.1 (old address) installs the package from the new address. 1.2 kept the old address in `waydesk.sources` (the postinst never touched an existing
+  file); 1.3 moves a file that still has exactly the old address to the new one and leaves every other local edit alone (checked with an extra `Architectures:` line). `apt update` then fetches from waydesk.dev.
