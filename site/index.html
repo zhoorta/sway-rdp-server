@@ -3,162 +3,232 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Waydesk · A desktop for your Debian server, over RDP</title>
-<meta name="description" content="Waydesk gives every account on a Debian 13 server its own Wayland desktop, reached over RDP. Free software, signed apt repository, measured memory use.">
+<title>Waydesk · Wayland desktops over RDP for Debian and Ubuntu</title>
+<meta name="description" content="Waydesk gives every account on a Debian 13 or Ubuntu 26.04 server its own Wayland desktop over RDP. Signed apt repository, architecture, measurements with methods, threat model and reference.">
 <link rel="canonical" href="https://waydesk.dev/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="theme-color" content="#14171d">
+<meta name="theme-color" content="#101216">
 <meta property="og:title" content="Waydesk">
-<meta property="og:description" content="Your Debian server as a desktop, over RDP. One Wayland desktop per account, kept in check.">
+<meta property="og:description" content="A Wayland desktop per account on your Debian or Ubuntu server, over RDP. Measured, documented, free software.">
 <meta property="og:url" content="https://waydesk.dev/">
 <meta property="og:type" content="website">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <a class="logo" href="/" aria-label="Waydesk">
-      <img class="l" src="/logo.svg" alt="Waydesk" width="159" height="35">
-      <img class="d" src="/logo-dark.svg" alt="" width="159" height="35">
-    </a>
-    <nav class="nav" aria-label="Main">
-      <a href="#install">Install</a>
-      <a href="#access">Reach it safely</a>
-      <a href="#features">Features</a>
-      <a href="#limits">Limits</a>
-      <a href="#contact">Contact</a>
-    </nav>
-  </header>
+<div class="col">
+<header>
+  <a class="wordmark" href="/">waydesk<span>_</span></a>
+  <nav aria-label="Sections">
+    <a href="#install">install</a>
+    <a href="#support">support</a>
+    <a href="#architecture">architecture</a>
+    <a href="#measurements">measurements</a>
+    <a href="#security">security</a>
+    <a href="#reference">reference</a>
+    <a href="#changelog">changelog</a>
+  </nav>
+</header>
 
-  <main>
-    <div class="hero">
-      <div>
-        <p class="label">Free software for Debian 13 servers</p>
-        <h1>Your server, <em>as a desktop</em> over RDP.</h1>
-        <p class="lede">Waydesk gives every account its own Wayland desktop, reached with the Windows App, Microsoft Remote Desktop or FreeRDP. Close the window, come back tomorrow, and your windows are where you left them.</p>
-        <div class="cta-row">
-          <a class="btn btn-primary" href="#install">Install</a>
-          <a class="btn btn-ghost" href="#access">Reach it safely</a>
-        </div>
-      </div>
-      <div class="card" aria-label="Measured figures">
-        <div class="card-head">measured, not promised</div>
-        <ul>
-          <li><span>idle desktop session</span><span class="val">about 520 MB</span></li>
-          <li><span>… in the low-memory mode</span><span class="val">about 355 MB</span></li>
-          <li><span>browser users on 4 GB</span><span class="val">4 (a fifth is refused)</span></li>
-          <li><span>after a disconnect</span><span class="val">same windows</span></li>
-          <li><span>picture</span><span class="val">H.264 over RDP</span></li>
-        </ul>
-        <div class="card-foot">2 vCPU / 4 GB server, Debian 13 on arm64, Chromium with three pages per user. Early software, one author.</div>
-      </div>
-    </div>
+<main>
+<h1>A Wayland desktop per account on your server, over RDP.</h1>
+<p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04 (amd64 or arm64). Every account that logs in over RDP gets its own headless sway session with a shell, kept alive across disconnects, with memory ceilings and a refusal when the machine is full. H.264 over RDP, no GPU needed. Free software, early, one author.</p>
 
-    <section id="install">
-      <div class="section-head">
-        <p class="label">Install</p>
-        <h2>Four steps and a check</h2>
-        <p>Debian 13 (trixie), arm64 or amd64. Run them as an administrator of the server.</p>
-      </div>
-      <div class="steps">
-        <div class="step">
-          <h3>Add the repository</h3>
-          <p>One small package: the signing key, the apt source and a pin so that these packages win over third-party builds of the same names.</p>
-          <pre>curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
-sudo apt install ./waydesk-repo.deb</pre>
-        </div>
-        <div class="step">
-          <h3>Check the key</h3>
-          <p>This first download cannot be verified by the repository itself, so compare the key you got with the fingerprint published here:</p>
-          <pre>gpg --show-keys --with-fingerprint /usr/share/keyrings/waydesk-archive-keyring.gpg</pre>
-          <div class="fp">C646 72B2 5ECD 4773 196C&nbsp; 3958 9D8E 8874 E676 17F4
-            <small>Also written as C64672B25ECD4773196C39589D8E8874E67617F4. If it differs, stop and tell us.</small>
-          </div>
-        </div>
-        <div class="step">
-          <h3>Install Waydesk</h3>
-          <p>The RDP server, the desktop and what they need.</p>
-          <pre>sudo apt update
-sudo apt install waydesk</pre>
-        </div>
-        <div class="step">
-          <h3>Add the desktop shell and the first administrator</h3>
-          <p>The wizard installs the shell (the bar, launcher and settings). Then make the account that connects over RDP and manages the others: there is no default account and no default password.</p>
-          <pre>sudo waydesk-setup
-sudo waydesk-setup-admin</pre>
-        </div>
-      </div>
-    </section>
+<pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
+<span class="p">$</span> sudo apt install ./waydesk-repo.deb
+<span class="p">$</span> sudo apt install waydesk
+<span class="p">$</span> sudo waydesk-setup-admin
+<span class="p">$</span> sudo waydesk-admin status
+<span class="c">Memory    7.6 GB in all, 504 MB available
+Swap      zram0 7.6 GB (7.5 GB used)
+Load      1.01 1.26 1.29 (4 cores)
+Sessions  7 running; a new one would be REFUSED: 504 MB available, 1161 MB needed
 
-    <section id="access">
-      <div class="section-head">
-        <p class="label">Reach it safely</p>
-        <h2>Do not put the RDP port on the internet</h2>
-        <p>The port listens on 127.0.0.1 by default, and the login is an account password sent inside TLS with a self-signed certificate. Reach it through a tunnel.</p>
-      </div>
-      <div class="grid">
-        <div class="item">
-          <h3>SSH tunnel</h3>
-          <p>Nothing to set up on the server. From your computer, then connect the RDP client to <code>localhost:13389</code>:</p>
-          <pre>ssh -N -L 13389:127.0.0.1:3389 you@server</pre>
-        </div>
-        <div class="item">
-          <h3>WireGuard</h3>
-          <p>For several people and devices: a key per device, RDP bound to the VPN address, only UDP 51820 open. The guide has the configuration, tested on a cloud server.</p>
-          <p class="mono" style="font-size:13px">/usr/share/doc/waydesk-server/WIREGUARD.md</p>
-        </div>
-        <div class="item">
-          <h3>Check the certificate</h3>
-          <p>On the first connection the client shows the server's certificate fingerprint. <code>waydesk-setup-admin</code> prints the one to expect.</p>
-        </div>
-      </div>
-    </section>
+ACCOUNT   SESSION  MEMORY  SWAP    CPU  LIMIT   PROGRAMS (resident)
+u1        running  416 MB  1.0 GB   3%  3.8 GB  code 194 MB, qs 132 MB, chrome 120 MB
+u2        running  472 MB  1.0 GB   4%  3.8 GB  code 263 MB, qs 133 MB, chrome 126 MB
+u3        running  438 MB  1.1 GB   3%  3.8 GB  code 186 MB, chrome 176 MB, qs 134 MB
+u4        running  455 MB  1.1 GB   3%  3.8 GB  chrome 219 MB, code 206 MB, qs 138 MB
+u5        running  477 MB  1.0 GB   4%  3.8 GB  chrome 277 MB, code 252 MB, qs 138 MB
+u6        running  858 MB  672 MB   7%  3.8 GB  code 529 MB, chrome 437 MB, qs 173 MB
+u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 265 MB</span></code></pre>
+<p class="method">Real output: Ubuntu 26.04, 4 vCPU, 7.6 GB, seven accounts each with Chromium, LibreOffice Calc and VS Code open, 2026-10-24. Accounts that were idle for a while have most of their memory in compressed swap, which is why the eighth one is refused only now.</p>
 
-    <section id="features">
-      <div class="section-head">
-        <p class="label">What you get</p>
-        <h2>A desktop for each account, kept in check</h2>
-      </div>
-      <div class="grid">
-        <div class="item"><h3>Own desktop per account</h3><p>Real Linux accounts with their own password and home. A session survives a disconnect, and a second login from the same account takes it over.</p></div>
-        <div class="item"><h3>A familiar shell</h3><p>Bar, launcher, dock, window buttons, four workspaces, a software centre with Flatpak, a file manager on the desktop.</p></div>
-        <div class="item"><h3>Sharp at any size</h3><p>The desktop is sized and scaled from what the client asks for, and follows when you resize the window.</p></div>
-        <div class="item"><h3>Memory protection</h3><p>A new session is refused when the machine cannot take one more, each account has ceilings, and compressed swap is on. The user is told why with a clear message.</p></div>
-        <div class="item"><h3>Administration</h3><p>A Users &amp; Access panel and a <code>waydesk-admin</code> command: accounts, limits, who is logged in.</p></div>
-        <div class="item"><h3>Signed updates</h3><p>Packages come from a signed apt repository with a pinned key, and the shell is built from source.</p></div>
-      </div>
-    </section>
+<h2 id="install">Install</h2>
+<p>Run as an administrator of the server. The port listens on 127.0.0.1 only; see <a href="#security">reaching it</a>.</p>
 
-    <section id="limits">
-      <div class="section-head">
-        <p class="label">Limits</p>
-        <h2>What to know before you rely on it</h2>
-      </div>
-      <ul class="limits">
-        <li><strong>Early software, one author.</strong> It has been tested mostly with FreeRDP, and with the Windows App on a Mac before the multi-user work, not since.</li>
-        <li><strong>Not independently reviewed.</strong> The root helper and the login code have had two internal security passes (written down in the package documentation), no outside review yet.</li>
-        <li><strong>Moving screens cost CPU.</strong> There is no hardware video encoding. On a 2-core server two busy screens use about 90&nbsp;% of the CPU, and three drop to a choppy frame rate. Memory allows more users than CPU does when they play video.</li>
-        <li><strong>Sizing.</strong> On an 8&nbsp;GB, 4-core server: 9 users with a browser and three pages each, or 6 to 8 heavier users (Chromium, LibreOffice Calc and VS Code open, about 1.2&nbsp;GB each) as long as most of them are idle. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down. A low-memory mode saves about 110&nbsp;MB per session and gives the shell a flat look.</li>
-        <li><strong>Debian 13 only.</strong> Tested on arm64 and amd64. Ubuntu 26.04 runs the server and a plain desktop, but not the shell yet (no quickshell there) and has no Chromium package; there is no Fedora build.</li>
-        <li><strong>No GPU.</strong> Applications that insist on one do not start on a server without it: Zed fails with "Failed to create surface". VS Code and LibreOffice work.</li>
-      </ul>
-    </section>
+<h3>1. Add the repository</h3>
+<p>One small package: the signing key, the apt source for your release (<code>trixie</code> or <code>resolute</code>, chosen from <code>VERSION_CODENAME</code>) and a pin so these packages win over third-party builds of the same names.</p>
+<pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
+<span class="p">$</span> sudo apt install ./waydesk-repo.deb</code></pre>
 
-    <section id="contact">
-      <div class="contact">
-        <h2>Questions, bugs, help setting it up</h2>
-        <p>Waydesk is made by StackCare in Portugal. It is free software, licensed MIT or Apache-2.0 at your option; each package carries the licences of what it includes under <code>/usr/share/doc/</code>.</p>
-        <p><a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a> · <a href="https://github.com/zhoorta/waydesk">Source on GitHub</a></p>
-      </div>
-    </section>
-  </main>
+<h3>2. Check the key</h3>
+<p>This first download cannot be verified by the repository itself. Compare the key you got with this fingerprint (ed25519, expires 2029-10-21):</p>
+<pre><code><span class="p">$</span> gpg --show-keys --with-fingerprint /usr/share/keyrings/waydesk-archive-keyring.gpg</code></pre>
+<div class="fp">C646 72B2 5ECD 4773 196C&nbsp; 3958 9D8E 8874 E676 17F4</div>
+<p class="dim">If it differs, stop and tell us.</p>
 
-  <footer>
-    <span>© 2026 StackCare</span>
-    <span>Commercial support and ready-made servers: <a href="https://stackcare.pt/en">StackCare</a></span>
-  </footer>
+<h3>3. Install</h3>
+<pre><code><span class="p">$</span> sudo apt update
+<span class="p">$</span> sudo apt install waydesk</code></pre>
+<p>Installs the RDP daemon, the root helper, <code>waydesk-admin</code>, our sway build, zram swap and the desktop package. <code>waydesk-server</code> alone is enough for a session with a plain terminal (a minimal sway config ships with it).</p>
+
+<h3>4. Shell and first administrator</h3>
+<pre><code><span class="p">$</span> sudo waydesk-setup           <span class="c"># wizard: shell, Chromium, LibreOffice, VS Code, ...</span>
+<span class="p">$</span> sudo waydesk-setup-admin     <span class="c"># the account that logs in over RDP and manages the others</span></code></pre>
+<p>There is no default account and no default password. <code>waydesk-setup-admin</code> prints the certificate fingerprint to expect on the first connection.</p>
+
+<h2 id="support">Support</h2>
+<div class="tw"><table>
+<tr><th>Distribution</th><th>amd64</th><th>arm64</th><th>Notes</th></tr>
+<tr><td>Debian 13 (trixie)</td><td class="ok">tested</td><td class="ok">tested</td><td>clean install from the published repository, RDP session with the shell, Chromium, LibreOffice, VS Code</td></tr>
+<tr><td>Ubuntu 26.04 LTS (resolute)</td><td class="ok">tested</td><td class="ok">tested</td><td>sway, quickshell and pcmanfm-qt are our builds under <code>/usr/lib/waydesk</code>; Chromium and Firefox come from Flathub (no Chromium deb)</td></tr>
+<tr><td>Ubuntu 24.04, Fedora, Arch</td><td colspan="2" class="dim">not yet</td><td>different Qt and wlroots; no rpm yet</td></tr>
+</table></div>
+<p class="method">"Tested": a clean server, SSH hardened first, then exactly the four steps above, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. Windows App, Microsoft Remote Desktop and mstsc were not part of the multi-user tests.</p>
+
+<h2 id="architecture">Architecture</h2>
+<pre><code>  client  --TLS/RDP--&gt;  waydesk.service         user <b>waydesk</b>, no login, sandboxed
+ (FreeRDP,               TLS, RDP, EGFX/H.264, audio and clipboard framing
+  Windows App)                |   unix socket, SO_PEERCRED checked
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ trust boundary: root
+                              v
+                       waydesk-helper.service  <b>root</b>, no network
+                       PAM check, starts the session as that account,
+                       refuses it when memory cannot take one more
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ trust boundary: each account
+                              v
+                waydesk-session@UID.service   <b>the account</b>, own logind session, own slice
+                  sway (headless, own XDG_RUNTIME_DIR 0700)
+                    +- capture (wlr-screencopy) + H.264 encode + input + audio + clipboard
+                    +- shell (quickshell), apps (Chromium, LibreOffice, VS Code ...)</code></pre>
+<div class="tw"><table>
+<tr><th>Part</th><th>Runs as</th><th>Does</th><th>Never does</th></tr>
+<tr><td><code>waydesk</code></td><td>waydesk</td><td>TLS, RDP protocol, channel framing, rate limits per address</td><td>touch user files, call PAM, keep passwords after the check</td></tr>
+<tr><td><code>waydesk-helper</code></td><td>root</td><td>checks the password through PAM, starts and finds sessions, admits or refuses by memory</td><td>parse RDP or TLS, listen on the network</td></tr>
+<tr><td><code>waydesk-session@UID</code></td><td>the account</td><td>its sway, capture, encoder, input, audio, clipboard, hooks</td><td>anything as another user</td></tr>
+</table></div>
+<p>A session is a systemd unit of the account, so it survives a disconnect, sits in <code>user-UID.slice</code> (limits there apply) and is killed with its control group. A second login from the same account takes the running session over. Design notes: <code>docs/MULTIUSER-DESIGN.md</code> in the repository.</p>
+
+<h2 id="measurements">Measurements</h2>
+<p>All figures are from our own servers (Hetzner cloud, no GPU), with the method next to them. Full tables and the failed attempts are in <code>docs/MEASUREMENTS.md</code> in the repository.</p>
+
+<h3>Heavy users on 8 GB, 4 vCPU (x86_64)</h3>
+<p>Available memory (<code>free</code>'s figure) after each user has logged in over RDP and opened Chromium (Wikipedia, BBC News, debian.org), LibreOffice Calc with a 300,000 x 10 CSV and VS Code on a source tree.</p>
+<div class="tw"><table>
+<tr><th class="n">users</th><th class="n">Debian 13</th><th class="n">Ubuntu 26.04</th></tr>
+<tr><td class="n">1</td><td class="n">5.4 GB</td><td class="n">5.2 GB</td></tr>
+<tr><td class="n">2</td><td class="n">3.9 GB</td><td class="n">3.4 GB</td></tr>
+<tr><td class="n">3</td><td class="n">2.4 GB</td><td class="n">2.1 GB</td></tr>
+<tr><td class="n">4</td><td class="n">1.6 GB</td><td class="n">2.2 GB</td></tr>
+<tr><td class="n">5</td><td class="n">1.7 GB</td><td class="n">2.0 GB</td></tr>
+<tr><td class="n">6</td><td class="n">1.6 GB</td><td class="n">1.7 GB</td></tr>
+<tr><td class="n">7</td><td class="n">1.6 GB</td><td class="n warn">810 MB, next refused</td></tr>
+<tr><td class="n">8</td><td class="n">1.1 GB</td><td class="n bad">refused</td></tr>
+<tr><td class="n">9</td><td class="n bad">refused</td><td class="n dim"></td></tr>
+</table></div>
+<p class="method">Method: one account at a time, 70 s after its last application started, applications left idle (an upper bound for idle load, no figure for active work). The server refuses a session when less than about 1.1 GB is available; the refusal reaches the client as <code>ERRINFO_OUT_OF_MEMORY</code>. No out-of-memory kill in any run; memory pressure ("some", 60 s average) 0.3 to 2.4 %. One heavy user costs 1.85 GB (Debian) to 2.0 GB (Ubuntu, Flatpak builds of Chromium and VS Code, a 30 MB tree instead of 25 MB).</p>
+
+<h3>Compressed swap</h3>
+<p>zram with zstd compresses this load about 4.5 to 5 : 1 (Ubuntu: 6.6 GB of data in 1.3 GB of RAM at seven users). The package sizes the device like the RAM (at most 16 GiB). With Debian's default of half the RAM, six heavy users fit instead of eight.</p>
+
+<h3>Other figures</h3>
+<div class="tw"><table>
+<tr><th>What</th><th>Result</th><th>Method</th></tr>
+<tr><td>idle session with the shell</td><td>430 to 600 MB</td><td>cgroup of the account, Debian 13 arm64 and Ubuntu 26.04 x86, nothing else open</td></tr>
+<tr><td>browser users on arm64, 3.7 GB</td><td>4 fit, the 5th refused (754 MB available, 900 MB needed)</td><td>Chromium, same three pages, one account at a time</td></tr>
+<tr><td>moving screens, 2 vCPU</td><td>two busy screens use about 90 % of the CPU, three drop to a choppy frame rate</td><td>video in a window, software H.264 (no hardware encoder)</td></tr>
+<tr><td>stalled client</td><td>connection closed 80 s after the freeze (TCP_USER_TIMEOUT 60 s)</td><td>client frozen but answering zero-window probes, Debian 13 arm64</td></tr>
+</table></div>
+<p class="method">Not measured: CPU under active work (a build, a recalculation), typing and scrolling latency, frame rate on x86 with moving screens.</p>
+
+<h2 id="security">Security</h2>
+<h3>Reaching it</h3>
+<p>Do not put the RDP port on the internet. The daemon binds 127.0.0.1:3389 and the login is the account's own password, checked by PAM, sent inside TLS with a self-signed certificate (PAM cannot do NLA). Anyone who can intercept an unchecked certificate can read passwords, so check the fingerprint on first use.</p>
+<pre><code><span class="p">$</span> ssh -N -L 13389:127.0.0.1:3389 you@server    <span class="c"># then connect the client to localhost:13389</span></code></pre>
+<p>For several people: WireGuard, a key per device, RDP bound to the VPN address, only UDP 51820 open. <code>/usr/share/doc/waydesk-server/WIREGUARD.md</code> has the configuration.</p>
+
+<h3>Threat model</h3>
+<ul class="plain">
+<li><b>Attacker on the network:</b> sees only TLS. Can guess passwords; failures are counted per account and per address, delayed, and answered identically for unknown and known accounts.</li>
+<li><b>Compromised daemon:</b> runs as an unprivileged user with a system call filter and a narrow capability set. It can read the streams of live sessions and type into them, and sees passwords in transit. It cannot start a session for an account that did not authenticate on the same connection, and the helper takes no program, path or arguments from it.</li>
+<li><b>Malicious account:</b> has its own sway, its own runtime directory (0700) and its own clipboard; it cannot capture or inject into another account's session. Memory, tasks and CPU ceilings apply per account.</li>
+<li><b>Out of scope:</b> drive, printer and smartcard redirection, RD Gateway, running exposed to the internet, GPU sharing.</li>
+</ul>
+
+<h3>Open items</h3>
+<ul class="plain">
+<li>Plain TLS login (above); a second factor is not available.</li>
+<li>The helper trusts the daemon's claim of the client's source address, so a compromised daemon can poison the per-address counters (the per-account counter still holds).</li>
+<li>Passwords are not wiped from memory; daemon and helper are one binary.</li>
+<li>Many failed logins from many addresses are logged, not stopped. <code>pam_faillock</code> in the PAM stack of the service does it, with the trade-off that a stranger can then lock the owner out.</li>
+<li>Chromium from Flathub runs with <code>--password-store=basic</code>: nothing in a Waydesk session unlocks a keyring, so saved passwords and cookies sit under a fixed key, protected by the home directory's permissions only.</li>
+<li>No fuzzing of the RDP side, no independent review. Four internal passes are written down in <code>docs/SECURITY-REVIEW.md</code>; an outside review should start at <code>src/helper.rs</code>, <code>src/auth.rs</code>, <code>src/link.rs</code>, <code>src/proto.rs</code> and the unit files.</li>
+</ul>
+
+<h2 id="limits">Limits</h2>
+<ul class="plain">
+<li>Early software, one author. Mostly tested with FreeRDP.</li>
+<li>No GPU: applications that insist on one do not start. Zed fails with "Failed to create surface"; VS Code and LibreOffice work.</li>
+<li>Sizing: on an 8 GB, 4-core server count 7 to 8 users with Chromium, Calc and VS Code open if most are idle. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down.</li>
+<li>First run of the Flathub Chromium: a seeded <code>First Run</code>/<code>EULA Accepted</code> skips its terms window, whose text is only a placeholder in that build.</li>
+</ul>
+
+<h2 id="reference">Reference</h2>
+<h3>Packages</h3>
+<dl class="ref">
+<dt>waydesk</dt><dd>metapackage: server, desktop</dd>
+<dt>waydesk-server</dt><dd>daemon, helper, <code>waydesk-admin</code>, <code>waydesk-setup-admin</code>, PAM services, units, zram and sysctl drop-ins, minimal sway config</dd>
+<dt>waydesk-desktop</dt><dd>sway config, setup wizard (<code>waydesk-setup</code>), per-account shell setup, administrator panels</dd>
+<dt>waydesk-shell, waydesk-quickshell</dt><dd>DankMaterialShell 2.0.0 built by us with our patches; quickshell 0.3.0 (private prefix on Ubuntu and Debian)</dd>
+<dt>waydesk-sway</dt><dd>sway 1.11 with wlroots 0.19.3 linked statically and the title-bar button patch, under <code>/usr/lib/waydesk/bin</code>; built per distribution (<code>+deb13</code>, <code>+ubuntu26.04</code>)</dd>
+<dt>pcmanfm-qt</dt><dd>file manager with our patches, built per distribution</dd>
+<dt>waydesk-repo</dt><dd>key, apt source template, pin</dd>
+</dl>
+
+<h3>Commands</h3>
+<dl class="ref">
+<dt>waydesk-admin status</dt><dd>memory, swap, load, sessions, per-account use</dd>
+<dt>waydesk-admin users list | add | remove | passwd | enable | disable | admin | sudo | limit</dt><dd>accounts and their ceilings (<code>--json</code> on most)</dd>
+<dt>waydesk-admin sessions list | end NAME</dt><dd>running sessions; ending one closes the account's desktop</dd>
+<dt>waydesk-setup [--list | --check]</dt><dd>choose and install shell, browsers, office, developer and creative apps</dd>
+<dt>waydesk-setup-admin [--name NAME | --existing NAME]</dt><dd>first administrator: RDP access, panels, Flatpak installs without a password</dd>
+</dl>
+
+<h3>Units, files, ports</h3>
+<dl class="ref">
+<dt>waydesk.service, waydesk-helper.service, waydesk-session@UID.service</dt><dd>daemon, root helper, one per account</dd>
+<dt>127.0.0.1:3389</dt><dd>RDP (TLS); <code>/run/waydesk/</code> holds the helper and session sockets</dd>
+<dt>/etc/default/waydesk</dt><dd>daemon and session options</dd>
+<dt>/etc/pam.d/waydesk-server, waydesk-session</dt><dd>login check; logind session of the account</dd>
+<dt>/etc/xdg/waydesk/sway.conf</dt><dd>session sway config (fallback: <code>/usr/share/waydesk/sway-minimal.conf</code>)</dd>
+<dt>/usr/lib/waydesk/bin</dt><dd>private sway, swaymsg, swaybar; first in the session's PATH</dd>
+<dt>/etc/apt/sources.list.d/waydesk.sources, /etc/apt/preferences.d/waydesk</dt><dd>repository and pin</dd>
+<dt>/usr/lib/systemd/zram-generator.conf.d/50-waydesk.conf</dt><dd>zram as large as the RAM, at most 16 GiB</dd>
+</dl>
+
+<h3>Key</h3>
+<p>Packages and indexes are signed with one ed25519 key, fingerprint <code>C64672B25ECD4773196C39589D8E8874E67617F4</code>, expires 2029-10-21. The public key is <code>/apt/waydesk-archive-keyring.gpg</code>.</p>
+
+<h2 id="changelog">Changelog</h2>
+<dl class="log">
+<dt>2026-10-24</dt><dd>Ubuntu 26.04 checked from the repository; <code>dms.sh</code> no longer adds Debian backports when the Waydesk repository is configured (it broke <code>apt update</code> on Ubuntu); a client that stops reading is dropped after 60 s; <code>waydesk-server</code> alone starts a session with a minimal sway config; the Flathub Chromium opens without its terms window and keyring prompt; seven heavy users fit on 8 GB.</dd>
+<dt>2026-10-23</dt><dd>Two suites, <code>trixie</code> and <code>resolute</code>, from one pool; private sway and quickshell under <code>/usr/lib/waydesk</code>; Flathub fallback for browsers; heavy-user capacity on Debian; fix for a publishing tool that deleted live packages.</dd>
+<dt>2026-10-22</dt><dd>Signed apt repository, <code>waydesk-repo</code> and <code>waydesk-setup-admin</code>; our own build of the shell as a package; refused logins tell the client why.</dd>
+<dt>2026-10-21</dt><dd>Memory admission, account ceilings and zram; patched sway with title-bar buttons; dock; Chromium as the default browser; third internal security pass.</dd>
+<dt>2026-10-20</dt><dd>Renamed to Waydesk. Desktop icons, themed Qt and Flatpak apps, logind session per account.</dd>
+<dt>2026-10-15 to 19</dt><dd>RDP server for sway, then multi-user daemon, helper and sessions; DankMaterialShell on sway.</dd>
+</dl>
+</main>
+
+<footer>
+  <span>© 2026 StackCare, Portugal</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a href="https://github.com/zhoorta/waydesk">source</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
 </div>
 </body>
 </html>

@@ -294,3 +294,20 @@ application started, applications left idle, so an upper bound for idle and a lo
   builds of Chromium and VS Code and the 30 MB tree (25 MB on Debian) explain part of it, the rest was not separated.
 - Compression about 5 to 1 (6.6 GB of data in 1.3 GB). With seven users the zram device was full (7.5 GB of 7.6 GB in use as swap), no out-of-memory kill, memory pressure ("some", 60 s) 0.3 to 2.4 %.
 - Not measured: CPU under active work, latency, moving screens; Ubuntu arm64; Debian with the corrected `dms.sh`.
+
+## Clean installs from the repository republished on 2026-10-24 (version 0.0.1~202610241746.git7cc4c91)
+Two freshly rebuilt Hetzner servers, SSH hardened first (key only, checked from outside): **Debian 13 x86_64** (4 vCPU, 7.6 GB) and **Ubuntu 26.04 arm64** (2 vCPU, 3.7 GB). The four steps of the site (`waydesk-repo.deb`, key fingerprint
+compared, `apt install waydesk`, `waydesk-setup-admin`), then the setup engine with `dms` and `vscode` selected, then an RDP login with Debian 13's `xfreerdp3` and Chromium, Calc and VS Code started in the session.
+
+| | Debian 13 x86_64 | Ubuntu 26.04 arm64 |
+|---|---|---|
+| suite chosen by `waydesk-repo` | trixie | resolute |
+| `apt install waydesk`, setup engine | exit 0, exit 0 | exit 0, exit 0 |
+| apt sources afterwards | Debian's own and Waydesk's (no backports) | Ubuntu's own and Waydesk's |
+| shell | waydesk-shell 2.0.0+waydesk2, waydesk-quickshell 0.3.0+deb13 | same, +ubuntu26.04 |
+| Chromium | apt package, no dialog | Flathub, opens with no terms window and no keyring prompt, page loads |
+| Calc, VS Code (Flathub) | run | run |
+| session with Chromium, Calc and VS Code open | 2.3 GB | 1.2 GB in RAM and 880 MB in zram (the account's ceiling is 1.9 GB on this 3.7 GB server) |
+
+- The Ubuntu x86 and Debian arm64 combinations were exercised earlier the same day from locally built packages of the same sources (`...1657`, one commit older: the Chromium seeding was added after), Debian arm64 also from the repository on 2026-10-23. They were not reinstalled from the final repository.
+- The arm64 server's stream was decoded with the x86 Debian client through two ssh tunnels: the arm64 `xfreerdp3` on Xvfb shows a shifted double image of the same correct stream (it does the same with the previous server build), so pictures of arm64 servers are taken from an x86 client.
