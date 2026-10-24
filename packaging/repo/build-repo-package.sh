@@ -3,13 +3,13 @@
 #
 #   packaging/repo/build-repo-package.sh PUBLIC-KEY.gpg [REPO-URL]     output: packaging/out/waydesk-repo_<version>_all.deb
 #
-# REPO-URL defaults to https://waydesk.stackcare.pt/apt. The first install on a server (it cannot come from the repository itself):
-#   curl -fsSLO https://waydesk.stackcare.pt/apt/waydesk-repo.deb && sudo apt install ./waydesk-repo.deb && sudo apt update
+# REPO-URL defaults to https://waydesk.dev/apt. The first install on a server (it cannot come from the repository itself):
+#   curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb && sudo apt install ./waydesk-repo.deb && sudo apt update
 # and check the key fingerprint against the one published with it.
 set -eu
 KEY=${1:?usage: build-repo-package.sh PUBLIC-KEY.gpg [REPO-URL]}
-URL=${2:-https://waydesk.stackcare.pt/apt}
-VERSION=${WAYDESK_REPO_PACKAGE_VERSION:-1.1}
+URL=${2:-https://waydesk.dev/apt}
+VERSION=${WAYDESK_REPO_PACKAGE_VERSION:-1.2}
 cd "$(dirname "$0")/../.."
 OUT="$PWD/packaging/out"
 mkdir -p "$OUT"
@@ -20,7 +20,7 @@ P=/tmp/pkg; rm -rf $P
 mkdir -p $P/DEBIAN $P/usr/share/keyrings $P/usr/share/waydesk-repo $P/etc/apt/preferences.d $P/usr/share/doc/waydesk-repo
 install -m 644 /key.gpg $P/usr/share/keyrings/waydesk-archive-keyring.gpg
 # the apt source depends on the system (Debian 13 is trixie, Ubuntu 26.04 is resolute): a template, written out by the postinst
-sed "s|https://waydesk.stackcare.pt/apt|$URL|; /^#/d" /repo/waydesk.sources.in > $P/usr/share/waydesk-repo/waydesk.sources.in
+sed "s|https://waydesk.dev/apt|$URL|; /^#/d" /repo/waydesk.sources.in > $P/usr/share/waydesk-repo/waydesk.sources.in
 chmod 644 $P/usr/share/waydesk-repo/waydesk.sources.in
 sed "/^#/d" /repo/waydesk.pref > $P/etc/apt/preferences.d/waydesk; chmod 644 $P/etc/apt/preferences.d/waydesk
 printf "/etc/apt/preferences.d/waydesk\n" > $P/DEBIAN/conffiles

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Uploads a repository made by make-repo.sh to the web server (cPanel host "focinhos"; the folder behind https://waydesk.stackcare.pt/apt).
+# Uploads a repository made by make-repo.sh to the web server (the folder behind https://waydesk.dev/apt).
 #
 #   packaging/repo/publish.sh REPO-DIR                       dry run: reads from the server and says what it would do
 #   packaging/repo/publish.sh REPO-DIR --really --key FINGERPRINT
@@ -8,15 +8,16 @@
 # InRelease must verify with it, and the waydesk-repo package inside must carry the same key. This is so that a test key can never be published by
 # accident. REPO-DIR is the OUTDIR of make-repo.sh; put waydesk-repo.deb in it
 # first (packaging/repo/build-repo-package.sh makes it) and check that waydesk-archive-keyring.gpg is the key you mean to publish.
-# Environment: WAYDESK_PUBLISH_HOST (ssh host, default focinhos), WAYDESK_PUBLISH_DIR (default waydesk-apt, relative to the home directory).
-# The server has tar but no rsync, so this uses tar over ssh (COPYFILE_DISABLE: macOS tar would otherwise add ._* metadata files to the upload).
+# Environment: WAYDESK_PUBLISH_HOST (required: the ssh host or alias of the web server), WAYDESK_PUBLISH_DIR (the folder behind /apt, relative to the home directory of
+# that ssh account; default waydesk-apt), WAYDESK_PUBLISH_URL (default https://waydesk.dev/apt, used for the final check of every package).
+# The server only needs tar, so this uses tar over ssh (COPYFILE_DISABLE: macOS tar would otherwise add ._* metadata files to the upload).
 #
 # Order, for servers that update while this runs: 1. packages that are not on the server yet (and the key and waydesk-repo.deb); 2. the index
 # files, one by one, each replaced atomically with the signature files (Release, InRelease, Release.gpg) last; 3. packages that the new indexes
 # no longer name. Nothing outside that folder is touched.
 set -eu
 SRC=${1:?usage: publish.sh REPO-DIR [--really]}
-HOST=${WAYDESK_PUBLISH_HOST:-focinhos}
+HOST=${WAYDESK_PUBLISH_HOST:?set WAYDESK_PUBLISH_HOST to the ssh host (or alias) of the web server}
 DIR=${WAYDESK_PUBLISH_DIR:-waydesk-apt}
 REAL=""; WANT=""
 shift
@@ -89,7 +90,7 @@ ssh "$HOST" "cd ~/'$DIR' && find dists -type f > .dists-have && grep -vxFf - .di
 # 3. packages the new indexes no longer name
 if [ -s "$tmp/delete.txt" ]; then ssh "$HOST" "cd ~/'$DIR' && xargs rm -f --" < "$tmp/delete.txt"; fi
 # 4. what a client will do: ask the public URL for every package in the pool (apt writes + as %2b)
-BASE=${WAYDESK_PUBLISH_URL:-https://waydesk.stackcare.pt/apt}
+BASE=${WAYDESK_PUBLISH_URL:-https://waydesk.dev/apt}
 echo "checking every package at $BASE ..."
 (cd "$SRC" && find pool -type f | sort) | while read -r f; do
     code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/$(printf '%s' "$f" | sed 's/+/%2b/g')")

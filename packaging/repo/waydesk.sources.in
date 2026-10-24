@@ -1,6 +1,6 @@
 # /etc/apt/sources.list.d/waydesk.sources: written by the postinst of waydesk-repo, with the suite of the system (trixie or resolute) in place of @SUITE@
 Types: deb
-URIs: https://waydesk.stackcare.pt/apt
+URIs: https://waydesk.dev/apt
 Suites: @SUITE@
 Components: main
 Signed-By: /usr/share/keyrings/waydesk-archive-keyring.gpg
