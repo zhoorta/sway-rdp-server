@@ -260,3 +260,34 @@ after sorting them on two machines (the Mac and the server sort `+`, `~` and `_`
 - Observation, not changed: the admission rule looks at available memory, which does not count what the kernel could still free by moving idle pages into the (now large) zram. With 3 GB of zram free, the arm64 server
   refused the fifth user at 754 MB available. Whether the rule should count some of that is open; it errs on the safe side.
 - Not measured: CPU with active work, latency, moving screens on these two servers.
+
+## Clean install and heavy users on Ubuntu 26.04 x86 (2026-10-24)
+Fresh Hetzner server, **Ubuntu 26.04.1, x86_64, 4 vCPU, 7.6 GB**. SSH hardened first (key only, checked from outside). Then what the site tells a user: `waydesk-repo.deb` from `https://waydesk.stackcare.pt/apt` (suite `resolute` chosen from
+`VERSION_CODENAME`, fingerprint C646 72B2 5ECD 4773 196C 3958 9D8E 8874 E676 17F4 compared), `apt install waydesk` (exit 0, zram 7.6 GB zstd, `waydesk` and `waydesk-helper` active), `waydesk-setup-admin`, and the setup engine
+with `vscode` and `dms` selected. Clients: a Debian 13 container with `xfreerdp3` and Xvfb on the server (Ubuntu's own `xfreerdp3` cannot decode our H.264).
+
+- **Session**: the shell (bar, clock, wallpaper), desktop icons, LibreOffice Calc (apt), VS Code and Chromium (Flathub). Chromium has the title-bar buttons and a correct dock icon once its first-run dialogs are out of the way.
+- **Bug found by this run, fixed in `4639c24` (not yet published)**: `dms.sh` added Debian's `trixie-backports` and installed `quickshell` from it even with the Waydesk repository configured. On Ubuntu that source is unsigned, so `apt update` failed
+  and `waydesk-shell` was never installed (the session had a desktop but no shell). With the repository configured the script now installs only `waydesk-shell`, which brings `waydesk-quickshell`.
+- **Two first-run dialogs of the Flathub Chromium, not fixed**: "Chromium Additional Terms of Service" (a placeholder text in this build; the window has an empty app id, so the dock shows "?" and the browser does nothing until it is
+  accepted) and gnome-keyring's "Choose password for new keyring" (the page stays on "Loading..." behind it). The capacity accounts were seeded past both (`First Run`, `EULA Accepted`, `--password-store=basic`); that is test setup, not a decision.
+  A session that was started before the shell was installed keeps running without it until `waydesk-admin sessions end`.
+
+**Capacity, heavy users** (Chromium with Wikipedia "Linux", BBC News, debian.org; Calc with a 300,000 x 10 CSV, 23 MB; VS Code on a 30 MB copy of the Python standard library, 1308 files; one account at a time, 70 to 100 s after the last
+application started, applications left idle, so an upper bound for idle and a lower bound for active work; CPU of a user was still 140 % at the first reading because VS Code was indexing and its welcome screen animates):
+
+| Users (all heavy) | Available | zram data / compressed |
+|---|---|---|
+| 1 | 5.2 GB | 0.7 MB |
+| 2 | 3.4 GB | 0.7 MB |
+| 3 | 2.1 GB | 472 MB / 113 MB |
+| 4 | 2.2 GB | 2.2 GB / 471 MB |
+| 5 | 2.0 GB | 3.9 GB / 816 MB |
+| 6 | 1.7 GB | 5.6 GB / 1.1 GB |
+| 7 | 810 MB (a new session is refused: 1161 MB needed) | 6.6 GB / 1.3 GB |
+| 8 | refused (`the server is short of memory (472 MB available, 1161 MB needed)`, the client was disconnected after 2 s) | |
+
+- **7 heavy users fit, the 8th was refused**; on Debian 13 (same hardware class, same procedure) 8 fit. One user cost 2.0 GB here (cgroup: Chromium 1.6-1.9 GB, VS Code 1.4 GB, shell 400 MB; Calc about 210 MB) against 1.85 GB on Debian; the Flatpak
+  builds of Chromium and VS Code and the 30 MB tree (25 MB on Debian) explain part of it, the rest was not separated.
+- Compression about 5 to 1 (6.6 GB of data in 1.3 GB). With seven users the zram device was full (7.5 GB of 7.6 GB in use as swap), no out-of-memory kill, memory pressure ("some", 60 s) 0.3 to 2.4 %.
+- Not measured: CPU under active work, latency, moving screens; Ubuntu arm64; Debian with the corrected `dms.sh`.
