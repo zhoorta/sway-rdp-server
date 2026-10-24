@@ -7,6 +7,12 @@ SUDO=""; [ "$(id -u)" -eq 0 ] || SUDO="sudo"
 $SUDO apt-get install -y --no-install-recommends curl gnupg ca-certificates
 $SUDO mkdir -p /etc/apt/keyrings
 
+# With the waydesk repository configured (/etc/apt/sources.list.d/waydesk.sources, packaging/repo), the shell and its helpers (danksearch,
+# dgop, matugen) come from there, built by us (docs/DMS-PACKAGE.md), and the third-party repositories are not added. quickshell comes from there too
+# (waydesk-quickshell, a private build under /usr/lib/waydesk), so Debian's backports are not needed and not added.
+OWN_REPO=
+[ -f /etc/apt/sources.list.d/waydesk.sources ] && OWN_REPO=1
+if [ -z "$OWN_REPO" ]; then
 # quickshell must come from trixie-backports (the old DankLinux build is deprecated). The installed build is the one that counts: a
 # backports version has "~bpo" in it. (Looking for the DankLinux repository in `apt-cache policy` removed a good, held build once that
 # repository also listed a newer quickshell.)
@@ -15,17 +21,13 @@ if dpkg -s quickshell >/dev/null 2>&1 && ! dpkg-query -W -f='${Version}' quicksh
   $SUDO apt-get remove -y quickshell
 fi
 echo "deb http://deb.debian.org/debian trixie-backports main" | $SUDO tee /etc/apt/sources.list.d/trixie-backports.list >/dev/null
+fi
 
 repo() { # name url
   local name="$1" url="$2"
   [ -f "/etc/apt/keyrings/$name.gpg" ] || curl -fsSL "${url}Release.key" | $SUDO gpg --dearmor -o "/etc/apt/keyrings/$name.gpg"
   echo "deb [signed-by=/etc/apt/keyrings/$name.gpg] $url /" | $SUDO tee "/etc/apt/sources.list.d/$name.list" >/dev/null
 }
-# With the waydesk repository configured (/etc/apt/sources.list.d/waydesk.sources, packaging/repo), the shell and its helpers (danksearch,
-# dgop, matugen) come from there, built by us (docs/DMS-PACKAGE.md), and the third-party repositories are not added. Only quickshell still
-# comes from Debian (trixie-backports).
-OWN_REPO=
-[ -f /etc/apt/sources.list.d/waydesk.sources ] && OWN_REPO=1
 if [ -z "$OWN_REPO" ]; then
 repo danklinux     https://download.opensuse.org/repositories/home:/AvengeMedia:/danklinux/Debian_13/
 repo avengemedia-dms https://download.opensuse.org/repositories/home:/AvengeMedia:/dms/Debian_13/
@@ -34,7 +36,7 @@ fi
 $SUDO apt-get update
 # Only when it is missing: an installed quickshell is held with DMS (below) and moves with it (WAYDESK_DMS_UPDATE=1); asking for the
 # newest one of trixie-backports on every run failed once backports had a newer build that needs other new libraries.
-dpkg -s quickshell >/dev/null 2>&1 || $SUDO apt-get install -y -t trixie-backports quickshell
+[ -n "$OWN_REPO" ] || dpkg -s quickshell >/dev/null 2>&1 || $SUDO apt-get install -y -t trixie-backports quickshell
 # qt6-wayland: without it the shell opens as plain windows instead of a bar and wallpaper
 # DMS is pinned: its repository is not versioned by us and a new major release moves files the shell patches (waydesk-shell) and
 # the plugins rely on, which broke running sessions once (1.6.3 -> 2.0.0). The tested version is installed and held; WAYDESK_DMS_UPDATE=1
@@ -46,7 +48,8 @@ if [ -n "$OWN_REPO" ]; then
   # Our own build (package waydesk-shell, Provides: dms): updated with the rest of waydesk, only quickshell stays held.
   $SUDO apt-mark unhold dms >/dev/null 2>&1 || true
   $SUDO apt-get install -y waydesk-shell
-  $SUDO apt-mark hold quickshell >/dev/null
+  # a backports quickshell from an earlier install stays held; waydesk-quickshell needs no hold (a private prefix)
+  if dpkg -s quickshell >/dev/null 2>&1; then $SUDO apt-mark hold quickshell >/dev/null; fi
 elif [ -n "${WAYDESK_DMS_UPDATE:-}" ]; then
   $SUDO apt-mark unhold dms quickshell >/dev/null 2>&1 || true
   $SUDO apt-get install -y dms
