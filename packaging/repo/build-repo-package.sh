@@ -9,7 +9,7 @@
 set -eu
 KEY=${1:?usage: build-repo-package.sh PUBLIC-KEY.gpg [REPO-URL]}
 URL=${2:-https://waydesk.dev/apt}
-VERSION=${WAYDESK_REPO_PACKAGE_VERSION:-1.2}
+VERSION=${WAYDESK_REPO_PACKAGE_VERSION:-1.3}
 cd "$(dirname "$0")/../.."
 OUT="$PWD/packaging/out"
 mkdir -p "$OUT"
@@ -29,8 +29,14 @@ cat > $P/DEBIAN/postinst <<"POSTINST"
 set -e
 if [ "$1" = configure ]; then
     f=/etc/apt/sources.list.d/waydesk.sources
-    # An existing file stays (version 1.0 shipped it as a conffile, always for trixie).
-    if [ ! -e "$f" ]; then
+    # An existing file stays (version 1.0 shipped it as a conffile, always for trixie), except for one change: a file that still has the old address of the
+    # repository (waydesk.stackcare.pt, used until 2026-10-24) is moved to the address of the template of this package; any other edit is left alone.
+    if [ -e "$f" ]; then
+        new=$(sed -n "s/^URIs: //p" /usr/share/waydesk-repo/waydesk.sources.in)
+        if [ -n "$new" ] && grep -qx "URIs: https://waydesk.stackcare.pt/apt" "$f"; then
+            sed -i "s|^URIs: https://waydesk.stackcare.pt/apt\$|URIs: $new|" "$f"
+        fi
+    else
         suite=""
         [ -r /etc/os-release ] && . /etc/os-release
         case "${VERSION_CODENAME:-}" in
