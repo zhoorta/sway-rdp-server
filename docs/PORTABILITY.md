@@ -86,3 +86,11 @@ Debian client (a `debian:13` container with `freerdp3-x11`, `--network host`, Xv
   `waydesk-admin` was also fixed (SIGPIPE).
 
 **Still open for Ubuntu:** clean install from the published repository on fresh Ubuntu servers; the app tests (LibreOffice, VS Code) and capacity on Ubuntu; Ubuntu 24.04 (not built: a different Qt and wlroots); the Flatpak Chromium first-run dialog and its dock icon; `docker-compose` alternatives in other rows if more turn up.
+
+## Arch and Omarchy (candidate, decided 2026-10-24: not now)
+
+Omarchy (Arch + Hyprland, single-user local workstation) has a large community, but it is a poor fit for a multi-user headless RDP server: it owns the session (Hyprland, its own menus and themes), and a rolling release moves sway, wlroots, Qt and
+quickshell under us, so the private-stack approach would become a PKGBUILD/AUR package that can break on any upgrade. Not worth starting before the remaining work (clean installs from the published repository, site, waydesk.dev migration, Ubuntu app and capacity tests, Fedora, Ubuntu 24.04).
+
+If it is done, target generic **Arch**, not Omarchy-specific (Omarchy users can then use it; nobody has to run Omarchy). Cheap first step, a few hours, in the "other distributions" round after the Fedora probe: an `archlinux` container on the x86 test
+server to check that the Rust server builds, that Arch's sway and wlroots work with the title-bar patch, what a PKGBUILD needs (sway, quickshell, pcmanfm-qt, freerdp), and how a rolling release should be pinned.
