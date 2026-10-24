@@ -1,6 +1,6 @@
 [package]
 name = "waydesk-server"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2021"
 description = "RDP server for sway: one headless output per connection, H.264 over the graphics pipeline, keyboard, pointer and audio"
 license = "MIT OR Apache-2.0"
