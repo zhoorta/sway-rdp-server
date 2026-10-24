@@ -636,6 +636,7 @@ async fn main() -> anyhow::Result<()> {
                     warn!(%peer, "too many connections, refused");
                     continue;
                 };
+                limit_stall(&stream, peer);
                 let common = common.clone();
                 tokio::task::spawn_local(async move {
                     serve(stream, peer, common).await;
@@ -645,6 +646,27 @@ async fn main() -> anyhow::Result<()> {
         })
         .await;
     Ok(())
+}
+
+/// A client that stops reading (frozen, or its network gone) leaves data in the send queue; the kernel's own limit for that is about
+/// 15 minutes, and a client that still answers the zero-window probes keeps the connection for ever, with its task, buffers and slot.
+/// This ends such a connection after STALL_LIMIT without progress, and probes idle ones so that a silent peer is noticed too.
+const STALL_LIMIT: std::time::Duration = std::time::Duration::from_secs(60);
+
+fn limit_stall(stream: &tokio::net::TcpStream, peer: std::net::SocketAddr) {
+    use std::os::fd::AsRawFd;
+    let fd = stream.as_raw_fd();
+    let set = |level: libc::c_int, name: libc::c_int, value: libc::c_int| {
+        let r = unsafe { libc::setsockopt(fd, level, name, (&value as *const libc::c_int).cast(), std::mem::size_of::<libc::c_int>() as libc::socklen_t) };
+        if r != 0 {
+            warn!(%peer, "cannot set socket option {name}: {}", std::io::Error::last_os_error());
+        }
+    };
+    set(libc::IPPROTO_TCP, libc::TCP_USER_TIMEOUT, STALL_LIMIT.as_millis() as libc::c_int);
+    set(libc::SOL_SOCKET, libc::SO_KEEPALIVE, 1);
+    set(libc::IPPROTO_TCP, libc::TCP_KEEPIDLE, 30);
+    set(libc::IPPROTO_TCP, libc::TCP_KEEPINTVL, 10);
+    set(libc::IPPROTO_TCP, libc::TCP_KEEPCNT, 3);
 }
 
 /// How long a connection may take to log in.
