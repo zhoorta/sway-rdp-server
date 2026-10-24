@@ -153,6 +153,13 @@ No hardware encoding (VA-API), no Opus, relative mouse and Unicode key events, C
 do not start on a server without one (Zed). Not independently reviewed: the internal security passes are in `docs/SECURITY-REVIEW.md`. See
 `docs/MULTIUSER-DESIGN.md` and the open items on [waydesk.dev](https://waydesk.dev/#security).
 
+## Source of the copyleft programs
+
+Waydesk and the programs it builds itself (sway, wlroots, DankMaterialShell, danksearch, dgop) are under MIT or Apache-2.0. The repository also ships three copyleft programs as binaries:
+matugen 4.2.0 (GPL-2.0-or-later), quickshell 0.3.0 (LGPL-3.0-only) and our patched pcmanfm-qt (GPL-2.0-or-later). Their source is offered from the same place as the packages:
+<https://waydesk.dev/apt/source/> (`README`, `SHA256SUMS`, the upstream archives, the crates matugen builds from, the Debian and Ubuntu source packages of pcmanfm-qt and our two patches).
+`packaging/source/collect-source.sh` makes that folder.
+
 ## Licence
 
 Dual-licensed under either of [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option. `patches/ironrdp-server` is a

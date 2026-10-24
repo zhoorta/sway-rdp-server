@@ -251,6 +251,16 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <div class="ent"><code class="k">/etc/apt/sources.list.d/waydesk.sources</code><p>the repository, written for your release</p></div>
 <div class="ent"><code class="k">/etc/apt/preferences.d/waydesk</code><p>the pin: these packages win over third-party builds of the same names</p></div>
 <div class="ent"><code class="k">/usr/lib/systemd/zram-generator.conf.d/50-waydesk.conf</code><p>zram as large as the RAM, at most 16 GiB</p></div>
+<p class="grp">Source code and licences</p>
+<p>Waydesk is MIT or Apache-2.0 (<a href="https://github.com/zhoorta/waydesk">source on GitHub</a>); so are the other programs we build: sway, wlroots, DankMaterialShell, danksearch and dgop. Three copyleft programs are in the repository as binaries, and their source is offered here, from the same place as the packages, at no charge:</p>
+<ul class="plain">
+<li><b>matugen 4.2.0</b> (GPL-2.0-or-later), built unmodified from the upstream tag, with its Rust crates</li>
+<li><b>quickshell 0.3.0</b> (LGPL-3.0-only), built unmodified from Debian's copy of the release</li>
+<li><b>pcmanfm-qt</b> (GPL-2.0-or-later): the Debian 13 and Ubuntu 26.04 source packages and our two patches (they remove menu entries)</li>
+</ul>
+<pre><code><span class="p">$</span> curl -fsSL https://waydesk.dev/apt/source/README</code></pre>
+<p class="dim">Every file is listed with its checksum in <a href="/apt/source/SHA256SUMS">SHA256SUMS</a>; <a href="/apt/source/">the folder</a> has the archives. Each package also carries its licence under <code>/usr/share/doc/&lt;package&gt;/copyright</code>.</p>
+
 <p class="grp">Key</p>
 <p>Packages and indexes are signed with one ed25519 key, fingerprint <code>C64672B25ECD4773196C39589D8E8874E67617F4</code>, expires 2029-10-21. The public key is <code>/apt/waydesk-archive-keyring.gpg</code>.</p>
 
