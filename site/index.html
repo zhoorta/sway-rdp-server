@@ -208,6 +208,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <h2 id="limits">Limits</h2>
 <ul class="plain">
 <li>Early software. Tested with FreeRDP and the Windows App on macOS; Microsoft Remote Desktop (Windows) and mstsc were not tested.</li>
+<li>No X11: <code>waydesk-sway</code> is built without XWayland, so an application that only speaks X11 does not start (Qt says "could not connect to display"). Most Flatpaks also offer Wayland; for one that does not, try <code>flatpak override --user --socket=wayland --env=QT_QPA_PLATFORM=wayland APP-ID</code> (for Qt apps; found with CoreX Hardware Monitor, which then runs). Whether to ship XWayland is open.</li>
 <li>No GPU: applications that insist on one do not start. Zed fails with "Failed to create surface"; VS Code and LibreOffice work.</li>
 <li>Sizing: on an 8 GB, 4-core server count 7 to 8 users with Chromium, Calc and VS Code open if most are idle. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down.</li>
 <li>First run of the Flathub Chromium: a seeded <code>First Run</code>/<code>EULA Accepted</code> skips its terms window, whose text is only a placeholder in that build.</li>

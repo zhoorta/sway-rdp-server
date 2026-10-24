@@ -150,7 +150,7 @@ because the old client is dropped before the new one has authenticated (so anyon
 ## Known gaps
 
 No hardware encoding (VA-API), no Opus, relative mouse and Unicode key events, Caps Lock sync; the clipboard is text only. Applications that insist on a GPU
-do not start on a server without one (Zed). Not independently reviewed: the internal security passes are in `docs/SECURITY-REVIEW.md`. See
+do not start on a server without one (Zed), and so do applications that only speak X11 (there is no XWayland; a Qt Flatpak can be pointed at Wayland with `flatpak override --user --socket=wayland --env=QT_QPA_PLATFORM=wayland APP-ID`). Not independently reviewed: the internal security passes are in `docs/SECURITY-REVIEW.md`. See
 `docs/MULTIUSER-DESIGN.md` and the open items on [waydesk.dev](https://waydesk.dev/#security).
 
 ## Source of the copyleft programs
