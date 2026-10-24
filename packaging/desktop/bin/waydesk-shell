@@ -277,6 +277,12 @@ if [ ! -e "$dms_dir/.flatpak-chromium" ] && { [ -d /var/lib/flatpak/app/org.chro
     done
     flags="$flatpak_chromium/config/chromium-flags.conf"
     grep -qs -- '--disable-gpu' "$flags" || printf '%s\n' '--disable-gpu' >> "$flags"
+    # First run of the Flathub build: its "Additional Terms of Service" window has a placeholder text ("This Space Intentionally Blank") and the
+    # browser does not open until it is accepted; these two files are what the accept button writes. And no keyring: nothing unlocks one in a
+    # Waydesk session (the password is checked by the helper, not by the session's PAM stack), so libsecret would ask for a new password at the first
+    # page. The basic store keeps cookies and saved passwords under a fixed key (the account's home directory permissions are their only protection).
+    touch "$flatpak_chromium/config/chromium/First Run" "$flatpak_chromium/config/chromium/EULA Accepted"
+    grep -qs -- '--password-store' "$flags" || printf '%s\n' '--password-store=basic' >> "$flags"
     prefs="$flatpak_chromium/config/chromium/Default/Preferences"
     if ! pgrep -u "$(id -u)" -f 'org.chromium.Chromium' >/dev/null 2>&1; then
         python3 - "$prefs" <<'PY'

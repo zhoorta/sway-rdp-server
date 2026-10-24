@@ -269,8 +269,11 @@ with `vscode` and `dms` selected. Clients: a Debian 13 container with `xfreerdp3
 - **Session**: the shell (bar, clock, wallpaper), desktop icons, LibreOffice Calc (apt), VS Code and Chromium (Flathub). Chromium has the title-bar buttons and a correct dock icon once its first-run dialogs are out of the way.
 - **Bug found by this run, fixed in `4639c24` (not yet published)**: `dms.sh` added Debian's `trixie-backports` and installed `quickshell` from it even with the Waydesk repository configured. On Ubuntu that source is unsigned, so `apt update` failed
   and `waydesk-shell` was never installed (the session had a desktop but no shell). With the repository configured the script now installs only `waydesk-shell`, which brings `waydesk-quickshell`.
-- **Two first-run dialogs of the Flathub Chromium, not fixed**: "Chromium Additional Terms of Service" (a placeholder text in this build; the window has an empty app id, so the dock shows "?" and the browser does nothing until it is
-  accepted) and gnome-keyring's "Choose password for new keyring" (the page stays on "Loading..." behind it). The capacity accounts were seeded past both (`First Run`, `EULA Accepted`, `--password-store=basic`); that is test setup, not a decision.
+- **Two first-run dialogs of the Flathub Chromium (fixed the same day in `waydesk-shell`, checked with a new account)**: "Chromium Additional Terms of Service" (a placeholder text in this build; the window has an empty app id, so the dock showed "?" and
+  the browser did nothing until it was accepted) and gnome-keyring's "Choose password for new keyring" (the page stayed on "Loading..." behind it). `waydesk-shell` now writes `First Run` and `EULA Accepted` (what the accept button writes) and
+  `--password-store=basic` for the Flatpak build. The basic store keeps cookies and saved passwords under a fixed key, protected only by the home directory's permissions. A keyring that unlocks with the login password is not possible
+  with the present design: the password is checked by the helper (PAM service `waydesk-server`, authentication and account only), the session starts from another unit with its own PAM service, so `pam_gnome_keyring` never sees the password.
+  The capacity accounts below were seeded the same way by hand. The "!" badge on the desktop icon of the Flatpak Chromium is still there.
   A session that was started before the shell was installed keeps running without it until `waydesk-admin sessions end`.
 
 **Capacity, heavy users** (Chromium with Wikipedia "Linux", BBC News, debian.org; Calc with a 300,000 x 10 CSV, 23 MB; VS Code on a 30 MB copy of the Python standard library, 1308 files; one account at a time, 70 to 100 s after the last
