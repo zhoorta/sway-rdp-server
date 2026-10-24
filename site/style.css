@@ -25,18 +25,20 @@ body {
 }
 
 .col { max-width: 98ch; margin: 0 auto; padding: 0 16px 4rem; }
-.col > header, main > p, main > h1, main > h2, main > h3, main > ul, main > dl.log { max-width: 78ch; }
+main > p, main > h1, main > h2, main > h3, main > ul, main > dl.log { max-width: 78ch; }
 
 a { color: var(--copper); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
 a:hover { text-decoration-thickness: 2px; }
 :focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
 
 header { padding: 1.4rem 0 1rem; border-bottom: 1px solid var(--line); margin-bottom: 1.6rem; }
-.wordmark { font-size: 1.25rem; font-weight: 700; color: var(--fg); text-decoration: none; letter-spacing: .02em; }
-.wordmark span { color: var(--copper); }
+.logo { display: inline-block; line-height: 0; }
+.logo img { height: 34px; width: auto; display: block; }
 nav { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .2rem 1.1rem; font-size: .88rem; }
 nav a { color: var(--dim); text-decoration: none; }
 nav a:hover { color: var(--copper); }
+nav a.gh, footer a.gh { display: inline-flex; align-items: center; gap: .4em; }
+.gh svg { width: 1.05em; height: 1.05em; fill: currentColor; }
 
 h1 { font-size: 1.35rem; line-height: 1.35; margin: 0 0 .8rem; font-weight: 700; }
 h2 { font-size: 1.05rem; margin: 2.6rem 0 .8rem; color: var(--fg); font-weight: 700; }
@@ -79,9 +81,9 @@ ul.plain { list-style: none; padding: 0; margin: .6rem 0; }
 ul.plain li { padding-left: 1.6em; position: relative; margin: .45rem 0; }
 ul.plain li::before { content: "-"; position: absolute; left: .4em; color: var(--copper); }
 
-dl.ref { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1.4rem; font-size: .86rem; margin: .8rem 0; }
-dl.ref dt { color: var(--fg); overflow-wrap: anywhere; }
-dl.ref dd { margin: 0; color: var(--dim); }
+dl.refold { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1.4rem; font-size: .86rem; margin: .8rem 0; }
+dl.refold dt { color: var(--fg); overflow-wrap: anywhere; }
+dl.refold dd { margin: 0; color: var(--dim); }
 
 .log { font-size: .86rem; }
 .log dt { color: var(--copper); margin-top: .9rem; }
@@ -91,7 +93,26 @@ footer { margin-top: 3.5rem; padding-top: 1rem; border-top: 1px solid var(--line
 
 @media (max-width: 560px) {
   body { font-size: 14px; }
-  dl.ref { grid-template-columns: 1fr; }
-  dl.ref dd { margin-bottom: .5rem; }
+  dl.refold { grid-template-columns: 1fr; }
+  dl.refold dd { margin-bottom: .5rem; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* reference entries: the command or path on its own line, the description under it */
+.grp { color: var(--dim); font-size: .84rem; margin: 1.6rem 0 .3rem; }
+.ent { margin: .7rem 0 0; }
+.ent code.k { display: block; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--copper); border-radius: 0; padding: .35rem .8rem; font-size: .86rem; overflow-x: auto; white-space: pre; }
+.ent p { margin: .25rem 0 0 .9rem; color: var(--dim); font-size: .86rem; line-height: 1.5; }
+
+/* architecture diagram */
+.dg { margin: 1rem 0; max-width: 520px; }
+.dg svg { display: block; width: 100%; height: auto; }
+.dg .zone { fill: none; stroke: var(--dim); stroke-width: 1; stroke-dasharray: 5 4; }
+.dg .box { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
+.dg .box.root { stroke: var(--copper); }
+.dg .arrow { fill: none; stroke: var(--copper); stroke-width: 1.5; }
+.dg text { font-family: var(--mono); font-size: 12.5px; fill: var(--fg); }
+.dg .nm { font-weight: 700; font-size: 13.5px; }
+.dg .dm { fill: var(--dim); }
+.dg .zl { fill: var(--dim); font-size: 11.5px; }
+.dg .rn { fill: var(--copper); }

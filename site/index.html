@@ -19,7 +19,7 @@
 <body>
 <div class="col">
 <header>
-  <a class="wordmark" href="/">waydesk<span>_</span></a>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
   <nav aria-label="Sections">
     <a href="#install">install</a>
     <a href="#support">support</a>
@@ -28,12 +28,13 @@
     <a href="#security">security</a>
     <a href="#reference">reference</a>
     <a href="#changelog">changelog</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
   </nav>
 </header>
 
 <main>
 <h1>A Wayland desktop per account on your server, over RDP.</h1>
-<p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04 (amd64 or arm64). Every account that logs in over RDP gets its own headless sway session with a shell, kept alive across disconnects, with memory ceilings and a refusal when the machine is full. H.264 over RDP, no GPU needed. Free software, early, one author.</p>
+<p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04 (amd64 or arm64). Every account that logs in over RDP gets its own headless sway session with a shell, kept alive across disconnects, with memory ceilings and a refusal when the machine is full. H.264 over RDP, no GPU needed. Free software, early, one author. <a href="https://github.com/zhoorta/waydesk">Source on GitHub</a>.</p>
 
 <pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
 <span class="p">$</span> sudo apt install ./waydesk-repo.deb
@@ -89,30 +90,67 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <p class="method">"Tested": a clean server, SSH hardened first, then exactly the four steps above, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. Windows App, Microsoft Remote Desktop and mstsc were not part of the multi-user tests.</p>
 
 <h2 id="architecture">Architecture</h2>
-<pre><code>  client  --TLS/RDP--&gt;  waydesk.service         user <b>waydesk</b>, no login, sandboxed
- (FreeRDP,               TLS, RDP, EGFX/H.264, audio and clipboard framing
-  Windows App)                |   unix socket, SO_PEERCRED checked
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ trust boundary: root
-                              v
-                       waydesk-helper.service  <b>root</b>, no network
-                       PAM check, starts the session as that account,
-                       refuses it when memory cannot take one more
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ trust boundary: each account
-                              v
-                waydesk-session@UID.service   <b>the account</b>, own logind session, own slice
-                  sway (headless, own XDG_RUNTIME_DIR 0700)
-                    +- capture (wlr-screencopy) + H.264 encode + input + audio + clipboard
-                    +- shell (quickshell), apps (Chromium, LibreOffice, VS Code ...)</code></pre>
+<div class="dg">
+<svg viewBox="0 0 520 556" role="img" aria-labelledby="dgt dgd">
+<title id="dgt">How a login reaches a session</title>
+<desc id="dgd">The client connects with TLS and RDP to the waydesk daemon, which has no privileges. The daemon asks the root helper, over a unix socket, to check the password and start a session. The helper starts the session as the account itself. The session sends screen, input, audio and clipboard back to the daemon.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e08a3c"/></marker></defs>
+
+<rect class="box" x="110" y="8" width="240" height="46" rx="3"/>
+<text class="nm" x="230" y="28" text-anchor="middle">client</text>
+<text class="dm" x="230" y="45" text-anchor="middle">FreeRDP, Windows App</text>
+<path class="arrow" d="M230 54V120" marker-end="url(#ah)"/>
+<text x="242" y="92">TLS, RDP</text>
+
+<rect class="zone" x="8" y="100" width="504" height="116" rx="4"/>
+<text class="zl" x="20" y="117">network-facing, no privileges</text>
+<rect class="box" x="110" y="124" width="240" height="76" rx="3"/>
+<text class="nm" x="230" y="145" text-anchor="middle">waydesk.service</text>
+<text class="rn" x="230" y="162" text-anchor="middle">runs as: waydesk</text>
+<text class="dm" x="230" y="180" text-anchor="middle">TLS, RDP, H.264 framing</text>
+<text class="dm" x="230" y="195" text-anchor="middle">no PAM, no user files</text>
+
+<path class="arrow" d="M230 200V260" marker-end="url(#ah)"/>
+<text x="242" y="236">unix socket,</text>
+<text x="242" y="251">peer credentials checked</text>
+
+<rect class="zone" x="8" y="226" width="504" height="108" rx="4"/>
+<text class="zl" x="20" y="243">root, no network</text>
+<rect class="box root" x="110" y="262" width="240" height="64" rx="3"/>
+<text class="nm" x="230" y="283" text-anchor="middle">waydesk-helper.service</text>
+<text class="rn" x="230" y="300" text-anchor="middle">runs as: root</text>
+<text class="dm" x="230" y="317" text-anchor="middle">PAM check, memory admission</text>
+
+<path class="arrow" d="M230 326V402" marker-end="url(#ah)"/>
+<text x="242" y="360">starts the session</text>
+<text x="242" y="375">as that account</text>
+
+<rect class="zone" x="8" y="342" width="504" height="206" rx="4"/>
+<text class="zl" x="20" y="359">the account itself</text>
+<text class="zl" x="500" y="540" text-anchor="end">own logind session, own cgroup</text>
+<rect class="box" x="110" y="402" width="240" height="120" rx="3"/>
+<text class="nm" x="230" y="423" text-anchor="middle">waydesk-session@UID</text>
+<text class="rn" x="230" y="440" text-anchor="middle">runs as: the account</text>
+<text class="dm" x="230" y="460" text-anchor="middle">sway (headless)</text>
+<text class="dm" x="230" y="476" text-anchor="middle">capture, H.264 encode, input</text>
+<text class="dm" x="230" y="492" text-anchor="middle">audio, clipboard</text>
+<text class="dm" x="230" y="508" text-anchor="middle">shell, apps</text>
+
+<path class="arrow" d="M350 462H492V162H354" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text x="484" y="436" text-anchor="end">screen, input,</text>
+<text x="484" y="451" text-anchor="end">audio, clipboard</text>
+</svg>
+</div>
 <div class="tw"><table>
 <tr><th>Part</th><th>Runs as</th><th>Does</th><th>Never does</th></tr>
 <tr><td><code>waydesk</code></td><td>waydesk</td><td>TLS, RDP protocol, channel framing, rate limits per address</td><td>touch user files, call PAM, keep passwords after the check</td></tr>
 <tr><td><code>waydesk-helper</code></td><td>root</td><td>checks the password through PAM, starts and finds sessions, admits or refuses by memory</td><td>parse RDP or TLS, listen on the network</td></tr>
 <tr><td><code>waydesk-session@UID</code></td><td>the account</td><td>its sway, capture, encoder, input, audio, clipboard, hooks</td><td>anything as another user</td></tr>
 </table></div>
-<p>A session is a systemd unit of the account, so it survives a disconnect, sits in <code>user-UID.slice</code> (limits there apply) and is killed with its control group. A second login from the same account takes the running session over. Design notes: <code>docs/MULTIUSER-DESIGN.md</code> in the repository.</p>
+<p>A session is a systemd unit of the account, so it survives a disconnect, sits in <code>user-UID.slice</code> (limits there apply) and is killed with its control group. A second login from the same account takes the running session over. Design notes: <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MULTIUSER-DESIGN.md"><code>docs/MULTIUSER-DESIGN.md</code></a> in the repository.</p>
 
 <h2 id="measurements">Measurements</h2>
-<p>All figures are from our own servers (Hetzner cloud, no GPU), with the method next to them. Full tables and the failed attempts are in <code>docs/MEASUREMENTS.md</code> in the repository.</p>
+<p>All figures are from our own servers (Hetzner cloud, no GPU), with the method next to them. Full tables and the failed attempts are in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MEASUREMENTS.md"><code>docs/MEASUREMENTS.md</code></a> in the repository.</p>
 
 <h3>Heavy users on 8 GB, 4 vCPU (x86_64)</h3>
 <p>Available memory (<code>free</code>'s figure) after each user has logged in over RDP and opened Chromium (Wikipedia, BBC News, debian.org), LibreOffice Calc with a 300,000 x 10 CSV and VS Code on a source tree.</p>
@@ -147,7 +185,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <h3>Reaching it</h3>
 <p>Do not put the RDP port on the internet. The daemon binds 127.0.0.1:3389 and the login is the account's own password, checked by PAM, sent inside TLS with a self-signed certificate (PAM cannot do NLA). Anyone who can intercept an unchecked certificate can read passwords, so check the fingerprint on first use.</p>
 <pre><code><span class="p">$</span> ssh -N -L 13389:127.0.0.1:3389 you@server    <span class="c"># then connect the client to localhost:13389</span></code></pre>
-<p>For several people: WireGuard, a key per device, RDP bound to the VPN address, only UDP 51820 open. <code>/usr/share/doc/waydesk-server/WIREGUARD.md</code> has the configuration.</p>
+<p>For several people: WireGuard, a key per device, RDP bound to the VPN address, only UDP 51820 open. <a href="https://github.com/zhoorta/waydesk/blob/main/docs/WIREGUARD.md"><code>docs/WIREGUARD.md</code></a> has the configuration (installed as <code>/usr/share/doc/waydesk-server/WIREGUARD.md</code>).</p>
 
 <h3>Threat model</h3>
 <ul class="plain">
@@ -164,7 +202,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <li>Passwords are not wiped from memory; daemon and helper are one binary.</li>
 <li>Many failed logins from many addresses are logged, not stopped. <code>pam_faillock</code> in the PAM stack of the service does it, with the trade-off that a stranger can then lock the owner out.</li>
 <li>Chromium from Flathub runs with <code>--password-store=basic</code>: nothing in a Waydesk session unlocks a keyring, so saved passwords and cookies sit under a fixed key, protected by the home directory's permissions only.</li>
-<li>No fuzzing of the RDP side, no independent review. Four internal passes are written down in <code>docs/SECURITY-REVIEW.md</code>; an outside review should start at <code>src/helper.rs</code>, <code>src/auth.rs</code>, <code>src/link.rs</code>, <code>src/proto.rs</code> and the unit files.</li>
+<li>No fuzzing of the RDP side, no independent review. Four internal passes are written down in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/SECURITY-REVIEW.md"><code>docs/SECURITY-REVIEW.md</code></a>; an outside review should start at <code>src/helper.rs</code>, <code>src/auth.rs</code>, <code>src/link.rs</code>, <code>src/proto.rs</code> and the unit files.</li>
 </ul>
 
 <h2 id="limits">Limits</h2>
@@ -176,39 +214,44 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 </ul>
 
 <h2 id="reference">Reference</h2>
-<h3>Packages</h3>
-<dl class="ref">
-<dt>waydesk</dt><dd>metapackage: server, desktop</dd>
-<dt>waydesk-server</dt><dd>daemon, helper, <code>waydesk-admin</code>, <code>waydesk-setup-admin</code>, PAM services, units, zram and sysctl drop-ins, minimal sway config</dd>
-<dt>waydesk-desktop</dt><dd>sway config, setup wizard (<code>waydesk-setup</code>), per-account shell setup, administrator panels</dd>
-<dt>waydesk-shell, waydesk-quickshell</dt><dd>DankMaterialShell 2.0.0 built by us with our patches; quickshell 0.3.0 (private prefix on Ubuntu and Debian)</dd>
-<dt>waydesk-sway</dt><dd>sway 1.11 with wlroots 0.19.3 linked statically and the title-bar button patch, under <code>/usr/lib/waydesk/bin</code>; built per distribution (<code>+deb13</code>, <code>+ubuntu26.04</code>)</dd>
-<dt>pcmanfm-qt</dt><dd>file manager with our patches, built per distribution</dd>
-<dt>waydesk-repo</dt><dd>key, apt source template, pin</dd>
-</dl>
-
-<h3>Commands</h3>
-<dl class="ref">
-<dt>waydesk-admin status</dt><dd>memory, swap, load, sessions, per-account use</dd>
-<dt>waydesk-admin users list | add | remove | passwd | enable | disable | admin | sudo | limit</dt><dd>accounts and their ceilings (<code>--json</code> on most)</dd>
-<dt>waydesk-admin sessions list | end NAME</dt><dd>running sessions; ending one closes the account's desktop</dd>
-<dt>waydesk-setup [--list | --check]</dt><dd>choose and install shell, browsers, office, developer and creative apps</dd>
-<dt>waydesk-setup-admin [--name NAME | --existing NAME]</dt><dd>first administrator: RDP access, panels, Flatpak installs without a password</dd>
-</dl>
-
-<h3>Units, files, ports</h3>
-<dl class="ref">
-<dt>waydesk.service, waydesk-helper.service, waydesk-session@UID.service</dt><dd>daemon, root helper, one per account</dd>
-<dt>127.0.0.1:3389</dt><dd>RDP (TLS); <code>/run/waydesk/</code> holds the helper and session sockets</dd>
-<dt>/etc/default/waydesk</dt><dd>daemon and session options</dd>
-<dt>/etc/pam.d/waydesk-server, waydesk-session</dt><dd>login check; logind session of the account</dd>
-<dt>/etc/xdg/waydesk/sway.conf</dt><dd>session sway config (fallback: <code>/usr/share/waydesk/sway-minimal.conf</code>)</dd>
-<dt>/usr/lib/waydesk/bin</dt><dd>private sway, swaymsg, swaybar; first in the session's PATH</dd>
-<dt>/etc/apt/sources.list.d/waydesk.sources, /etc/apt/preferences.d/waydesk</dt><dd>repository and pin</dd>
-<dt>/usr/lib/systemd/zram-generator.conf.d/50-waydesk.conf</dt><dd>zram as large as the RAM, at most 16 GiB</dd>
-</dl>
-
-<h3>Key</h3>
+<p class="grp">Packages</p>
+<div class="ent"><code class="k">waydesk</code><p>metapackage: server and desktop</p></div>
+<div class="ent"><code class="k">waydesk-server</code><p>daemon, root helper, waydesk-admin, waydesk-setup-admin, PAM services, units, zram and sysctl drop-ins, minimal sway config</p></div>
+<div class="ent"><code class="k">waydesk-desktop</code><p>sway config, setup wizard (waydesk-setup), per-account shell setup, administrator panels</p></div>
+<div class="ent"><code class="k">waydesk-shell, waydesk-quickshell</code><p>DankMaterialShell 2.0.0 built by us with our patches; quickshell 0.3.0, built per distribution</p></div>
+<div class="ent"><code class="k">waydesk-sway</code><p>sway 1.11 with wlroots 0.19.3 linked statically and the title-bar button patch, under /usr/lib/waydesk/bin; built per distribution (+deb13, +ubuntu26.04)</p></div>
+<div class="ent"><code class="k">pcmanfm-qt</code><p>file manager with our patches, built per distribution</p></div>
+<div class="ent"><code class="k">waydesk-repo</code><p>the key, the apt source template and the pin</p></div>
+<p class="grp">Commands: administration</p>
+<div class="ent"><code class="k">waydesk-admin status [--json]</code><p>memory, swap, load, running sessions and what each account uses</p></div>
+<div class="ent"><code class="k">waydesk-admin users list [--json]</code><p>accounts that may log in</p></div>
+<div class="ent"><code class="k">waydesk-admin users add NAME [--admin] [--sudo] [--no-rdp]</code><p>create an account; prints a generated password</p></div>
+<div class="ent"><code class="k">waydesk-admin users passwd NAME [--stdin]</code><p>set a password (read from stdin, never from an argument)</p></div>
+<div class="ent"><code class="k">waydesk-admin users remove NAME [--delete-home]</code><p>remove an account</p></div>
+<div class="ent"><code class="k">waydesk-admin users enable NAME | disable NAME [--keep-session]</code><p>allow or stop RDP logins for an account</p></div>
+<div class="ent"><code class="k">waydesk-admin users admin NAME on|off</code><p>Flatpak installs without a password</p></div>
+<div class="ent"><code class="k">waydesk-admin users sudo NAME on|off</code><p>membership of the sudo group</p></div>
+<div class="ent"><code class="k">waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]</code><p>per-account ceilings</p></div>
+<div class="ent"><code class="k">waydesk-admin sessions list [--json] | end NAME</code><p>running sessions; ending one closes that account's desktop</p></div>
+<p class="grp">Commands: setup</p>
+<div class="ent"><code class="k">waydesk-setup [--list | --check]</code><p>choose and install shell, browsers, office, developer and creative apps</p></div>
+<div class="ent"><code class="k">waydesk-setup-admin [--name NAME [--password-stdin]] [--existing NAME]</code><p>the first administrator: RDP access, panels, Flatpak installs without a password</p></div>
+<p class="grp">Units and ports</p>
+<div class="ent"><code class="k">waydesk.service</code><p>the daemon: TLS, RDP, framing (user waydesk)</p></div>
+<div class="ent"><code class="k">waydesk-helper.service</code><p>the root helper: password check, session start, memory admission</p></div>
+<div class="ent"><code class="k">waydesk-session@UID.service</code><p>one per account: its sway, capture, encoder and shell</p></div>
+<div class="ent"><code class="k">127.0.0.1:3389</code><p>RDP over TLS; reach it through a tunnel or a VPN</p></div>
+<p class="grp">Files</p>
+<div class="ent"><code class="k">/etc/default/waydesk</code><p>daemon and session options</p></div>
+<div class="ent"><code class="k">/etc/pam.d/waydesk-server</code><p>PAM service for the login check</p></div>
+<div class="ent"><code class="k">/etc/pam.d/waydesk-session</code><p>PAM service that gives the session a logind session</p></div>
+<div class="ent"><code class="k">/etc/xdg/waydesk/sway.conf</code><p>the session's sway config (fallback: /usr/share/waydesk/sway-minimal.conf)</p></div>
+<div class="ent"><code class="k">/usr/lib/waydesk/bin</code><p>private sway, swaymsg and swaybar; first in the session's PATH</p></div>
+<div class="ent"><code class="k">/run/waydesk/</code><p>helper and session sockets</p></div>
+<div class="ent"><code class="k">/etc/apt/sources.list.d/waydesk.sources</code><p>the repository, written for your release</p></div>
+<div class="ent"><code class="k">/etc/apt/preferences.d/waydesk</code><p>the pin: these packages win over third-party builds of the same names</p></div>
+<div class="ent"><code class="k">/usr/lib/systemd/zram-generator.conf.d/50-waydesk.conf</code><p>zram as large as the RAM, at most 16 GiB</p></div>
+<p class="grp">Key</p>
 <p>Packages and indexes are signed with one ed25519 key, fingerprint <code>C64672B25ECD4773196C39589D8E8874E67617F4</code>, expires 2029-10-21. The public key is <code>/apt/waydesk-archive-keyring.gpg</code>.</p>
 
 <h2 id="changelog">Changelog</h2>
@@ -225,7 +268,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <footer>
   <span>© 2026 StackCare, Portugal</span>
   <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
-  <a href="https://github.com/zhoorta/waydesk">source</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
   <a href="https://stackcare.pt/en">commercial support: StackCare</a>
   <span>MIT or Apache-2.0</span>
 </footer>
