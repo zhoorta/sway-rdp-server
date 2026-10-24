@@ -266,6 +266,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 
 <h2 id="changelog">Changelog</h2>
 <dl class="log">
+<dt>2026-10-24 · 0.1.0</dt><dd>First numbered release: <code>waydesk-server</code>, <code>waydesk-desktop</code> and <code>waydesk</code> 0.1.0 for Debian 13 and Ubuntu 26.04, amd64 and arm64. <code>waydesk-repo</code> 1.3 moves servers that still use the old repository address to waydesk.dev. The source of the copyleft programs in the repository (matugen, quickshell, pcmanfm-qt) is offered at <a href="/apt/source/">/apt/source/</a>.</dd>
 <dt>2026-10-24</dt><dd>Ubuntu 26.04 checked from the repository; <code>dms.sh</code> no longer adds Debian backports when the Waydesk repository is configured (it broke <code>apt update</code> on Ubuntu); a client that stops reading is dropped after 60 s; <code>waydesk-server</code> alone starts a session with a minimal sway config; the Flathub Chromium opens without its terms window and keyring prompt; seven heavy users fit on 8 GB.</dd>
 <dt>2026-10-23</dt><dd>Two suites, <code>trixie</code> and <code>resolute</code>, from one pool; private sway and quickshell under <code>/usr/lib/waydesk</code>; Flathub fallback for browsers; heavy-user capacity on Debian; fix for a publishing tool that deleted live packages.</dd>
 <dt>2026-10-22</dt><dd>Signed apt repository, <code>waydesk-repo</code> and <code>waydesk-setup-admin</code>; our own build of the shell as a package; refused logins tell the client why.</dd>
