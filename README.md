@@ -5,12 +5,30 @@
   </picture>
 </p>
 
-# Waydesk (waydesk-server)
+# Waydesk
 
-An RDP server for [sway](https://swaywm.org). Every client gets a headless sway output sized and scaled from what the
-client asks for, so a Retina Mac or a laptop with 200 % scaling gets a sharp desktop at its own resolution and the
-window can be resized live. Status: **early, one author, tested mostly with FreeRDP in a VM; the Windows App on macOS
-was tested before the multi-user work and not since.**
+A Wayland desktop for every account on a Debian or Ubuntu server, over RDP. Each account that logs in gets its own headless
+[sway](https://swaywm.org) session with a shell, sized and scaled from what the client asks for (a Retina Mac or a laptop with 200 % scaling gets a sharp
+desktop at its own resolution, and the window can be resized live). Sessions survive disconnects, memory is protected (a new session is refused when the
+machine is full), and the picture is H.264 over RDP with no GPU needed. Free software, early. Tested with FreeRDP and with the Windows App on macOS.
+
+**Website, with the architecture, measurements and their methods, the threat model and a reference: [waydesk.dev](https://waydesk.dev).**
+
+## Install
+
+Debian 13 or Ubuntu 26.04 LTS, amd64 or arm64, as an administrator of the server:
+
+```
+curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
+sudo apt install ./waydesk-repo.deb
+gpg --show-keys --with-fingerprint /usr/share/keyrings/waydesk-archive-keyring.gpg   # must be C646 72B2 5ECD 4773 196C 3958 9D8E 8874 E676 17F4
+sudo apt update && sudo apt install waydesk
+sudo waydesk-setup            # the shell, browser, office and developer apps
+sudo waydesk-setup-admin      # the first administrator
+```
+
+The first download cannot be verified by the repository itself, so compare the fingerprint above with the one printed. The RDP port listens on `127.0.0.1:3389`:
+reach it through an SSH tunnel or a VPN (`docs/WIREGUARD.md`), never straight from the internet. Packages and indexes are signed with that one key (expires 2029-10-21).
 
 ## The first administrator
 
@@ -30,11 +48,11 @@ It prints the certificate fingerprint to check in the RDP client. There is no de
 **Waydesk** is the name of the product (a Windows-like remote Linux desktop over RDP); `apt install waydesk` installs everything.
 The packages are `waydesk-server` (the RDP server, the root helper and the `waydesk-admin` tool) and `waydesk-desktop` (the desktop for
 the sessions); `waydesk` is an empty package that depends on both. Waydesk builds on the sway compositor and is not part of the sway
-project. Waydesk is a working name: no domain, trademark or package-name clearance has been done.
+project. Waydesk is a working name: the domain waydesk.dev is registered, but no trademark or package-name clearance has been done.
 
-## Multi-user (Debian 13)
+## Multi-user (Debian 13, Ubuntu 26.04)
 
-`apt install ./waydesk-server_*.deb` (build it with `packaging/build-deb.sh [arm64|amd64]`, Docker needed) installs two
+`apt install waydesk-server` (from the repository above, or `apt install ./waydesk-server_*.deb` after `packaging/build-deb.sh [arm64|amd64]`, Docker needed) installs two
 systemd services:
 
 - `waydesk-helper`: runs as root and does only two things: check a password through PAM and start a session as that
@@ -60,7 +78,7 @@ Debian-based ones included, have not been tried (Fedora: not yet), and the packa
 `waydesk-desktop` (second package, same build) makes those sessions a Windows-like desktop: a system sway config
 (`/etc/xdg/waydesk/sway.conf`: floating windows with title bars, Alt+Tab, Alt+F4, `Super+d` launcher, screenshots;
 an account's `~/.config/waydesk/config` replaces it), the glue that starts [DankMaterialShell](https://duxlabs.dev)
-through the account's systemd user session when it is installed (it is not in Debian), and `waydesk-setup`, a
+through the account's systemd user session when it is installed (`waydesk-shell`, our own build from source; it is not in Debian), and `waydesk-setup`, a
 whiptail wizard for DMS and developer, creative and AI apps. Design, threat model and what is not done yet:
 [docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
 exists (run the binary inside your own sway).
@@ -81,10 +99,10 @@ defaults for a new profile, and a Firefox default preference), so they get the w
 is changed once at the next start of the shell.
 
 Window buttons (red closes, yellow minimizes, green maximizes) in the title bar of every window need a patched sway, because sway's title
-bars are text only: `packaging/sway/build.sh [arm64|amd64]` builds Debian's sway 1.10 with `packaging/sway/waydesk-titlebar-buttons.patch`
+bars are text only. The package `waydesk-sway` is sway 1.11 with wlroots 0.19.3 linked in statically and `packaging/sway/waydesk-titlebar-buttons.patch`
 (a new command, `titlebar_button close|minimize|maximize COMMAND`, set by `waydesk-titlebar-buttons`; a double click on a title bar runs the
-maximize command). Install the `.deb` over Debian's
-package and `apt-mark hold sway`; the patch has to be checked against each new Debian sway. With Debian's own sway nothing breaks: the
+maximize command). It lives under `/usr/lib/waydesk/bin`, which the session puts first in its `PATH`, so the distribution's own sway is left alone;
+`packaging/sway/build-private.sh` builds it in a container for each distribution (`docs/PORTABILITY.md`). Without it nothing breaks: the
 shell's bar shows the same three buttons for the focused window instead.
 
 - Capture: `wlr-screencopy` (frame diff). The pointer is drawn by the RDP client, and sway gets an invisible cursor theme (`WAYDESK_CURSOR=server` keeps the cursor in the picture instead, with the shapes of the apps, for clients that hide their own pointer).
@@ -131,9 +149,9 @@ because the old client is dropped before the new one has authenticated (so anyon
 
 ## Known gaps
 
-No dynamic hardware encoding (VA-API), no Opus, relative mouse and Unicode key events,
-Caps Lock sync. In the multi-user form sound is off, and sessions share the helper's control group (no
-per-account resource limits yet). See docs/MULTIUSER-DESIGN.md.
+No hardware encoding (VA-API), no Opus, relative mouse and Unicode key events, Caps Lock sync; the clipboard is text only. Applications that insist on a GPU
+do not start on a server without one (Zed). Not independently reviewed: the internal security passes are in `docs/SECURITY-REVIEW.md`. See
+`docs/MULTIUSER-DESIGN.md` and the open items on [waydesk.dev](https://waydesk.dev/#security).
 
 ## Licence
 
@@ -141,6 +159,9 @@ Dual-licensed under either of [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT)
 modified copy of IronRDP's `ironrdp-server` crate and stays under its own licence (MIT or Apache-2.0, files included there).
 
 ## Sizing
+
+Current figures, with their methods (heavy users on 8 GB, browser users on 4 GB, zram): [waydesk.dev](https://waydesk.dev/#measurements) and `docs/MEASUREMENTS.md`.
+The breakdown below is from the first 4 GB arm64 development VM and is kept for the per-process split.
 
 Measured in the 4 GB arm64 development VM (software rendering, 1280x800), desktop with the bar and the dock, nothing else open (2026-10-21):
 

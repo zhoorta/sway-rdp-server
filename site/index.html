@@ -34,7 +34,7 @@
 
 <main>
 <h1>A Wayland desktop per account on your server, over RDP.</h1>
-<p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04 (amd64 or arm64). Every account that logs in over RDP gets its own headless sway session with a shell, kept alive across disconnects, with memory ceilings and a refusal when the machine is full. H.264 over RDP, no GPU needed. Free software, early, one author. <a href="https://github.com/zhoorta/waydesk">Source on GitHub</a>.</p>
+<p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04 (amd64 or arm64). Every account that logs in over RDP gets its own headless sway session with a shell, kept alive across disconnects, with memory ceilings and a refusal when the machine is full. H.264 over RDP, no GPU needed. Free software, early. Tested with FreeRDP and the Windows App on macOS. <a href="https://github.com/zhoorta/waydesk">Source on GitHub</a>.</p>
 
 <pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
 <span class="p">$</span> sudo apt install ./waydesk-repo.deb
@@ -87,7 +87,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <tr><td>Ubuntu 26.04 LTS (resolute)</td><td class="ok">tested</td><td class="ok">tested</td><td>sway, quickshell and pcmanfm-qt are our builds under <code>/usr/lib/waydesk</code>; Chromium and Firefox come from Flathub (no Chromium deb)</td></tr>
 <tr><td>Ubuntu 24.04, Fedora, Arch</td><td colspan="2" class="dim">not yet</td><td>different Qt and wlroots; no rpm yet</td></tr>
 </table></div>
-<p class="method">"Tested": a clean server, SSH hardened first, then exactly the four steps above, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. Windows App, Microsoft Remote Desktop and mstsc were not part of the multi-user tests.</p>
+<p class="method">"Tested": a clean server, SSH hardened first, then exactly the four steps above, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on macOS was also used; Microsoft Remote Desktop and mstsc on Windows were not tested.</p>
 
 <h2 id="architecture">Architecture</h2>
 <div class="dg">
@@ -207,7 +207,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 
 <h2 id="limits">Limits</h2>
 <ul class="plain">
-<li>Early software, one author. Mostly tested with FreeRDP.</li>
+<li>Early software. Tested with FreeRDP and the Windows App on macOS; Microsoft Remote Desktop (Windows) and mstsc were not tested.</li>
 <li>No GPU: applications that insist on one do not start. Zed fails with "Failed to create surface"; VS Code and LibreOffice work.</li>
 <li>Sizing: on an 8 GB, 4-core server count 7 to 8 users with Chromium, Calc and VS Code open if most are idle. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down.</li>
 <li>First run of the Flathub Chromium: a seeded <code>First Run</code>/<code>EULA Accepted</code> skips its terms window, whose text is only a placeholder in that build.</li>
