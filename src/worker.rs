@@ -477,11 +477,7 @@ impl OwnSway {
         use std::os::unix::process::CommandExt;
         let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);
         let uid = unsafe { libc::getuid() };
-        // The account's own config for these sessions wins, then the system's; without either, sway's usual lookup.
-        let config = std::env::var_os("HOME")
-            .map(|h| std::path::PathBuf::from(h).join(".config/waydesk/config"))
-            .filter(|p| p.is_file())
-            .or_else(|| Some(std::path::PathBuf::from("/etc/xdg/waydesk/sway.conf")).filter(|p| p.is_file()));
+        let config = sway_config(std::env::var_os("HOME").as_deref().map(std::path::Path::new), |p| p.is_file());
         let mut cmd = std::process::Command::new("sway");
         if let Some(path) = &config {
             cmd.arg("-c").arg(path);
@@ -585,6 +581,24 @@ pub fn path_with_private_first(current: Option<&std::ffi::OsStr>, dir: &std::pat
 pub const PRIVATE_QML: &str = "/usr/lib/waydesk/qml";
 
 /// Called once when a session worker starts, before any thread runs sway.
+/// Configs sway looks for itself (`/usr/lib/waydesk/etc` is where our private sway is built to look instead of `/etc`).
+const SWAY_OWN_CONFIGS: [&str; 2] = ["/etc/sway/config", "/usr/lib/waydesk/etc/sway/config"];
+/// Used when nothing else exists, so that a server without the desktop package still gets a session (sway refuses to start without a config).
+const MINIMAL_CONFIG: &str = "/usr/share/waydesk/sway-minimal.conf";
+
+/// The config to start sway with (`-c`), or None to let sway look. The account's own config for these sessions wins, then the system's;
+/// then sway's usual lookup, and if that would find nothing, the minimal one.
+fn sway_config(home: Option<&std::path::Path>, is_file: impl Fn(&std::path::Path) -> bool) -> Option<std::path::PathBuf> {
+    use std::path::{Path, PathBuf};
+    let user = |rel: &str| home.map(|h| h.join(rel)).filter(|p| is_file(p));
+    user(".config/waydesk/config")
+        .or_else(|| Some(PathBuf::from("/etc/xdg/waydesk/sway.conf")).filter(|p| is_file(p)))
+        .or_else(|| {
+            let sway_finds = user(".sway/config").is_some() || user(".config/sway/config").is_some() || SWAY_OWN_CONFIGS.iter().any(|c| is_file(Path::new(c)));
+            (!sway_finds).then(|| PathBuf::from(MINIMAL_CONFIG)).filter(|p| is_file(p))
+        })
+}
+
 pub fn prefer_private_bin() {
     let dir = std::path::Path::new(PRIVATE_BIN);
     if dir.is_dir() {
@@ -598,6 +612,19 @@ pub fn prefer_private_bin() {
 
 #[cfg(test)]
 mod private_bin_tests {
+    #[test]
+    fn sway_config_choice() {
+        let has = |files: &'static [&'static str]| move |p: &Path| files.iter().any(|f| p == Path::new(f));
+        let home = Some(Path::new("/home/a"));
+        let minimal = Some(std::path::PathBuf::from(MINIMAL_CONFIG));
+        assert_eq!(sway_config(home, has(&[MINIMAL_CONFIG])), minimal, "a server without anything else gets the minimal config");
+        assert_eq!(sway_config(home, has(&[MINIMAL_CONFIG, "/etc/sway/config"])), None, "sway finds the stock config itself");
+        assert_eq!(sway_config(home, has(&[MINIMAL_CONFIG, "/home/a/.config/sway/config"])), None, "the account's sway config is left to sway");
+        assert_eq!(sway_config(home, has(&[MINIMAL_CONFIG, "/etc/xdg/waydesk/sway.conf"])), Some("/etc/xdg/waydesk/sway.conf".into()));
+        assert_eq!(sway_config(home, has(&[MINIMAL_CONFIG, "/etc/xdg/waydesk/sway.conf", "/home/a/.config/waydesk/config"])), Some("/home/a/.config/waydesk/config".into()));
+        assert_eq!(sway_config(home, has(&[])), None, "no minimal config installed: as before");
+    }
+
     use super::*;
     use std::ffi::OsStr;
     use std::path::Path;
