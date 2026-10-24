@@ -5,7 +5,7 @@
 # 0.19, and sway 1.12 would need libwayland 1.24, which Debian 13 does not have: that is why 1.11 with its own wlroots.
 #
 #   packaging/sway/build-private.sh [arch [image]]      arch: arm64 (default) or amd64; image: debian:13 (default) or ubuntu:26.04
-# Output: packaging/out/waydesk-sway_1.11+waydesk1+<tag>_<arch>.deb  (tag: deb13, ubuntu26.04, from the image). The dependencies come from the binaries (dpkg-shlibdeps).
+# Output: packaging/out/waydesk-sway_1.11+waydesk2+<tag>_<arch>.deb  (tag: deb13, ubuntu26.04, from the image). The dependencies come from the binaries (dpkg-shlibdeps).
 set -e
 cd "$(dirname "$0")/../.."
 ARCH=${1:-arm64}
@@ -20,7 +20,8 @@ apt-get update -qq
 apt-get install -y -qq --no-install-recommends build-essential meson ninja-build pkg-config patch scdoc wayland-protocols curl ca-certificates dpkg-dev \
   libwayland-dev libxkbcommon-dev libpixman-1-dev libinput-dev libdrm-dev libudev-dev libseat-dev libvulkan-dev glslang-tools \
   libegl-dev libgles-dev libgbm-dev libdisplay-info-dev liblcms2-dev libjson-c-dev libpcre2-dev libcairo2-dev libpango1.0-dev \
-  libgdk-pixbuf-2.0-dev libevdev-dev hwdata libliftoff-dev libsystemd-dev libxcb1-dev libxcb-icccm4-dev libxcb-errors-dev >/dev/null
+  libgdk-pixbuf-2.0-dev libevdev-dev hwdata libliftoff-dev libsystemd-dev libxcb1-dev libxcb-icccm4-dev libxcb-errors-dev \
+  xwayland libxcb-composite0-dev libxcb-ewmh-dev libxcb-render0-dev libxcb-res0-dev libxcb-xfixes0-dev >/dev/null
 mkdir /build && cd /build
 fetch() { curl -fsSL --retry 3 -o "$2" "$1" && echo "$3  $2" | sha256sum -c - >/dev/null; }
 fetch https://github.com/swaywm/sway/releases/download/1.11/sway-1.11.tar.gz sway.tar.gz 0e37a55b7c3379230e97e1ad982542b75016a0c7d6676198604e557f9b373dae
@@ -28,7 +29,7 @@ fetch https://gitlab.freedesktop.org/wlroots/wlroots/-/releases/0.19.3/downloads
 tar -xzf sway.tar.gz && cd sway-1.11
 mkdir -p subprojects && tar -xzf ../wlroots.tar.gz -C subprojects && mv subprojects/wlroots-0.19.3 subprojects/wlroots
 patch -p1 < /patch/waydesk-titlebar-buttons.patch >/dev/null
-meson setup build -Dwlroots:xwayland=disabled -Dwlroots:examples=false -Dwlroots:default_library=static -Ddefault-wallpaper=false -Dman-pages=disabled \
+meson setup build -Dwlroots:xwayland=enabled -Dwlroots:examples=false -Dwlroots:default_library=static -Ddefault-wallpaper=false -Dman-pages=disabled \
   -Dzsh-completions=false -Dbash-completions=false -Dfish-completions=false --buildtype=release --prefix=/usr/lib/waydesk >/dev/null
 ninja -C build >/dev/null
 P=/build/pkg; B=$P/usr/lib/waydesk/bin
@@ -46,17 +47,18 @@ mkdir -p /tmp/dh/debian && cd /tmp/dh && printf "Source: waydesk-sway\n\nPackage
 DEPS=$(dpkg-shlibdeps -O $B/sway $B/swaymsg $B/swaybar $B/swaynag 2>/dev/null | sed "s/^shlibs:Depends=//")
 cat > $P/DEBIAN/control <<CTL
 Package: waydesk-sway
-Version: 1.11+waydesk1+$TAG
+Version: 1.11+waydesk2+$TAG
 Architecture: $ARCH
 Maintainer: José Mendonça <jmendonca@gmail.com>
 Section: x11
 Priority: optional
-Depends: $DEPS
+Depends: $DEPS, xwayland
 Description: sway 1.11 with window buttons in the title bar, for Waydesk sessions
- sway with wlroots 0.19.3 linked in, plus Waydesk'"'"'s title-bar patch, installed under
+ sway with wlroots 0.19.3 linked in (with XWayland support, so that applications that only speak
+ X11 run: the Xwayland server of the distribution starts when the first one opens), plus Waydesk'"'"'s title-bar patch, installed under
  /usr/lib/waydesk/bin so that every distribution runs the same compositor in the
  Waydesk session. It does not replace the distribution'"'"'s sway.
 CTL
-dpkg-deb --root-owner-group -b $P /out/waydesk-sway_1.11+waydesk1+${TAG}_${ARCH}.deb >/dev/null
+dpkg-deb --root-owner-group -b $P /out/waydesk-sway_1.11+waydesk2+${TAG}_${ARCH}.deb >/dev/null
 chown $UID_HOST:$GID_HOST /out/waydesk-sway_*.deb
 echo "Depends: $DEPS"'
