@@ -136,9 +136,11 @@ the first terminal, `--no-terminal` skips it), `libopenh264.so.8`, and `parec`/`
 Useful options: `--bind ADDR`, `--kb-layout xkb` (fallback layout), `--workspace NAME` (default `Remote`),
 `--session-hook PROGRAM`, `--bitrate`, `--quality`, `--no-egfx`, `--no-audio`, `--no-clipboard`, `--replace`/`--no-replace`.
 
-**Exposure.** Binding to anything but loopback puts an RDP login on the network. Use a long random password, and prefer
-loopback plus an SSH tunnel or a VPN. A new connection replaces the open one; that is on by default only for loopback,
-because the old client is dropped before the new one has authenticated (so anyone who can reach the port could kick the user).
+**Exposure.** Binding to anything but loopback puts an RDP login on the network. `sudo waydesk-admin access` sets where the port listens and which
+source addresses may connect (this machine, the local network, a VPN), `waydesk-admin cert local-ca` gives clients a certificate they can verify, and
+`waydesk-admin vpn init` makes a WireGuard VPN for the port: see `docs/ACCESS.md`. Without a list of allowed addresses (`WAYDESK_ALLOW_FROM`) a daemon on a
+non-loopback address accepts only private networks. Use a long random password, and prefer loopback plus an SSH tunnel or a VPN over the open internet. A new connection
+replaces the open one; that is on by default only for loopback, because the old client is dropped before the new one has authenticated (so anyone who can reach the port could kick the user).
 
 ## Session hook
 
@@ -150,8 +152,8 @@ because the old client is dropped before the new one has authenticated (so anyon
 ## Known gaps
 
 No hardware encoding (VA-API), no Opus, relative mouse and Unicode key events, Caps Lock sync; the clipboard is text only. Applications that insist on a GPU
-do not start on a server without one (Zed), and so do applications that only speak X11 (there is no XWayland; a Qt Flatpak can be pointed at Wayland with `flatpak override --user --socket=wayland --env=QT_QPA_PLATFORM=wayland APP-ID`). Not independently reviewed: the internal security passes are in `docs/SECURITY-REVIEW.md`. See
-`docs/MULTIUSER-DESIGN.md` and the open items on [waydesk.dev](https://waydesk.dev/#security).
+do not start on a server without one (Zed). Applications that only speak X11 run through XWayland (one Xwayland server per account, checked on Debian 13 x86_64 with CoreX, `xeyes` and GIMP). Not independently reviewed: the internal security passes are in `docs/SECURITY-REVIEW.md`. See
+`docs/MULTIUSER-DESIGN.md` and the threat model and open items in `docs/THREAT-MODEL.md`.
 
 ## Source of the copyleft programs
 

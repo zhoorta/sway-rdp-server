@@ -80,7 +80,7 @@ and Chromium as the largest program (about 1.2 GB resident, shared pages counted
 
 ## Hetzner CAX11, over the internet (2026-10-22, commit 6dac08c)
 Hetzner Cloud CAX11 (2 vCPU Ampere, 3.8 GB, Debian 13.6 arm64, zram 1.9 GB), the `.deb` packages of that commit plus DMS 2.0.0db1, quickshell 0.3.0 and the
-patched sway; RDP on a WireGuard address (`docs/WIREGUARD.md`), reached from a Mac in Portugal (ping 77 ms). `tester1` came in with the Windows App (1680x1050);
+patched sway; RDP on a WireGuard address (`docs/WIREGUARD.md`), reached from a Mac (ping 77 ms). `tester1` came in with the Windows App (1680x1050);
 `tester2`-`tester4` with `sdl-freerdp` at 1280x720, one after the other, Chromium with three real pages (Wikipedia, Hacker News, debian.org) opened in each from the
 server, 65 s after each login.
 
@@ -317,3 +317,24 @@ compared, `apt install waydesk`, `waydesk-setup-admin`), then the setup engine w
   (`dms`, `vscode`) both exit 0, suite `trixie`, no backports, shell 2.0.0+waydesk2 with quickshell 0.3.0+deb13; RDP login with the shell, bar and desktop icons (idle session 593 MB with the shell).
 - **Upgrade path on Ubuntu 26.04 arm64**: a server with `waydesk-repo` 1.1 (old address) installs the package from the new address. 1.2 kept the old address in `waydesk.sources` (the postinst never touched an existing
   file); 1.3 moves a file that still has exactly the old address to the new one and leaves every other local edit alone (checked with an extra `Architectures:` line). `apt update` then fetches from waydesk.dev.
+
+## TCP congestion control: BBR against CUBIC on a link that loses packets (2026-10-25)
+One link, one afternoon, so read it as "what happens on a lossy long link", not as a general factor.
+- **Server**: Debian 13 x86_64, 2 vCPU, kernel 6.12.107+deb13-cloud, Hetzner Nuremberg. **Client**: the Windows App on macOS, over WireGuard (the RDP connection runs inside it). Video at the configured 10 Mbit/s, graphics pipeline with H.264.
+- **Method**: `ss -ti dst CLIENT` on the server for the RDP connection, read every 4 to 5 seconds while the picture was moving (scrolling a page, dragging a window), and `nstat` for the whole machine. CUBIC was the system default; for the second run only the default was changed
+  (`sysctl net.ipv4.tcp_congestion_control=bbr`, `net.core.default_qdisc=fq`) and the client reconnected (a running session survives that); nothing else changed.
+
+| | CUBIC (default) | BBR |
+|---|---|---|
+| round trip, as TCP sees it | 142 to 160 ms | 110 to 119 ms |
+| what the connection delivered while the picture moved | 20 kbit/s to 1.5 Mbit/s, typically 200 to 400 | BBR's own estimate 1.9 to 4.3 Mbit/s (it sent 2.7 MB in 17 s, about 1.3 Mbit/s: the picture needed no more) |
+| congestion window (segments) | 4 to 22 (slow start threshold 3 in one sample) | 15 to 90 |
+| bytes waiting unsent on the server | 50 to 120 kB, up to 317 kB | 1 to 13 kB |
+| retransmitted since the connection began | 3.9 % of the segments (808 of 20 604), 4.5 % of the bytes | 7 to 9 % of the bytes; the retransmitted segments per interval went 45, 36, 14, 3 as BBR probed (CUBIC: 10 to 13 per interval at a tenth of the traffic) |
+| delay of the path the flow control measured | not usable: frames waited 1 to 9 seconds in the queue | 120 to 130 ms, no queue reported (frame acknowledgement times were not captured in this run) |
+
+- **Why**: with a loss rate of a few percent CUBIC cannot get far: the Mathis formula, MSS / RTT x 1.22 / sqrt(loss) = 1368 x 8 / 0.15 x 1.22 / sqrt(0.039), gives about 0.45 Mbit/s, the order of what was seen; BBR does not take a random loss for congestion.
+- **Typing**: with CUBIC the keystrokes reached the server in bursts. `xev` in the session (58 events for the sentence "the quick brown fox"): four groups of keys with the same arrival time (for example `e`, space, `q`, `u` at 1483 ms, `space`, `f`, `o` at 4823 ms), and two keys whose release arrived 600 ms or more after the
+  press, so that key repeat started (`c` repeated nine times, `o` once). The stalls were about a second, which fits a retransmission timeout (344 ms) doubling after a loss (that is an inference: the cause of each stall was not traced). With BBR the typing was reported as "much much better"; it was **not** captured with `xev` again.
+- **What the server now does**: the daemon asks for BBR on each RDP connection (`WAYDESK_TCP_CONGESTION`, empty for the system's default); the package loads `tcp_bbr` and adds `bbr` to `net.ipv4.tcp_allowed_congestion_control`, which is what lets a process that is not root use it. The system's default stays CUBIC.
+- **Not measured**: a link without loss (then BBR and CUBIC should be close), the effect on a LAN, other kernels.
