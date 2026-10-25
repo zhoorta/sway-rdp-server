@@ -463,6 +463,11 @@ fi
 # reading dconf, so Flatpak apps never saw the dark preference. This session has the bus, so drop it.
 [ -z "${GSETTINGS_BACKEND:-}" ] && systemctl --user unset-environment GSETTINGS_BACKEND 2>/dev/null
 dbus-update-activation-environment --systemd --all 2>/dev/null
+# The portals of the last session lost their display when it ended (the account's user manager outlives its sessions) and stay dead: every
+# Flatpak or GTK app asks them for the settings when it starts, and each call hangs until it times out, minutes in all. Start them
+# again, now that this session's display is in the environment.
+( systemctl --user reset-failed xdg-desktop-portal-gtk.service xdg-desktop-portal.service
+  systemctl --user restart xdg-desktop-portal-gtk.service xdg-desktop-portal.service ) >/dev/null 2>&1 &
 # When the last session ended, the shell was restarted over and over (there was no display) until systemd gave up, and a unit that
 # gave up is not started again: clear that, or the next login has no bar.
 systemctl --user reset-failed dms.service 2>/dev/null
