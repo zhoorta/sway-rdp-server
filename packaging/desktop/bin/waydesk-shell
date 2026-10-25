@@ -50,12 +50,12 @@ with open(tmp, "w") as f:
 os.replace(tmp, path)
 PY
 fi
-# Window buttons (minimize, maximize, close): sway's title bars have none, so a DMS bar plugin provides them. An account that
-# already has its own bar layout keeps it and can add the widget "Window Controls" in the shell's settings.
+# Bar plugins of ours (volume, settings, workspaces). The window buttons are on the title bars of the patched sway, not in the bar.
 plugins=/usr/share/waydesk/dms-plugin
 if [ -d "$plugins" ] && command -v python3 >/dev/null 2>&1; then
     mkdir -p "$dms_dir/plugins"
     for plugin in "$plugins"/*; do ln -sfn "$plugin" "$dms_dir/plugins/$(basename "$plugin")"; done
+    rm -f "$dms_dir/plugins/swayWindowControls"   # the window controls widget is gone (the title bars have the buttons)
     python3 - "$dms_dir" <<'PY'
 import json, os, sys
 d = sys.argv[1]
@@ -69,7 +69,7 @@ plugins = load("plugin_settings.json")
 if plugins is None:
     plugins = {}
 added = False
-for name in ("swayWindowControls", "swayVolume", "swaySettings", "swayWorkspaces"):
+for name in ("swayVolume", "swaySettings", "swayWorkspaces"):
     if name not in plugins:
         plugins[name] = {"enabled": True}
         added = True
@@ -86,27 +86,23 @@ if settings is not None and "powerMenuActions" not in settings:
 if settings is not None and "barConfigs" not in settings:
     settings["barConfigs"] = [{
         "id": "default", "name": "Main Bar", "enabled": True, "position": 0, "screenPreferences": ["all"],
-        "leftWidgets": ["launcherButton", "swayWindowControls", "workspaceSwitcher", "swayWorkspaces", "focusedWindow"],
+        "leftWidgets": ["launcherButton", "workspaceSwitcher", "swayWorkspaces", "focusedWindow"],
         "centerWidgets": ["clock"],
         "rightWidgets": ["systemTray", "swayVolume", "notificationButton", "swaySettings", "powerMenuButton"],
     }]
     changed = True
-# An account that already has a bar layout gets the buttons once, after the launcher button (the marker keeps a removal
-# by the account). An earlier version put them at the right end of the bar: they move.
-marker = os.path.join(d, ".window-controls-left")
+# The window buttons are on the title bars (the patched sway) and the dock lists the minimized windows: the bar no longer has the
+# window controls widget. Taken out of an account's bar once (the marker keeps it if the account adds it back).
+marker = os.path.join(d, ".window-controls-removed")
 if settings is not None and not os.path.exists(marker):
     def is_ours(w):
         return w == "swayWindowControls" or (isinstance(w, dict) and w.get("id") == "swayWindowControls")
-    bars = settings.get("barConfigs") or []
-    if bars and not changed:
-        bar = bars[0]
-        old = [w for k in ("leftWidgets", "centerWidgets", "rightWidgets") for w in bar.get(k, []) if is_ours(w)]
+    for bar in settings.get("barConfigs") or []:
         for k in ("leftWidgets", "centerWidgets", "rightWidgets"):
-            bar[k] = [w for w in bar.get(k, []) if not is_ours(w)]
-        left = bar.setdefault("leftWidgets", [])
-        at = next((i + 1 for i, w in enumerate(left) if w == "launcherButton" or (isinstance(w, dict) and w.get("id") == "launcherButton")), 0)
-        left.insert(at, old[0] if old else "swayWindowControls")
-        changed = True
+            kept = [w for w in bar.get(k, []) if not is_ours(w)]
+            if len(kept) != len(bar.get(k, [])):
+                bar[k] = kept
+                changed = True
     open(marker, "w").close()
 # The workspace button ("+", and the list of workspaces) goes after the workspace switcher, once per account.
 marker = os.path.join(d, ".workspaces-widget")
@@ -395,7 +391,9 @@ for gtk in gtk-3.0 gtk-4.0; do
     [ -e "$ini" ] || printf '[Settings]\n' > "$ini"
     sed -i '/^-e \[Settings\]/s/^-e //' "$ini"
     grep -q '\[Settings\]' "$ini" || printf '[Settings]\n' >> "$ini"
-    for kv in gtk-application-prefer-dark-theme=1 gtk-font-name="Inter 10"; do
+    # GTK apps with their own header bar (Text Editor, Files, ...) show only the close button outside GNOME: add minimize and maximize on the
+    # right (sway does what they ask for, see the titlebar_button commands of the patched sway).
+    for kv in gtk-application-prefer-dark-theme=1 gtk-font-name="Inter 10" gtk-decoration-layout=:minimize,maximize,close; do
         key="${kv%%=*}"
         grep -q "^$key=" "$ini" || sed -i "/\[Settings\]/a $kv" "$ini"
     done
@@ -422,6 +420,7 @@ if command -v gsettings >/dev/null 2>&1; then
             gs cursor-theme waydesk-blank
         fi
         gs color-scheme prefer-dark
+        gsettings set org.gnome.desktop.wm.preferences button-layout ':minimize,maximize,close' 2>/dev/null
         gs font-name 'Inter 10'
     }
     apply_gsettings

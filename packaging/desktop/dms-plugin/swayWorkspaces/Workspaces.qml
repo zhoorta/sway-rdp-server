@@ -7,7 +7,7 @@ import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
 
 // Workspaces of a waydesk session, next to the shell's own workspace switcher (which switches between the ones that exist but cannot
-// add one on sway): "+" makes a new workspace and goes to it, the arrow opens the list of workspaces with their windows. Click a window
+// add one on sway): "+" makes a new workspace and goes to it, the arrow opens the list of workspaces with their windows (minimized ones dimmed, a click brings one back). Click a window
 // to go to it; the small buttons under it send it to another workspace (or to a new one). All of it goes through
 // `waydesk-windows` (sway's own IPC), nothing of the shell's internals.
 PluginComponent {
@@ -196,6 +196,8 @@ PluginComponent {
                                             text: winBlock.modelData.title || winBlock.modelData.app || "?"
                                             elide: Text.ElideRight
                                             color: winBlock.modelData.focused ? Theme.primary : Theme.surfaceText
+                                            opacity: winBlock.modelData.minimized ? 0.55 : 1
+                                            font.italic: winBlock.modelData.minimized === true
                                             font.pixelSize: Theme.fontSizeMedium
                                         }
                                     }
@@ -205,11 +207,12 @@ PluginComponent {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: root.run(["focus", String(winBlock.modelData.id)], true)
+                                        onClicked: root.run([winBlock.modelData.minimized ? "restore" : "focus", String(winBlock.modelData.id)], true)
                                     }
                                 }
 
                                 Row {
+                                    visible: winBlock.modelData.minimized !== true
                                     leftPadding: Theme.spacingL + 18 + Theme.spacingS
                                     spacing: 4
                                     bottomPadding: 4
