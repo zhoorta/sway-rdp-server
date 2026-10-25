@@ -11,6 +11,9 @@
 //!   waydesk-admin sessions end NAME
 //!   waydesk-admin status [--json]                (memory, swap, load, whether a new session would be accepted, and what each account uses)
 //!   waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
+//!   waydesk-admin access [show | local | lan | vpn | custom ...]     who can reach the RDP port (scripts in /usr/lib/waydesk/admin)
+//!   waydesk-admin cert [status | local-ca | reissue | export-ca | install | self-signed]     the certificate clients check
+//!   waydesk-admin vpn [status | init | add NAME | show NAME | list | remove NAME]     a WireGuard VPN for the port
 //!
 //! Listing and `status` are open to everybody (the account database and the cgroup files are). Everything else needs root (`sudo`, or `pkexec` from the panel).
 //! The work is done by the system's own tools (useradd, userdel, gpasswd, chpasswd, systemctl, loginctl), started by their
@@ -228,6 +231,9 @@ fn run() -> Result<()> {
         ["users", "sudo", name, onoff] => users_sudo(name, parse_onoff(onoff)?),
         ["sessions", "list"] => sessions_list(json_out),
         ["status"] => status(json_out),
+        // Who can reach the port, what certificate it shows, a VPN for it: shell scripts that check every value they are given
+        // (they ask for root themselves where they change something).
+        [which @ ("access" | "cert" | "vpn"), rest @ ..] => run_admin_script(which, rest),
         ["users", "limit", name, rest @ ..] => users_limit(name, rest),
         ["sessions", "end", name] => {
             require_root()?;
@@ -254,7 +260,19 @@ usage: waydesk-admin users list [--json]
        waydesk-admin sessions list [--json] | end NAME
        waydesk-admin status [--json]
        waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
+       waydesk-admin access [show | local | lan [--address IP] [--allow LIST] | vpn | custom --bind ADDR:PORT [--allow LIST]]
+       waydesk-admin cert [status | local-ca [--san NAME] | reissue | export-ca | install --cert FILE --key FILE | self-signed]
+       waydesk-admin vpn [status | init [--endpoint HOST] | add NAME | show NAME | list | remove NAME]
 ";
+
+/// Runs one of the scripts in /usr/lib/waydesk/admin (by absolute path, the arguments as they are: no shell on the way) and ends with its status.
+fn run_admin_script(name: &str, args: &[&str]) -> Result<()> {
+    let status = Command::new(format!("/usr/lib/waydesk/admin/{name}"))
+        .args(args)
+        .status()
+        .with_context(|| format!("cannot run /usr/lib/waydesk/admin/{name}"))?;
+    std::process::exit(status.code().unwrap_or(1));
+}
 
 fn take_flag(args: &mut Vec<String>, flag: &str) -> bool {
     let before = args.len();

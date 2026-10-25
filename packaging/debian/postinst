@@ -19,7 +19,9 @@ if [ "$1" = configure ]; then
     chown waydesk:waydesk /etc/waydesk/key.pem /etc/waydesk/cert.pem
     chmod 600 /etc/waydesk/key.pem
     systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl enable --now waydesk-cert-renew.timer >/dev/null 2>&1 || true   # does nothing until a local certificate authority exists
     # Compressed swap in RAM (systemd-zram-generator, a dependency: a minimal image skips Recommends) and its kernel settings, without a reboot.
+    modprobe tcp_bbr >/dev/null 2>&1 || true   # before the sysctl file lists bbr as allowed
     /usr/lib/systemd/systemd-sysctl /usr/lib/sysctl.d/50-waydesk.conf >/dev/null 2>&1 || true
     if [ -x /usr/lib/systemd/system-generators/zram-generator ] && ! grep -q zram /proc/swaps 2>/dev/null; then
         systemctl start systemd-zram-setup@zram0.service >/dev/null 2>&1 || true

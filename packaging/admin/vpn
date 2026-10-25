@@ -1,0 +1,157 @@
+#!/bin/bash
+# waydesk-admin vpn: a WireGuard VPN for the RDP port, made and managed in one command. Run through `sudo waydesk-admin vpn ...`.
+#
+#   vpn [status]                       the interface, the address, the clients and when each last connected
+#   vpn init [--endpoint HOST[:PORT]] [--subnet CIDR] [--interface NAME] [--port N] [--force]
+#                                      installs WireGuard if needed, makes the server side (default 10.8.0.0/24 on waydesk0, UDP 51820),
+#                                      makes RDP listen on the VPN address only for the VPN's addresses, and opens the port if ufw is on
+#   vpn add NAME                       a client: its configuration is printed (and as a QR code when qrencode is installed) and kept in /etc/waydesk/vpn/peers
+#   vpn show NAME                      the configuration of a client again
+#   vpn list                           the clients
+#   vpn remove NAME                    stops a client's access at once
+#
+# The client's configuration only routes the VPN address of this server through the tunnel (not the client's other traffic).
+set -eu
+. "$(dirname "$0")/common.sh"
+
+VPN_DIR=$STATE/vpn
+PEERS=$VPN_DIR/peers
+usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; }
+valid_peer_name() { [[ $1 =~ ^[a-z][a-z0-9-]{0,30}$ ]]; }
+load() { [ -r "$VPN_DIR/vpn.conf" ] || die "no VPN yet: run \`sudo waydesk-admin vpn init\` first"; . "$VPN_DIR/vpn.conf"; }
+wgconf() { echo "/etc/wireguard/$INTERFACE.conf"; }
+
+qr() {
+    if command -v qrencode >/dev/null; then qrencode -t ansiutf8 < "$1"
+    else say "(install qrencode to show this as a QR code: apt install qrencode)"; fi
+}
+
+peer_ip() {  # the first free address of the subnet after the server's
+    local base mask n used i
+    base=${SUBNET%/*}; mask=${SUBNET#*/}
+    n=$(ip_to_int "$base")
+    used=$(cat "$VPN_DIR/peers.list" 2>/dev/null | awk '{print $2}')
+    for i in $(seq 2 $(( (1 << (32 - mask)) - 2 ))); do
+        ip=$(int_to_ip $(( n + i )))
+        [ "$ip" = "$ADDRESS" ] && continue
+        echo "$used" | grep -qxF "$ip" || { echo "$ip"; return 0; }
+    done
+    die "the subnet $SUBNET is full"
+}
+
+cmd=${1:-status}; [ $# -gt 0 ] && shift
+case $cmd in
+    -h|--help|help) usage ;;
+    status)
+        if [ ! -r "$VPN_DIR/vpn.conf" ]; then say "No VPN yet. \`sudo waydesk-admin vpn init\` makes one."; exit 0; fi
+        load
+        say "Interface    $INTERFACE  ($ADDRESS, subnet $SUBNET, UDP port $PORT)"
+        say "Endpoint     $ENDPOINT"
+        if systemctl is-active --quiet "wg-quick@$INTERFACE.service"; then say "State        up"; else say "State        DOWN (systemctl start wg-quick@$INTERFACE)"; fi
+        say ""
+        if [ -s "$VPN_DIR/peers.list" ]; then
+            printf '%-20s %-15s %s\n' CLIENT ADDRESS "LAST CONNECTED"
+            while read -r name ip pub; do
+                hs=$(wg show "$INTERFACE" latest-handshakes 2>/dev/null | awk -v k="$pub" '$1==k {print $2}')
+                if [ -n "${hs:-}" ] && [ "$hs" != 0 ]; then when="$(( $(date +%s) - hs )) s ago"; else when="never"; fi
+                printf '%-20s %-15s %s\n' "$name" "$ip" "$when"
+            done < "$VPN_DIR/peers.list"
+        else say "No clients yet: \`sudo waydesk-admin vpn add NAME\`."; fi
+        ;;
+    list) exec "$0" status ;;
+    init)
+        need_root
+        endpoint="" subnet=10.8.0.0/24 interface=waydesk0 port=51820 force=""
+        while [ $# -gt 0 ]; do
+            case $1 in
+                --endpoint) endpoint=${2:?--endpoint needs HOST or HOST:PORT}; shift 2 ;;
+                --subnet) subnet=${2:?--subnet needs a range like 10.8.0.0/24}; shift 2 ;;
+                --interface) interface=${2:?--interface needs a name}; shift 2 ;;
+                --port) port=${2:?--port needs a number}; shift 2 ;;
+                --force) force=1; shift ;;
+                *) die "vpn init: unknown option $1" ;;
+            esac
+        done
+        [[ $interface =~ ^[a-z][a-z0-9]{0,14}$ ]] || die "bad interface name: $interface"
+        valid_port "$port" || die "bad port: $port"
+        # (valid_ipv4 uses a regular expression too, so the parts are taken out first)
+        [[ $subnet =~ ^([0-9.]+)/([0-9]{1,2})$ ]] || die "bad --subnet: $subnet (an IPv4 range like 10.8.0.0/24)"
+        base=${BASH_REMATCH[1]}; mask=${BASH_REMATCH[2]}
+        { valid_ipv4 "$base" && [ "$mask" -ge 16 ] && [ "$mask" -le 29 ]; } || die "bad --subnet: $subnet (an IPv4 range from /16 to /29)"
+        subnet=$(network_of "$base" "$mask")
+        address=$(int_to_ip $(( $(ip_to_int "${subnet%/*}") + 1 )))
+        # the VPN's range must not be one this machine already uses
+        if ip -4 route show 2>/dev/null | awk '{print $1}' | grep -qxF "$subnet"; then die "$subnet is already a network of this machine: choose another with --subnet"; fi
+        if [ -z "$endpoint" ]; then
+            pub=$(all_ipv4 | while read -r a; do is_private_ipv4 "$a" || { echo "$a"; break; }; done)
+            [ -n "$pub" ] || die "this machine has no public address to name: say where clients connect with --endpoint HOST[:PORT]"
+            endpoint=$pub
+        fi
+        host=${endpoint%:*}
+        if [[ $endpoint == *:* ]]; then eport=${endpoint##*:}; else eport=$port; host=$endpoint; fi
+        { valid_ipv4 "$host" || valid_host "$host"; } && valid_port "$eport" || die "bad --endpoint: $endpoint"
+        endpoint=$host:$eport
+        conf=/etc/wireguard/$interface.conf
+        if [ -e "$conf" ] && [ -z "$force" ]; then die "$conf exists already; to replace it (a backup is kept) say --force"; fi
+        if ! command -v wg >/dev/null; then
+            say "Installing wireguard-tools..."
+            DEBIAN_FRONTEND=noninteractive apt-get install -y wireguard-tools >/dev/null 2>&1 || die "could not install wireguard-tools (apt install wireguard-tools)"
+        fi
+        [ -e "$conf" ] && cp -p "$conf" "$conf.bak.$(date +%s)"
+        mkdir -p "$PEERS" /etc/wireguard; chmod 700 "$VPN_DIR" "$PEERS"
+        umask 077
+        key=$(wg genkey); pubkey=$(printf '%s' "$key" | wg pubkey)
+        printf '[Interface]\nAddress = %s/%s\nListenPort = %s\nPrivateKey = %s\n' "$address" "$mask" "$port" "$key" > "$conf"
+        : > "$VPN_DIR/peers.list"
+        printf 'INTERFACE=%s\nADDRESS=%s\nSUBNET=%s\nPORT=%s\nENDPOINT=%s\nSERVER_PUBKEY=%s\n' "$interface" "$address" "$subnet" "$port" "$endpoint" "$pubkey" > "$VPN_DIR/vpn.conf"
+        # the daemon starts after the VPN is up, so that the address it listens on exists
+        mkdir -p /etc/systemd/system/waydesk.service.d
+        printf '[Unit]\nRequires=wg-quick@%s.service\nAfter=wg-quick@%s.service\n' "$interface" "$interface" > /etc/systemd/system/waydesk.service.d/10-vpn.conf
+        systemctl daemon-reload
+        systemctl enable --now "wg-quick@$interface.service" >/dev/null 2>&1 || die "the VPN interface did not come up: systemctl status wg-quick@$interface"
+        if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
+            ufw allow "$port/udp" >/dev/null && say "Opened UDP $port in ufw."
+        else
+            say "Open UDP $port to the internet in this machine's firewall and in the provider's security group, if there is one."
+        fi
+        "$(dirname "$0")/access" vpn
+        say ""
+        say "The VPN is ready. Add a client with:  sudo waydesk-admin vpn add NAME"
+        ;;
+    add)
+        need_root; load
+        name=${1:-}; valid_peer_name "$name" || die "give the client a name: lower case letters, digits and - (for example laptop)"
+        grep -q "^$name " "$VPN_DIR/peers.list" 2>/dev/null && die "there is a client called $name already (waydesk-admin vpn show $name)"
+        umask 077
+        ip=$(peer_ip)
+        key=$(wg genkey); pub=$(printf '%s' "$key" | wg pubkey); psk=$(wg genpsk)
+        {
+            printf '\n# BEGIN peer %s\n[Peer]\nPublicKey = %s\nPresharedKey = %s\nAllowedIPs = %s/32\n# END peer %s\n' "$name" "$pub" "$psk" "$ip" "$name"
+        } >> "$(wgconf)"
+        echo "$name $ip $pub" >> "$VPN_DIR/peers.list"
+        printf '[Interface]\nPrivateKey = %s\nAddress = %s/32\n\n[Peer]\nPublicKey = %s\nPresharedKey = %s\nEndpoint = %s\nAllowedIPs = %s/32\nPersistentKeepalive = 25\n' \
+            "$key" "$ip" "$SERVER_PUBKEY" "$psk" "$ENDPOINT" "$ADDRESS" > "$PEERS/$name.conf"
+        wg syncconf "$INTERFACE" <(wg-quick strip "$INTERFACE") 2>/dev/null || die "could not add the client to the running interface"
+        say "Client $name ($ip) added. Import this in the WireGuard app (or scan the QR code), then connect the RDP client to $ADDRESS:"
+        say ""
+        cat "$PEERS/$name.conf"
+        say ""
+        qr "$PEERS/$name.conf"
+        say "The same text is kept in $PEERS/$name.conf (root only); \`waydesk-admin vpn show $name\` prints it again."
+        ;;
+    show)
+        need_root; load
+        name=${1:-}; valid_peer_name "$name" && [ -r "$PEERS/$name.conf" ] || die "no client called ${name:-?}"
+        cat "$PEERS/$name.conf"; say ""; qr "$PEERS/$name.conf"
+        ;;
+    remove)
+        need_root; load
+        name=${1:-}; valid_peer_name "$name" && grep -q "^$name " "$VPN_DIR/peers.list" || die "no client called ${name:-?}"
+        sed -i "/^# BEGIN peer $name\$/,/^# END peer $name\$/d" "$(wgconf)"
+        sed -i "/^$name /d" "$VPN_DIR/peers.list"
+        rm -f "$PEERS/$name.conf"
+        wg syncconf "$INTERFACE" <(wg-quick strip "$INTERFACE") 2>/dev/null || true
+        say "Client $name removed: it cannot connect any more."
+        ;;
+    *) usage >&2; exit 2 ;;
+esac

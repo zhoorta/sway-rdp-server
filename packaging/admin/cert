@@ -1,0 +1,172 @@
+#!/bin/bash
+# waydesk-admin cert: the certificate the RDP server shows to clients. Run through `sudo waydesk-admin cert ...`.
+#
+#   cert [status]                          what the server shows now, who signed it, when it ends
+#   cert local-ca [--san NAME_OR_IP]...    make a certificate authority of your own (kept on this server) and a certificate signed by it,
+#                                          for this server's names and addresses (and the --san ones). Clients trust the authority once and
+#                                          then check every connection: no fingerprint to compare, no warning, no man in the middle.
+#   cert reissue [--san NAME_OR_IP]...     a new certificate from the same authority (a new address or name)
+#   cert export-ca [FILE]                  the authority's certificate, for the clients to import (default: /etc/waydesk/waydesk-ca.crt)
+#   cert install --cert FILE --key FILE    use a certificate from elsewhere (for example Let's Encrypt; see docs/ACCESS.md for a certbot hook)
+#   cert self-signed                       back to a self-signed certificate (the fingerprint is then what to check)
+#   cert renew-if-needed                   reissue from the local authority when less than 60 days are left (run weekly by a timer)
+set -eu
+. "$(dirname "$0")/common.sh"
+
+CA_DIR=$STATE/ca
+CERT=$STATE/cert.pem
+KEY=$STATE/key.pem
+CA_VALID_DAYS=3650
+CERT_VALID_DAYS=800      # macOS refuses certificates that are valid for more than 825 days
+RENEW_DAYS=60
+
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; }
+fp() { openssl x509 -in "$1" -noout -fingerprint -sha256 | sed 's/^[^=]*=//'; }
+
+status() {
+    [ -r "$CERT" ] || die "no certificate at $CERT"
+    local issuer subject
+    subject=$(openssl x509 -in "$CERT" -noout -subject | sed 's/^subject= *//')
+    issuer=$(openssl x509 -in "$CERT" -noout -issuer | sed 's/^issuer= *//')
+    say "Subject          $subject"
+    if [ "$subject" = "$issuer" ]; then say "Signed by        itself (self-signed): clients have to compare the fingerprint"
+    else say "Signed by        $issuer"; fi
+    say "Valid until      $(openssl x509 -in "$CERT" -noout -enddate | sed 's/^notAfter=//')"
+    say "Names            $(openssl x509 -in "$CERT" -noout -ext subjectAltName 2>/dev/null | sed -n '2p' | sed 's/^ *//' || true)"
+    say "Fingerprint      $(fp "$CERT")"
+    if [ -r "$CA_DIR/ca.crt" ]; then
+        say "Authority        $(openssl x509 -in "$CA_DIR/ca.crt" -noout -subject | sed 's/^subject= *//')"
+        say "Authority print  $(fp "$CA_DIR/ca.crt")"
+        say "                 give $STATE/waydesk-ca.crt to the clients (\`waydesk-admin cert export-ca\`)"
+    fi
+}
+
+# The names the certificate carries: this machine's names, every address it has, and what was asked for.
+san_list() {
+    local extra=("$@") item out=() host short
+    host=$(hostname -f 2>/dev/null || hostname); short=$(hostname -s 2>/dev/null || hostname)
+    for item in "$host" "$short" "${short}.local" "${extra[@]}"; do
+        [ -n "$item" ] || continue
+        valid_ipv4 "$item" && continue   # an address is not a DNS name
+        valid_host "$item" && out+=("DNS:$item")
+    done
+    for item in $(all_ipv4) "${extra[@]}"; do
+        valid_ipv4 "$item" && out+=("IP:$item")
+    done
+    printf '%s\n' "${out[@]}" | awk '!seen[$0]++' | paste -sd, -
+}
+
+collect_sans() {  # sets EXTRA to the validated --san values
+    EXTRA=()
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --san) v=${2:?--san needs a name or an address}; { valid_host "$v" || valid_ipv4 "$v"; } || die "bad --san: $v"; EXTRA+=("$v"); shift 2 ;;
+            *) die "cert: unknown option $1" ;;
+        esac
+    done
+}
+
+# Writes the sans of the authority's certificates so that `reissue` and the timer keep them.
+issue() {
+    local sans work
+    [ -r "$CA_DIR/ca.key" ] || die "no local authority yet: run \`sudo waydesk-admin cert local-ca\`"
+    touch "$CA_DIR/sans"
+    mapfile -t saved < "$CA_DIR/sans"
+    sans=$(san_list "${saved[@]}" "$@")
+    work=$(mktemp -d); trap "rm -rf '$work'" EXIT
+    openssl req -new -newkey rsa:2048 -nodes -keyout "$work/key.pem" -out "$work/csr.pem" -subj "/CN=$(hostname -s)" >/dev/null 2>&1
+    printf 'subjectAltName=%s\nextendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyEncipherment\nbasicConstraints=CA:FALSE\n' "$sans" > "$work/ext"
+    openssl x509 -req -in "$work/csr.pem" -CA "$CA_DIR/ca.crt" -CAkey "$CA_DIR/ca.key" -CAcreateserial -CAserial "$CA_DIR/serial" \
+        -days "$CERT_VALID_DAYS" -sha256 -extfile "$work/ext" -out "$work/cert.pem" >/dev/null 2>&1 || die "openssl could not sign the certificate"
+    for x in "$@"; do grep -qxF "$x" "$CA_DIR/sans" || echo "$x" >> "$CA_DIR/sans"; done
+    put "$work/cert.pem" "$work/key.pem"
+    say "Issued a certificate for: ${sans//,/, }"
+}
+
+# Puts a certificate and its key in place for the daemon and restarts it; the old ones come back if it does not start.
+put() {
+    local cert=$1 key=$2 backup
+    backup=$(mktemp -d)
+    cp -p "$CERT" "$backup/cert.pem" 2>/dev/null || true
+    cp -p "$KEY" "$backup/key.pem" 2>/dev/null || true
+    install -o waydesk -g waydesk -m 644 "$cert" "$CERT"
+    install -o waydesk -g waydesk -m 600 "$key" "$KEY"
+    systemctl restart waydesk.service 2>/dev/null || true
+    sleep 2
+    if ! systemctl is-active --quiet waydesk.service; then
+        [ -r "$backup/cert.pem" ] && install -o waydesk -g waydesk -m 644 "$backup/cert.pem" "$CERT"
+        [ -r "$backup/key.pem" ] && install -o waydesk -g waydesk -m 600 "$backup/key.pem" "$KEY"
+        systemctl restart waydesk.service 2>/dev/null || true
+        rm -rf "$backup"
+        die "the daemon did not start with the new certificate; the old one is back"
+    fi
+    rm -rf "$backup"
+}
+
+cmd=${1:-status}; [ $# -gt 0 ] && shift
+case $cmd in
+    status) status ;;
+    -h|--help|help) usage ;;
+    local-ca)
+        need_root
+        collect_sans "$@"
+        mkdir -p "$CA_DIR"; chmod 700 "$CA_DIR"
+        if [ ! -r "$CA_DIR/ca.key" ]; then
+            openssl genrsa -out "$CA_DIR/ca.key" 3072 >/dev/null 2>&1
+            chmod 600 "$CA_DIR/ca.key"
+            openssl req -x509 -new -key "$CA_DIR/ca.key" -sha256 -days "$CA_VALID_DAYS" -subj "/CN=Waydesk local CA ($(hostname -s))" \
+                -addext "basicConstraints=critical,CA:TRUE,pathlen:0" -addext "keyUsage=critical,keyCertSign,cRLSign" -out "$CA_DIR/ca.crt" >/dev/null 2>&1
+            say "Made a certificate authority of your own; its key stays in $CA_DIR (root only)."
+        else
+            say "Using the existing certificate authority."
+        fi
+        printf '%s\n' "${EXTRA[@]}" | sed '/^$/d' >> "$CA_DIR/sans"; sort -u "$CA_DIR/sans" -o "$CA_DIR/sans"
+        issue
+        install -m 644 "$CA_DIR/ca.crt" "$STATE/waydesk-ca.crt"
+        say ""
+        say "Now the clients have to trust the authority, once: copy $STATE/waydesk-ca.crt to each of them and import it."
+        say "  macOS:    double-click the file, add it to the login keychain, open it and set Trust to Always Trust."
+        say "  Windows:  certmgr.msc, Trusted Root Certification Authorities, Import."
+        say "  Linux:    copy it to /usr/local/share/ca-certificates/ and run update-ca-certificates."
+        say "Authority fingerprint (to be sure the file is the right one): $(fp "$CA_DIR/ca.crt")"
+        ;;
+    reissue)
+        need_root
+        collect_sans "$@"
+        printf '%s\n' "${EXTRA[@]}" | sed '/^$/d' >> "$CA_DIR/sans" 2>/dev/null || true
+        issue
+        ;;
+    export-ca)
+        [ -r "$CA_DIR/ca.crt" ] || die "no local authority yet: run \`sudo waydesk-admin cert local-ca\`"
+        if [ $# -gt 0 ]; then need_root; install -m 644 "$CA_DIR/ca.crt" "$1"; say "Written to $1"; else say "$STATE/waydesk-ca.crt"; fi
+        ;;
+    install)
+        need_root
+        c="" k=""
+        while [ $# -gt 0 ]; do
+            case $1 in --cert) c=${2:?--cert needs a file}; shift 2 ;; --key) k=${2:?--key needs a file}; shift 2 ;; *) die "cert install: unknown option $1" ;; esac
+        done
+        [ -r "$c" ] && [ -r "$k" ] || die "cert install needs --cert FILE --key FILE (both readable)"
+        openssl x509 -in "$c" -noout 2>/dev/null || die "$c is not a certificate (PEM)"
+        a=$(openssl x509 -in "$c" -noout -pubkey | openssl md5); b=$(openssl pkey -in "$k" -pubout 2>/dev/null | openssl md5)
+        [ "$a" = "$b" ] || die "the key does not belong to the certificate"
+        openssl x509 -in "$c" -noout -checkend 0 >/dev/null || die "the certificate has expired"
+        put "$c" "$k"
+        status
+        ;;
+    self-signed)
+        need_root
+        work=$(mktemp -d); trap "rm -rf '$work'" EXIT
+        openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=$(hostname)" -keyout "$work/key.pem" -out "$work/cert.pem" >/dev/null 2>&1
+        put "$work/cert.pem" "$work/key.pem"
+        say "A self-signed certificate again. Fingerprint to check in the client: $(fp "$CERT")"
+        ;;
+    renew-if-needed)
+        need_root
+        [ -r "$CA_DIR/ca.key" ] || exit 0
+        [ "$(openssl x509 -in "$CERT" -noout -issuer)" != "$(openssl x509 -in "$CERT" -noout -subject)" ] || exit 0
+        if openssl x509 -in "$CERT" -noout -checkend $((RENEW_DAYS * 86400)) >/dev/null; then exit 0; fi
+        issue
+        ;;
+    *) usage >&2; exit 2 ;;
+esac

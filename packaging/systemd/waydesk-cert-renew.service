@@ -1,0 +1,7 @@
+[Unit]
+Description=waydesk: renew the server certificate when it is from the local authority and nearly over
+ConditionPathExists=/etc/waydesk/ca/ca.key
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/waydesk/admin/cert renew-if-needed

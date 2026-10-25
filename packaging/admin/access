@@ -1,0 +1,138 @@
+#!/bin/bash
+# waydesk-admin access: who can reach the RDP port. Run through `sudo waydesk-admin access ...`.
+#
+#   access [show]                     the current setting and how to connect
+#   access local                      this machine only (the default): reach it through an SSH tunnel
+#   access lan [--address IP] [--allow LIST] [--port N]
+#                                     listen on this machine's address on the local network, and let only that network (or LIST) connect
+#   access vpn                        listen on the WireGuard address made by `waydesk-admin vpn init`, and let only the VPN's addresses connect
+#   access custom --bind ADDR:PORT [--allow LIST]
+#                                     any address; LIST is ranges, addresses, and the words private, loopback, any (see /etc/default/waydesk)
+set -eu
+. "$(dirname "$0")/common.sh"
+
+usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; }
+
+mode_of() {
+    local bind=$1 host
+    host=${bind%:*}
+    case $host in
+        127.*|localhost|"") echo local ;;
+        *) if [ -r "$STATE/vpn/vpn.conf" ] && [ "$host" = "$(. "$STATE/vpn/vpn.conf"; echo "${ADDRESS:-}")" ]; then echo vpn
+           elif valid_ipv4 "$host" && is_private_ipv4 "$host"; then echo lan
+           else echo custom; fi ;;
+    esac
+}
+
+show() {
+    local bind allow mode host port fp
+    bind=$(conf_get WAYDESK_BIND); bind=${bind:-127.0.0.1:3389}
+    allow=$(conf_get WAYDESK_ALLOW_FROM)
+    mode=$(mode_of "$bind"); host=${bind%:*}; port=${bind##*:}
+    say "Listening on     $bind  ($mode)"
+    case $mode in
+        local) say "Who may connect   this machine only" ;;
+        *) say "Who may connect   ${allow:-private networks (the default for this address)}" ;;
+    esac
+    if [ -r "$STATE/cert.pem" ]; then
+        fp=$(openssl x509 -in "$STATE/cert.pem" -noout -fingerprint -sha256 2>/dev/null | sed 's/^[^=]*=//')
+        say "Signed by        $(openssl x509 -in "$STATE/cert.pem" -noout -issuer 2>/dev/null | sed 's/^issuer= *//')"
+        say "Fingerprint      $fp"
+    fi
+    say ""
+    case $mode in
+        local) say "Connect: from your computer run  ssh -N -L 3389:127.0.0.1:3389 ACCOUNT@THIS-SERVER  and point the RDP client at localhost." ;;
+        lan) say "Connect: point the RDP client at $host (port $port) from a computer on the same network, and check the fingerprint above on the first connection." ;;
+        vpn) say "Connect: bring the VPN up on the client, then point the RDP client at $host. \`waydesk-admin vpn add NAME\` makes a client." ;;
+        *) say "Connect: point the RDP client at $host (port $port). This is a password login with no second factor: keep it off the open internet." ;;
+    esac
+}
+
+apply() {  # BIND ALLOW(or empty to unset)
+    local backup; backup=$(mktemp)
+    cp -p "$CONF" "$backup"
+    conf_set WAYDESK_BIND "$1"
+    if [ -n "$2" ]; then conf_set WAYDESK_ALLOW_FROM "$2"; else conf_unset WAYDESK_ALLOW_FROM; fi
+    restart_daemon_or_restore "$backup"
+    rm -f "$backup"
+    # A certificate from the local authority names the addresses of this machine: make it again, so that it names the new one.
+    if [ -r "$STATE/ca/ca.key" ]; then
+        if "$(dirname "$0")/cert" reissue >/dev/null 2>&1; then echo "The certificate was reissued for the new address."
+        else echo "waydesk-admin: could not reissue the certificate for the new address: run \`sudo waydesk-admin cert reissue\`" >&2; fi
+    fi
+    echo "Done."
+    show
+}
+
+cmd=${1:-show}; [ $# -gt 0 ] && shift
+case $cmd in
+    show) show ;;
+    -h|--help|help) usage ;;
+    local)
+        need_root
+        apply "127.0.0.1:3389" ""
+        ;;
+    lan)
+        need_root
+        address="" allow="" port=3389
+        while [ $# -gt 0 ]; do
+            case $1 in
+                --address) address=${2:?--address needs an IPv4 address}; shift 2 ;;
+                --allow) allow=${2:?--allow needs a list}; shift 2 ;;
+                --port) port=${2:?--port needs a number}; shift 2 ;;
+                *) die "access lan: unknown option $1" ;;
+            esac
+        done
+        valid_port "$port" || die "bad port: $port"
+        if [ -z "$address" ]; then
+            mapfile -t found < <(local_ipv4 | while read -r cidr iface; do ip=${cidr%/*}; is_private_ipv4 "$ip" && echo "$cidr $iface"; done)
+            case ${#found[@]} in
+                0) die "this machine has no address on a local network (10.x, 172.16-31.x, 192.168.x); give one with --address, or use \`access custom\`" ;;
+                1) cidr=${found[0]%% *} ;;
+                *) echo "This machine has several local addresses:" >&2; printf '  %s\n' "${found[@]}" >&2; die "choose one with --address IP" ;;
+            esac
+            address=${cidr%/*}; prefix=${cidr#*/}
+        else
+            valid_ipv4 "$address" || die "bad address: $address"
+            cidr=$(local_ipv4 | awk -v a="$address" '{split($1,x,"/"); if (x[1]==a) print $1}' | head -n1)
+            [ -n "$cidr" ] || die "$address is not an address of this machine"
+            prefix=${cidr#*/}
+        fi
+        if [ -z "$allow" ]; then
+            is_private_ipv4 "$address" || die "$address is not on a local network: say who may connect with --allow (a public address is open to the world otherwise)"
+            allow=$(network_of "$address" "$prefix")
+        fi
+        valid_allow_list "$allow" || die "bad --allow list: $allow"
+        say "Listening on $address:$port for $allow"
+        apply "$address:$port" "${allow//,/ }"
+        if ! openssl x509 -in "$STATE/cert.pem" -noout -ext subjectAltName 2>/dev/null | grep -q "$address"; then
+            say ""
+            say "The certificate does not name $address, so a client that checks names will warn. Fix it with:  sudo waydesk-admin cert local-ca"
+        fi
+        ;;
+    vpn)
+        need_root
+        [ -r "$STATE/vpn/vpn.conf" ] || die "no VPN yet: run \`sudo waydesk-admin vpn init\` first"
+        # shellcheck disable=SC1091
+        . "$STATE/vpn/vpn.conf"
+        apply "$ADDRESS:3389" "$SUBNET"
+        ;;
+    custom)
+        need_root
+        bind="" allow=""
+        while [ $# -gt 0 ]; do
+            case $1 in
+                --bind) bind=${2:?--bind needs ADDRESS:PORT}; shift 2 ;;
+                --allow) allow=${2:?--allow needs a list}; shift 2 ;;
+                *) die "access custom: unknown option $1" ;;
+            esac
+        done
+        [ -n "$bind" ] || die "access custom needs --bind ADDRESS:PORT"
+        host=${bind%:*}; port=${bind##*:}
+        { valid_ipv4 "$host" || [ "$host" = "::" ] || [[ $host =~ ^\[[0-9A-Fa-f:]+\]$ ]]; } || die "bad address in --bind: $bind (an IPv4 address, or [IPv6])"
+        valid_port "$port" || die "bad port in --bind: $bind"
+        [ -z "$allow" ] || valid_allow_list "$allow" || die "bad --allow list: $allow"
+        apply "$bind" "${allow//,/ }"
+        ;;
+    *) usage >&2; exit 2 ;;
+esac

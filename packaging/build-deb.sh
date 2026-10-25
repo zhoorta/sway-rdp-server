@@ -22,6 +22,9 @@ mkdir -p $P/lib/systemd/system/user-.slice.d && install -m 644 packaging/systemd
 mkdir -p $P/usr/lib/systemd/zram-generator.conf.d $P/usr/lib/sysctl.d
 install -m 644 packaging/systemd/zram/50-waydesk.conf $P/usr/lib/systemd/zram-generator.conf.d/50-waydesk.conf
 install -m 644 packaging/systemd/sysctl/50-waydesk.conf $P/usr/lib/sysctl.d/50-waydesk.conf
+mkdir -p $P/usr/lib/waydesk/admin && install -m 755 packaging/admin/access packaging/admin/cert packaging/admin/vpn $P/usr/lib/waydesk/admin/ && install -m 644 packaging/admin/common.sh $P/usr/lib/waydesk/admin/   # waydesk-admin access, cert, vpn
+install -m 644 packaging/systemd/waydesk-cert-renew.service packaging/systemd/waydesk-cert-renew.timer $P/lib/systemd/system/
+mkdir -p $P/usr/lib/modules-load.d && install -m 644 packaging/systemd/modules-load/waydesk.conf $P/usr/lib/modules-load.d/waydesk.conf   # tcp_bbr
 install -m 644 packaging/default-waydesk $P/etc/default/waydesk
 mkdir -p $P/usr/share/waydesk && install -m 644 packaging/sway-minimal.conf $P/usr/share/waydesk/sway-minimal.conf   # a server without waydesk-desktop still gets a session
 install -m 644 packaging/pam-waydesk-server $P/etc/pam.d/waydesk-server
@@ -29,7 +32,7 @@ install -m 644 packaging/pam-waydesk-session $P/etc/pam.d/waydesk-session
 mkdir -p $P/usr/share/icons && cp -a packaging/cursors/waydesk-blank $P/usr/share/icons/   # cursors with nothing in them
 install -m 644 README.md $P/usr/share/doc/waydesk-server/README.md
 install -m 644 docs/MULTIUSER-DESIGN.md $P/usr/share/doc/waydesk-server/MULTIUSER-DESIGN.md
-install -m 644 docs/WIREGUARD.md docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md $P/usr/share/doc/waydesk-server/
+install -m 644 docs/WIREGUARD.md docs/ACCESS.md docs/THREAT-MODEL.md docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md $P/usr/share/doc/waydesk-server/
 cat LICENSE-MIT > $P/usr/share/doc/waydesk-server/copyright
 for f in postinst prerm postrm conffiles; do install -m 755 packaging/debian/$f $P/DEBIAN/$f; done
 chmod 644 $P/DEBIAN/conffiles
