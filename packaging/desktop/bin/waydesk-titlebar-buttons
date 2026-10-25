@@ -31,8 +31,13 @@ if surface and fg:
     black = [0, 0, 0]
     bar = mix(s, black, 0.25 if dark else 0.04)
     # A thin very dark grey line, like the outline of a Mac window: a little towards the text colour on a dark theme, towards black on a light one.
-    border = mix(s, f, 0.14) if dark else mix(s, black, 0.25)
-    border_off = mix(s, f, 0.08) if dark else mix(s, black, 0.15)
+    # (On a light theme the shadow next to the border is darker than a pale border, so the border has to be darker than the shadow.)
+    border = mix(s, f, 0.14) if dark else mix(s, black, 0.5)
+    border_off = mix(s, f, 0.08) if dark else mix(s, black, 0.32)
+    # The focused window's border takes a little of the theme's accent, so that it is clear at a glance which window has the focus.
+    accent = get("accent_bg_color")
+    if accent:
+        border = mix(border, rgb(accent), 0.22)
     text_off = mix(f, s, 0.5)
     sway("client.focused", hexs(border), hexs(bar), fg, hexs(border), hexs(border))
     for state in ("client.focused_inactive", "client.unfocused"):

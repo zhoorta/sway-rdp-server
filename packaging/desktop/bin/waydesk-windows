@@ -131,6 +131,10 @@ def place(con_id, x, y, w=None, h=None, deco=0):
     command(cmd + f"move absolute position {x} {y}")
 
 
+# The dock floats over the bottom of the screen (it reserves no space): keep the title bar of a window above it.
+DOCK_CLEARANCE = 60
+
+
 def fit_node(ws, n):
     """Keep a floating window reachable: inside the usable area of its workspace, except that the bottom may go down behind the dock
     (the title bar stays above it, so the window can always be dragged back)."""
@@ -141,7 +145,7 @@ def fit_node(ws, n):
     x, y, w, h, deco = geometry(n)
     nw, nh = min(w, aw), min(h, ah - deco)
     nx = min(max(x, ax), ax + aw - nw)
-    ny = min(max(y, ay), ay + ah - deco)
+    ny = min(max(y, ay), ay + ah - deco - DOCK_CLEARANCE)
     if (nx, ny, nw, nh) != (x, y, w, h):
         place(n["id"], nx, ny, nw, nh, deco)
 
