@@ -1,8 +1,10 @@
 //! Graphics pipeline (EGFX) output: the captured frames go to the client as H.264 (AVC420).
 //! The Windows App on macOS is built around this path and mishandles the older bitmap updates.
 
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, Result};
 use ironrdp_egfx::pdu::{Avc420Region, CapabilitySet};
@@ -25,18 +27,82 @@ pub struct EgfxState {
     acked: AtomicU64,
     handle: Mutex<Option<GfxServerHandle>>,
     sender: Mutex<Option<UnboundedSender<ServerEvent>>>,
+    flow: Mutex<Flow>,
 }
 
-/// Frames the session may have in flight (sent, not acknowledged yet): 3, the pipeline's own default
-/// (`ironrdp_egfx` DEFAULT_MAX_FRAMES_IN_FLIGHT), which suits a local network. The frame rate cannot exceed the frames in
-/// flight divided by the round trip time, so a client far away (100 ms: about 30 frames a second at 3, less with a busy tunnel)
-/// needs more frames in the air; `WAYDESK_FRAMES_IN_FLIGHT` (1 to 32) sets it for the daemon and the pipeline alike.
-pub fn max_credits() -> u16 {
-    static VALUE: OnceLock<u16> = OnceLock::new();
-    *VALUE.get_or_init(|| {
-        std::env::var("WAYDESK_FRAMES_IN_FLIGHT").ok().and_then(|v| v.trim().parse::<u16>().ok()).map_or(3, |n| n.clamp(1, 32))
-    })
+/// Frames in flight (sent, not acknowledged yet) are limited by credits. The frame rate cannot exceed the frames in flight
+/// divided by the round trip time, so 3 (the pipeline's own default) suits a local network but a client 100 ms away needs
+/// about 8. Unless `WAYDESK_FRAMES_IN_FLIGHT` (1 to 32) fixes the number, the window follows the round trip measured from the
+/// acknowledgements (see `Flow`), between `MIN_WINDOW` and `MAX_WINDOW`.
+const MIN_WINDOW: u32 = 3;
+const MAX_WINDOW: u32 = 16;
+/// The window aims at this many frames per second at the measured round trip.
+const TARGET_FRAME_MS: u32 = 16;
+/// How long the lowest round trip is collected before the window is reconsidered.
+const PERIOD: Duration = Duration::from_secs(2);
+/// Round trips of the first frames of a connection are not counted.
+const FIRST_FRAMES: u32 = 5;
+
+fn fixed_window() -> Option<u16> {
+    static VALUE: OnceLock<Option<u16>> = OnceLock::new();
+    *VALUE.get_or_init(|| std::env::var("WAYDESK_FRAMES_IN_FLIGHT").ok().and_then(|v| v.trim().parse::<u16>().ok()).map(|n| n.clamp(1, 32)))
 }
+
+/// The most frames the pipeline itself accepts in flight: the credits stay below it.
+pub fn max_credits() -> u16 {
+    fixed_window().unwrap_or(MAX_WINDOW as u16)
+}
+
+/// The adaptive credit window of one connection. `issued` counts the credits out there (held by the session or attached to a
+/// frame in flight); an acknowledgement ends a frame and tops `issued` up to `window`, so a larger window hands out extra
+/// credits and a smaller one simply gives fewer back.
+struct Flow {
+    window: u32,
+    issued: u32,
+    sent_at: VecDeque<(u32, Instant)>,
+    period_start: Instant,
+    period_min: Option<Duration>,
+    /// Acknowledgements still to ignore: the first frame is the whole picture and takes far longer than any later one.
+    skip: u32,
+}
+
+impl Default for Flow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Flow {
+    fn new() -> Self {
+        let window = fixed_window().map_or(MIN_WINDOW + 1, u32::from);
+        Self { window, issued: 0, sent_at: VecDeque::new(), period_start: Instant::now(), period_min: None, skip: FIRST_FRAMES }
+    }
+
+    /// Notes a round trip sample; at the end of a period moves the window towards what the lowest round trip needs
+    /// (the lowest, because the queueing a big window causes would otherwise make it ask for even more).
+    fn sample(&mut self, rtt: Duration) {
+        if fixed_window().is_some() {
+            return;
+        }
+        if self.skip > 0 {
+            self.skip -= 1;
+            return;
+        }
+        self.period_min = Some(self.period_min.map_or(rtt, |m| m.min(rtt)));
+        if self.period_start.elapsed() < PERIOD {
+            return;
+        }
+        let wanted = (self.period_min.take().map_or(0, |m| m.as_millis() as u32).div_ceil(TARGET_FRAME_MS) + 2).clamp(MIN_WINDOW, MAX_WINDOW);
+        self.period_start = Instant::now();
+        // Up at once, down one step at a time.
+        let next = if wanted > self.window { wanted } else { self.window.saturating_sub(1).max(wanted) };
+        if next != self.window {
+            info!(from = self.window, to = next, "frames in flight adjusted to the round trip");
+            self.window = next;
+        }
+    }
+}
+
 /// The client's queue depth when it has switched acknowledgements off: it will never give a credit back.
 const ACKS_SUSPENDED: u32 = 0xFFFF_FFFF;
 
@@ -51,6 +117,40 @@ impl EgfxState {
     /// Sets where credits are delivered.
     pub fn set_credit_sink(&self, sink: Box<dyn Fn(u16) + Send + Sync>) {
         *self.credit_sink.lock().unwrap() = Some(sink);
+    }
+
+    /// A new connection, or one that restarted from zero credits (after a resize): hands out a whole window.
+    pub fn reset_credits(&self) {
+        let window = {
+            let mut flow = self.flow.lock().unwrap();
+            flow.issued = flow.window;
+            flow.sent_at.clear();
+            flow.window
+        };
+        self.grant(window as u16);
+    }
+
+    fn frame_sent(&self, frame_id: u32) {
+        let mut flow = self.flow.lock().unwrap();
+        if flow.sent_at.len() >= 64 {
+            flow.sent_at.pop_front();
+        }
+        flow.sent_at.push_back((frame_id, Instant::now()));
+    }
+
+    /// A frame was acknowledged: measures its round trip and returns how many credits to hand out.
+    fn frame_acked(&self, frame_id: u32) -> u16 {
+        let mut flow = self.flow.lock().unwrap();
+        while let Some((id, at)) = flow.sent_at.pop_front() {
+            if id == frame_id {
+                flow.sample(at.elapsed());
+                break;
+            }
+        }
+        flow.issued = flow.issued.saturating_sub(1);
+        let give = flow.window.saturating_sub(flow.issued);
+        flow.issued += give;
+        give as u16
     }
 
     pub fn grant(&self, frames: u16) {
@@ -94,13 +194,14 @@ impl GraphicsPipelineHandler for Handler {
     }
 
     fn on_ready(&mut self, negotiated: &CapabilitySet) {
-        info!(?negotiated, frames_in_flight = max_credits(), "EGFX ready");
+        info!(?negotiated, frames_in_flight = fixed_window(), "EGFX ready");
         self.st.ready.store(true, Ordering::Release);
-        self.st.grant(max_credits());
+        self.st.reset_credits();
     }
 
     fn on_frame_ack(&mut self, frame_id: u32, queue_depth: u32, total_frames_decoded: u32) {
-        self.st.grant(if queue_depth == ACKS_SUSPENDED { 1000 } else { 1 });
+        let give = if queue_depth == ACKS_SUSPENDED { 1000 } else { self.st.frame_acked(frame_id) };
+        self.st.grant(give);
         let n = self.st.acked.fetch_add(1, Ordering::Relaxed) + 1;
         if n <= 3 || n % 200 == 0 {
             info!(frame_id, queue_depth, total_frames_decoded, acked = n, sent = self.st.sent.load(Ordering::Relaxed), "client acknowledged frame");
@@ -136,6 +237,7 @@ impl GfxServerFactory for Factory {
     fn build_server_with_handle(&self) -> Option<(GfxDvcBridge, GfxServerHandle)> {
         // New client: nothing is ready until its capabilities arrive.
         self.st.ready.store(false, Ordering::Release);
+        *self.st.flow.lock().unwrap() = Flow::new();
         // The desktop size is only known per session; `Out::send` sends ResetGraphics with it.
         let server = GraphicsPipelineServer::new(Box::new(Handler { st: self.st.clone() }));
         let handle: GfxServerHandle = Arc::new(Mutex::new(server));
@@ -215,11 +317,49 @@ impl Out {
         if n <= 3 {
             info!(n, bytes = data.len(), ?dirty, left = region.left, top = region.top, right = region.right, bottom = region.bottom, "sending first frames");
         }
-        if server.send_avc420_frame(surface, data, &[region], ts).is_none() {
-            // Refused frames are never acknowledged, so the credit would be lost for good.
-            self.st.grant(1);
-            warn!("send_avc420_frame refused a frame after encoding it");
+        match server.send_avc420_frame(surface, data, &[region], ts) {
+            Some(frame_id) => self.st.frame_sent(frame_id),
+            None => {
+                // Refused frames are never acknowledged, so the credit would be lost for good.
+                self.st.grant(1);
+                warn!("send_avc420_frame refused a frame after encoding it");
+            }
         }
         self.st.flush(&mut server)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn period(flow: &mut Flow, rtt_ms: u64) {
+        flow.period_start = Instant::now() - PERIOD;
+        flow.sample(Duration::from_millis(rtt_ms));
+    }
+
+    #[test]
+    fn window_follows_round_trip() {
+        let mut flow = Flow::new();
+        flow.skip = 0;
+        period(&mut flow, 100);
+        assert_eq!(flow.window, 9); // 100 ms / 16 ms = 7, plus 2
+        period(&mut flow, 1);
+        assert_eq!(flow.window, 8); // down one step at a time
+        for _ in 0..10 {
+            period(&mut flow, 1);
+        }
+        assert_eq!(flow.window, MIN_WINDOW);
+        period(&mut flow, 5000);
+        assert_eq!(flow.window, MAX_WINDOW);
+    }
+
+    #[test]
+    fn first_frames_are_ignored() {
+        let mut flow = Flow::new();
+        for _ in 0..FIRST_FRAMES {
+            period(&mut flow, 5000);
+        }
+        assert_eq!(flow.window, MIN_WINDOW + 1);
     }
 }
