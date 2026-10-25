@@ -22,6 +22,16 @@
  	bool primary_selection;
  
  	bool tiling_drag;
+--- a/include/sway/ipc-server.h
++++ b/include/sway/ipc-server.h
+@@ -18,6 +18,7 @@
+ void ipc_event_barconfig_update(struct bar_config *bar);
+ void ipc_event_bar_state_update(struct bar_config *bar);
+ void ipc_event_mode(const char *mode, bool pango);
++void ipc_event_cursor(const char *name);
+ void ipc_event_shutdown(const char *reason);
+ void ipc_event_binding(struct sway_binding *binding);
+ void ipc_event_input(const char *change, struct sway_input_device *device);
 --- a/include/sway/sway_text_node.h
 +++ b/include/sway/sway_text_node.h
 @@ -10,6 +10,11 @@
@@ -47,16 +57,36 @@
  
 --- a/include/sway/tree/container.h
 +++ b/include/sway/tree/container.h
-@@ -79,6 +79,8 @@
+@@ -65,11 +65,15 @@
+ 	double content_width, content_height;
+ };
+ 
++struct waydesk_shadow;
++
+ struct sway_container {
+ 	struct sway_node node;
+ 	struct sway_view *view;
+ 
+ 	struct wlr_scene_tree *scene_tree;
++	// A soft shadow around a floating window (waydesk_draw.h).
++	struct waydesk_shadow *shadow;
+ 
+ 	struct {
+ 		struct wlr_scene_tree *tree;
+@@ -79,6 +83,12 @@
  
  		struct sway_text_node *title_text;
  		struct sway_text_node *marks_text;
 +		// close, minimize, maximize (see titlebar_button)
 +		struct sway_text_node *buttons[3];
++		// The rounded top corners (left, right) and what they were drawn with.
++		struct wlr_scene_buffer *corners[2];
++		float corner_fill[4], corner_line[4];
++		int corner_scale;
  	} title_bar;
  
  	struct {
-@@ -361,6 +363,17 @@
+@@ -361,6 +371,22 @@
  int container_squash(struct sway_container *con);
  
  void container_arrange_title_bar(struct sway_container *con);
@@ -68,6 +98,11 @@
 +/**
 + * Remembers which button of which container the pointer is over (con NULL: none) and redraws the two title bars that change.
 + */
++/**
++ * Places the window shadow around the container (called when its size is set).
++ */
++void container_update_shadow(struct sway_container *con, int width, int height);
++
 +void container_titlebar_set_hover(struct sway_container *con, int button);
 +
 +int container_titlebar_button_at(struct sway_container *con, double lx, double ly);
@@ -84,6 +119,48 @@
  	struct wl_listener request_fullscreen;
  	struct wl_listener set_title;
  	struct wl_listener set_app_id;
+--- a/include/sway/waydesk_draw.h
++++ b/include/sway/waydesk_draw.h
+@@ -0,0 +1,39 @@
++#ifndef _SWAY_WAYDESK_DRAW_H
++#define _SWAY_WAYDESK_DRAW_H
++#include <stdbool.h>
++#include <cairo.h>
++#include <wlr/types/wlr_buffer.h>
++#include <wlr/types/wlr_scene.h>
++
++/**
++ * A buffer of width x height pixels (ARGB, premultiplied) with a cairo context to draw in. The context lives as long as the buffer.
++ */
++struct wlr_buffer *waydesk_cairo_buffer_create(int width, int height, cairo_t **cairo);
++
++/**
++ * A soft shadow around a window: nine pieces (four corners, four edges and the inside) of two pictures made once, so that moving or resizing a window
++ * only moves and stretches scene nodes. It sits at the bottom of the container's scene tree, outside the container's own rectangle.
++ */
++struct waydesk_shadow {
++	struct wlr_scene_tree *tree;
++	struct wlr_scene_buffer *part[9];
++	int width, height;
++	bool visible;
++	float strength;
++};
++
++struct waydesk_shadow *waydesk_shadow_create(struct wlr_scene_tree *parent);
++
++/**
++ * Places the shadow around a container of this size, shown or not, with this strength (0 to 1).
++ */
++void waydesk_shadow_update(struct waydesk_shadow *shadow, int width, int height, bool visible, float strength);
++
++/**
++ * The picture of one rounded top corner of a title bar: a quarter of a disc of the fill colour with an outline of the line colour,
++ * radius pixels (logical) at the output scale; transparent outside the arc.
++ */
++struct wlr_buffer *waydesk_corner_buffer(int radius, int scale, bool right,
++		const float fill[4], const float line[4]);
++
++#endif
 --- a/sway/commands/titlebar_button.c
 +++ b/sway/commands/titlebar_button.c
 @@ -0,0 +1,71 @@
@@ -180,6 +257,16 @@
  	free(config->swaybg_command);
  	free(config->swaynag_command);
  	free((char *)config->current_config_path);
+--- a/sway/desktop/transaction.c
++++ b/sway/desktop/transaction.c
+@@ -456,6 +456,7 @@
+ 		wlr_scene_node_reparent(&con->view->scene_tree->node, con->content_tree);
+ 		wlr_scene_node_set_position(&con->view->scene_tree->node,
+ 			border_left, border_top);
++		container_update_shadow(con, width, height);
+ 	} else {
+ 		// make sure to disable the title bar if the parent is not managing it
+ 		if (title_bar) {
 --- a/sway/desktop/xdg_shell.c
 +++ b/sway/desktop/xdg_shell.c
 @@ -1,10 +1,14 @@
@@ -263,6 +350,32 @@
  
  	xdg_shell_view->request_fullscreen.notify = handle_request_fullscreen;
  	wl_signal_add(&toplevel->events.request_fullscreen,
+--- a/sway/input/cursor.c
++++ b/sway/input/cursor.c
+@@ -19,6 +19,7 @@
+ #include "log.h"
+ #include "util.h"
+ #include "sway/commands.h"
++#include "sway/ipc-server.h"
+ #include "sway/input/cursor.h"
+ #include "sway/input/keyboard.h"
+ #include "sway/input/tablet.h"
+@@ -987,6 +988,7 @@
+ 	cursor->image = image;
+ 	cursor->hotspot_x = cursor->hotspot_y = 0;
+ 	cursor->image_client = client;
++	ipc_event_cursor(image);
+ 
+ 	if (cursor->hidden) {
+ 		return;
+@@ -1011,6 +1013,7 @@
+ 	cursor->hotspot_x = hotspot_x;
+ 	cursor->hotspot_y = hotspot_y;
+ 	cursor->image_client = client;
++	ipc_event_cursor("default");
+ 
+ 	if (cursor->hidden) {
+ 		return;
 --- a/sway/input/seatop_default.c
 +++ b/sway/input/seatop_default.c
 @@ -1,10 +1,12 @@
@@ -356,9 +469,42 @@
  
  	if (surface) {
  		if (seat_is_input_allowed(seat, surface)) {
+--- a/sway/ipc-server.c
++++ b/sway/ipc-server.c
+@@ -492,6 +492,22 @@
+ 	json_object_put(json);
+ }
+ 
++// The shape of the mouse pointer changed: a tick event with the payload "cursor:NAME" (a cursor name such as "text"; "default" when an
++// application draws its own pointer image), for whatever follows the pointer, like the Waydesk session sending it to the RDP client.
++void ipc_event_cursor(const char *name) {
++	static char last[48] = "";
++	if (!name || !*name) {
++		name = "default";
++	}
++	if (strcmp(last, name) == 0) {
++		return;
++	}
++	snprintf(last, sizeof(last), "%s", name);
++	char payload[64];
++	snprintf(payload, sizeof(payload), "cursor:%s", name);
++	ipc_event_tick(payload);
++}
++
+ void ipc_event_input(const char *change, struct sway_input_device *device) {
+ 	if (!ipc_has_event_listeners(IPC_EVENT_INPUT)) {
+ 		return;
 --- a/sway/meson.build
 +++ b/sway/meson.build
-@@ -117,6 +117,7 @@
+@@ -11,6 +11,7 @@
+ 	'scene_descriptor.c',
+ 	'server.c',
+ 	'sway_text_node.c',
++	'waydesk_draw.c',
+ 	'swaynag.c',
+ 	'xdg_activation_v1.c',
+ 	'xdg_decoration.c',
+@@ -117,6 +118,7 @@
  	'commands/title_align.c',
  	'commands/title_format.c',
  	'commands/titlebar_border_thickness.c',
@@ -463,7 +609,43 @@
  }
 --- a/sway/tree/container.c
 +++ b/sway/tree/container.c
-@@ -116,7 +116,9 @@
+@@ -1,5 +1,7 @@
+ #include <assert.h>
+ #include <drm_fourcc.h>
++#include <math.h>
++#include <string.h>
+ #include <stdint.h>
+ #include <stdlib.h>
+ #include <wayland-server-core.h>
+@@ -9,6 +11,7 @@
+ #include <wlr/types/wlr_subcompositor.h>
+ #include "linux-dmabuf-unstable-v1-protocol.h"
+ #include "sway/config.h"
++#include "sway/waydesk_draw.h"
+ #include "sway/desktop/transaction.h"
+ #include "sway/input/input-manager.h"
+ #include "sway/input/seat.h"
+@@ -104,10 +107,19 @@
+ 	//     - buffer used for output enter/leave events for foreign_toplevel
+ 	bool failed = false;
+ 	c->scene_tree = alloc_scene_tree(root->staging, &failed);
++	// the shadow is made first: it stays under everything else
++	if (view && !failed) {
++		c->shadow = waydesk_shadow_create(c->scene_tree);
++	}
+ 
+ 	c->title_bar.tree = alloc_scene_tree(c->scene_tree, &failed);
+ 	c->title_bar.border = alloc_scene_tree(c->title_bar.tree, &failed);
+ 	c->title_bar.background = alloc_scene_tree(c->title_bar.tree, &failed);
++	if (view && !failed) {
++		for (int i = 0; i < 2; i++) {
++			c->title_bar.corners[i] = wlr_scene_buffer_create(c->title_bar.tree, NULL);
++		}
++	}
+ 
+ 	// for opacity purposes we need to carfully create the scene such that
+ 	// none of our rect nodes as well as text buffers don't overlap. To do
+@@ -116,7 +128,9 @@
  		alloc_rect_node(c->title_bar.border, &failed);
  	}
  
@@ -474,10 +656,55 @@
  		alloc_rect_node(c->title_bar.background, &failed);
  	}
  
-@@ -254,6 +256,31 @@
+@@ -254,6 +268,76 @@
  	wlr_scene_rect_set_color(rect, premultiplied);
  }
  
++#define TITLE_RADIUS 10 // radius of the rounded top corners of a title bar, in pixels
++
++static int output_scale_of(struct sway_container *con) {
++	if (con->current.workspace && con->current.workspace->output && con->current.workspace->output->wlr_output) {
++		int scale = (int)ceilf(con->current.workspace->output->wlr_output->scale);
++		return scale < 1 ? 1 : scale;
++	}
++	return 1;
++}
++
++// The round corners: redrawn when the colours or the output scale changed.
++static void update_title_corners(struct sway_container *con, struct border_colors *colors) {
++	if (!con->title_bar.corners[0]) {
++		return;
++	}
++	int scale = output_scale_of(con);
++	if (con->title_bar.corner_scale == scale &&
++			memcmp(con->title_bar.corner_fill, colors->background, sizeof(float) * 4) == 0 &&
++			memcmp(con->title_bar.corner_line, colors->border, sizeof(float) * 4) == 0) {
++		return;
++	}
++	con->title_bar.corner_scale = scale;
++	memcpy(con->title_bar.corner_fill, colors->background, sizeof(float) * 4);
++	memcpy(con->title_bar.corner_line, colors->border, sizeof(float) * 4);
++	for (int i = 0; i < 2; i++) {
++		struct wlr_buffer *buffer = waydesk_corner_buffer(TITLE_RADIUS, scale, i == 1,
++			colors->background, colors->border);
++		if (buffer) {
++			wlr_scene_buffer_set_buffer(con->title_bar.corners[i], buffer);
++			wlr_buffer_drop(buffer);
++		}
++	}
++}
++
++void container_update_shadow(struct sway_container *con, int width, int height) {
++	if (!con->shadow) {
++		return;
++	}
++	struct border_colors *colors = container_get_current_colors(con);
++	bool focused = colors == &config->border_colors.focused;
++	bool show = container_is_current_floating(con) && con->current.fullscreen_mode == FULLSCREEN_NONE &&
++		!container_is_scratchpad_hidden(con);
++	waydesk_shadow_update(con->shadow, width, height, show, focused ? 1.0f : 0.55f);
++}
++
 +// The three window buttons are one capsule: the outer ends of minimize (1) and close (0) are round, the joins are square.
 +static const int button_corners[3] = {2, 1, 0}; // close: right end, minimize: left end, maximize: none
 +#define BUTTON_MIN_WIDTH 30
@@ -506,7 +733,7 @@
  void container_update(struct sway_container *con) {
  	struct border_colors *colors = container_get_current_colors(con);
  	list_t *siblings = NULL;
-@@ -307,6 +334,36 @@
+@@ -307,6 +391,38 @@
  		sway_text_node_set_color(con->title_bar.marks_text, colors->text);
  		sway_text_node_set_background(con->title_bar.marks_text, colors->background);
  	}
@@ -523,10 +750,12 @@
 +		if (!con->title_bar.buttons[i]) {
 +			continue;
 +		}
-+		// Transparent at rest: the title bar colour with the mark faintly in the text colour; the one under the pointer fills with
++		update_title_corners(con, colors);
++
++	// Transparent at rest: the title bar colour with the mark faintly in the text colour; the one under the pointer fills with
 +		// its own colour and shows the mark in the title bar colour.
 +		float rest[4], glyph[4];
-+		float amount = focused ? 0.38f : 0.22f;
++		float amount = focused ? 0.38f : 0.34f;
 +		memcpy(rest, colors->background, sizeof(rest));
 +		for (int c = 0; c < 3; c++) {
 +			glyph[c] = colors->background[c] + (colors->text[c] - colors->background[c]) * amount;
@@ -543,7 +772,7 @@
  }
  
  void container_update_itself_and_parents(struct sway_container *con) {
-@@ -349,6 +406,37 @@
+@@ -349,6 +465,37 @@
  	pixman_region32_t text_area;
  	pixman_region32_init(&text_area);
  
@@ -581,7 +810,7 @@
  	if (con->title_bar.marks_text) {
  		struct sway_text_node *node = con->title_bar.marks_text;
  		marks_buffer_width = node->width;
-@@ -379,17 +467,17 @@
+@@ -379,17 +526,17 @@
  
  		int h_padding;
  		if (title_align == ALIGN_RIGHT) {
@@ -603,7 +832,36 @@
  		alloc_width = MAX(alloc_width, 0);
  
  		sway_text_node_set_max_width(node, alloc_width);
-@@ -427,6 +515,26 @@
+@@ -418,6 +565,28 @@
+ 	pixman_region32_subtract(&background, &background, &text_area);
+ 	pixman_region32_fini(&text_area);
+ 
++	// Rounded top corners: the corner squares are left to two small pictures that are round and have the outline, so that the
++	// rectangles of the bar and its border go around them.
++	bool rounded = con->title_bar.corners[0] && width >= TITLE_RADIUS * 4 && height >= TITLE_RADIUS;
++	for (int i = 0; i < 2; i++) {
++		if (!con->title_bar.corners[i]) {
++			continue;
++		}
++		wlr_scene_node_set_enabled(&con->title_bar.corners[i]->node, rounded);
++		if (rounded) {
++			wlr_scene_node_set_position(&con->title_bar.corners[i]->node, i == 0 ? 0 : width - TITLE_RADIUS, 0);
++			wlr_scene_buffer_set_dest_size(con->title_bar.corners[i], TITLE_RADIUS, TITLE_RADIUS);
++		}
++	}
++	if (rounded) {
++		pixman_region32_t corners;
++		pixman_region32_init_rect(&corners, 0, 0, TITLE_RADIUS, TITLE_RADIUS);
++		pixman_region32_union_rect(&corners, &corners, width - TITLE_RADIUS, 0, TITLE_RADIUS, TITLE_RADIUS);
++		pixman_region32_subtract(&background, &background, &corners);
++		pixman_region32_subtract(&border, &border, &corners);
++		pixman_region32_fini(&corners);
++	}
++
+ 	update_rect_list(con->title_bar.background, &background);
+ 	pixman_region32_fini(&background);
+ 
+@@ -427,6 +596,26 @@
  	container_update(con);
  }
  
@@ -630,7 +888,7 @@
  void container_update_marks(struct sway_container *con) {
  	char *buffer = NULL;
  
-@@ -489,6 +597,23 @@
+@@ -489,6 +678,23 @@
  	con->title_bar.title_text = sway_text_node_create(con->title_bar.tree,
  		con->formatted_title, colors->text, config->pango_markup);
  
@@ -654,7 +912,12 @@
  	// we always have to remake these text buffers completely for text font
  	// changes etc...
  	if (con->title_bar.marks_text) {
-@@ -531,6 +656,10 @@
+@@ -527,10 +733,15 @@
+ 
+ 	scene_node_disown_children(con->content_tree);
+ 	wlr_scene_node_destroy(&con->scene_tree->node);
++	free(con->shadow);
+ 	free(con);
  }
  
  void container_begin_destroy(struct sway_container *con) {
@@ -665,3 +928,230 @@
  	if (con->view) {
  		ipc_event_window(con, "close");
  	}
+--- a/sway/waydesk_draw.c
++++ b/sway/waydesk_draw.c
+@@ -0,0 +1,224 @@
++#include <drm_fourcc.h>
++#include <math.h>
++#include <stdlib.h>
++#include <string.h>
++#include <cairo.h>
++#include <wlr/interfaces/wlr_buffer.h>
++#include <wlr/types/wlr_buffer.h>
++#include <wlr/types/wlr_scene.h>
++#include "log.h"
++#include "sway/waydesk_draw.h"
++
++struct cairo_buffer {
++	struct wlr_buffer base;
++	cairo_surface_t *surface;
++	cairo_t *cairo;
++};
++
++static void cairo_buffer_handle_destroy(struct wlr_buffer *wlr_buffer) {
++	struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
++	cairo_destroy(buffer->cairo);
++	cairo_surface_destroy(buffer->surface);
++	free(buffer);
++}
++
++static bool cairo_buffer_handle_begin_data_ptr_access(struct wlr_buffer *wlr_buffer,
++		uint32_t flags, void **data, uint32_t *format, size_t *stride) {
++	struct cairo_buffer *buffer = wl_container_of(wlr_buffer, buffer, base);
++	cairo_surface_flush(buffer->surface);
++	*data = cairo_image_surface_get_data(buffer->surface);
++	*stride = cairo_image_surface_get_stride(buffer->surface);
++	*format = DRM_FORMAT_ARGB8888;
++	return true;
++}
++
++static void cairo_buffer_handle_end_data_ptr_access(struct wlr_buffer *wlr_buffer) {
++}
++
++static const struct wlr_buffer_impl cairo_buffer_impl = {
++	.destroy = cairo_buffer_handle_destroy,
++	.begin_data_ptr_access = cairo_buffer_handle_begin_data_ptr_access,
++	.end_data_ptr_access = cairo_buffer_handle_end_data_ptr_access,
++};
++
++struct wlr_buffer *waydesk_cairo_buffer_create(int width, int height, cairo_t **cairo) {
++	struct cairo_buffer *buffer = calloc(1, sizeof(*buffer));
++	if (!buffer) {
++		return NULL;
++	}
++	buffer->surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
++	if (cairo_surface_status(buffer->surface) != CAIRO_STATUS_SUCCESS) {
++		cairo_surface_destroy(buffer->surface);
++		free(buffer);
++		return NULL;
++	}
++	buffer->cairo = cairo_create(buffer->surface);
++	wlr_buffer_init(&buffer->base, &cairo_buffer_impl, width, height);
++	*cairo = buffer->cairo;
++	return &buffer->base;
++}
++
++// ---- the shadow ----
++
++// The light comes from the top left: the shadow is the window's shape moved down and to the right, with rounded corners and a soft edge,
++// so that it shows on the right and the bottom, fading in below the top right corner and to the right of the bottom left one.
++#define SHADOW_BLUR 12 // half the width of the soft edge, in pixels
++#define SHADOW_RADIUS 14 // radius of the rounded corners of the shadow
++#define SHADOW_DX 8 // how far to the right of the window it sits
++#define SHADOW_DY 8 // how far lower
++#define SHADOW_PEAK 0.28f // opacity inside it
++#define SHADOW_INSIDE (SHADOW_BLUR + SHADOW_RADIUS) // how far inside the edge a corner piece reaches
++#define SHADOW_PART (SHADOW_BLUR + SHADOW_INSIDE) // size of a corner piece
++
++static float shadow_alpha(float distance) {
++	float t = (distance + SHADOW_BLUR) / (2.0f * SHADOW_BLUR);
++	t = t < 0 ? 0 : (t > 1 ? 1 : t);
++	return SHADOW_PEAK * (1.0f - t * t * (3.0f - 2.0f * t));
++}
++
++// Distance from the edge of the shadow's rounded rectangle (positive outside, negative inside) of a point of the piece at its top left
++// corner, measured from the piece's top left; the rectangle's corner is at (SHADOW_BLUR, SHADOW_BLUR).
++static float corner_distance(float x, float y) {
++	float cx = SHADOW_BLUR + SHADOW_RADIUS;
++	float qx = cx - x, qy = cx - y;
++	float ox = qx > 0 ? qx : 0, oy = qy > 0 ? qy : 0;
++	float inner = qx > qy ? qx : qy;
++	if (inner > 0) {
++		inner = 0;
++	}
++	return hypotf(ox, oy) + inner - SHADOW_RADIUS;
++}
++
++// Part numbers: 0 top left, 1 top, 2 top right, 3 left, 4 right, 5 bottom left, 6 bottom, 7 bottom right, 8 the inside.
++static struct wlr_buffer *shadow_textures[9];
++
++static struct wlr_buffer *make_shadow_texture(int part) {
++	bool corner = part == 0 || part == 2 || part == 5 || part == 7;
++	int w = corner || part == 3 || part == 4 ? SHADOW_PART : 1;
++	int h = corner || part == 1 || part == 6 ? SHADOW_PART : 1;
++	cairo_t *cairo;
++	struct wlr_buffer *buffer = waydesk_cairo_buffer_create(w, h, &cairo);
++	if (!buffer) {
++		return NULL;
++	}
++	cairo_surface_t *surface = cairo_get_target(cairo);
++	uint32_t *pixels = (uint32_t *)cairo_image_surface_get_data(surface);
++	int stride = cairo_image_surface_get_stride(surface) / 4;
++	bool mirror_x = part == 2 || part == 4 || part == 7;
++	bool mirror_y = part == 5 || part == 6 || part == 7;
++	for (int y = 0; y < h; y++) {
++		for (int x = 0; x < w; x++) {
++			float a;
++			if (part == 8) {
++				a = SHADOW_PEAK;
++			} else {
++				// The pieces on the right and the bottom are the mirror image of the ones on the left and the top.
++				float px = (mirror_x ? w - 1 - x : x) + 0.5f;
++				float py = (mirror_y ? h - 1 - y : y) + 0.5f;
++				float d;
++				if (corner) {
++					d = corner_distance(px, py);
++				} else if (part == 1 || part == 6) {
++					d = SHADOW_BLUR - py;
++				} else {
++					d = SHADOW_BLUR - px;
++				}
++				a = shadow_alpha(d);
++			}
++			pixels[y * stride + x] = (uint32_t)(a * 255.0f + 0.5f) << 24; // black, premultiplied
++		}
++	}
++	cairo_surface_mark_dirty(surface);
++	return buffer;
++}
++
++static bool shadow_accepts_input(struct wlr_scene_buffer *buffer, double *x, double *y) {
++	return false;
++}
++
++struct waydesk_shadow *waydesk_shadow_create(struct wlr_scene_tree *parent) {
++	for (int i = 0; i < 9; i++) {
++		if (!shadow_textures[i] && !(shadow_textures[i] = make_shadow_texture(i))) {
++			return NULL;
++		}
++	}
++	struct waydesk_shadow *shadow = calloc(1, sizeof(*shadow));
++	if (!shadow) {
++		return NULL;
++	}
++	shadow->tree = wlr_scene_tree_create(parent);
++	if (!shadow->tree) {
++		free(shadow);
++		return NULL;
++	}
++	for (int i = 0; i < 9; i++) {
++		shadow->part[i] = wlr_scene_buffer_create(shadow->tree, shadow_textures[i]);
++		if (!shadow->part[i]) {
++			wlr_scene_node_destroy(&shadow->tree->node);
++			free(shadow);
++			return NULL;
++		}
++		shadow->part[i]->point_accepts_input = shadow_accepts_input;
++	}
++	wlr_scene_node_set_enabled(&shadow->tree->node, false);
++	wlr_scene_node_lower_to_bottom(&shadow->tree->node);
++	shadow->strength = -1;
++	return shadow;
++}
++
++void waydesk_shadow_update(struct waydesk_shadow *shadow, int width, int height, bool visible, float strength) {
++	const int m = SHADOW_BLUR, k = SHADOW_INSIDE, s = SHADOW_PART, ox = SHADOW_DX, oy = SHADOW_DY;
++	// A window too small for the corner pieces gets no shadow.
++	visible = visible && width > 2 * k && height > 2 * k;
++	if (shadow->visible != visible) {
++		shadow->visible = visible;
++		wlr_scene_node_set_enabled(&shadow->tree->node, visible);
++	}
++	if (!visible) {
++		return;
++	}
++	if (shadow->strength != strength) {
++		shadow->strength = strength;
++		for (int i = 0; i < 9; i++) {
++			wlr_scene_buffer_set_opacity(shadow->part[i], strength);
++		}
++	}
++	if (shadow->width == width && shadow->height == height) {
++		return;
++	}
++	shadow->width = width;
++	shadow->height = height;
++	int iw = width - 2 * k, ih = height - 2 * k;
++	struct { int x, y, w, h; } at[9] = {
++		{ox - m, oy - m, s, s}, {ox + k, oy - m, iw, s}, {ox + width - k, oy - m, s, s},
++		{ox - m, oy + k, s, ih}, {ox + width - k, oy + k, s, ih},
++		{ox - m, oy + height - k, s, s}, {ox + k, oy + height - k, iw, s}, {ox + width - k, oy + height - k, s, s},
++		{ox + k, oy + k, iw, ih},
++	};
++	for (int i = 0; i < 9; i++) {
++		wlr_scene_node_set_position(&shadow->part[i]->node, at[i].x, at[i].y);
++		wlr_scene_buffer_set_dest_size(shadow->part[i], at[i].w, at[i].h);
++	}
++}
++
++// ---- the corner of a title bar ----
++
++struct wlr_buffer *waydesk_corner_buffer(int radius, int scale, bool right,
++		const float fill[4], const float line[4]) {
++	int size = radius * scale;
++	cairo_t *cairo;
++	struct wlr_buffer *buffer = waydesk_cairo_buffer_create(size, size, &cairo);
++	if (!buffer) {
++		return NULL;
++	}
++	double r = size, cx = right ? 0 : size, outline = scale;
++	cairo_set_antialias(cairo, CAIRO_ANTIALIAS_BEST);
++	cairo_set_source_rgba(cairo, line[0], line[1], line[2], line[3]);
++	cairo_arc(cairo, cx, r, r, 0, 2 * 3.14159265358979323846);
++	cairo_fill(cairo);
++	cairo_set_source_rgba(cairo, fill[0], fill[1], fill[2], fill[3]);
++	cairo_arc(cairo, cx, r, r - outline, 0, 2 * 3.14159265358979323846);
++	cairo_fill(cairo);
++	cairo_surface_flush(cairo_get_target(cairo));
++	return buffer;
++}
