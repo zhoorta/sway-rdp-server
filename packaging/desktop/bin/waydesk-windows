@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Window helpers for waydesk sessions (floating windows): maximize, minimize, and keeping title bars reachable.
 
-  waydesk-windows maximize   toggle: fill the usable area (below the shell's bar), or go back to the old size
+  waydesk-windows maximize [on|off]   toggle: fill the usable area (below the shell's bar), or go back to the old size (on / off: only to that state)
   waydesk-windows minimize   send the focused window to the scratchpad
   waydesk-windows restore [ID]  bring a minimized window back (the last one without an ID)
   waydesk-windows list       the minimized windows as JSON: [{"id", "title", "app"}]
   waydesk-windows fit        pull every window of this workspace back into the usable area
   waydesk-windows watch      run `fit` twice a second (started by the session's sway config)
-  waydesk-windows workspaces            the workspaces and their windows as JSON (the bar's workspace button uses it)
+  waydesk-windows workspaces            the workspaces and their windows (minimized ones too) as JSON (the bar's workspace button uses it)
   waydesk-windows workspace-new         a new workspace at the next free number, and go to it
   waydesk-windows workspace-go NAME     go to a workspace
   waydesk-windows focus ID              focus a window (and so go to its workspace)
@@ -17,10 +17,58 @@ import json
 import os
 import socket
 import struct
+import subprocess
 import time
 import sys
 
 STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "waydesk-windows.json")
+# Where each minimized window came from: {window id: workspace name} (the scratchpad does not say).
+MINIMIZED_FROM = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "waydesk-minimized.json")
+
+
+def minimized_from():
+    try:
+        with open(MINIMIZED_FROM) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_minimized_from(data):
+    try:
+        with open(MINIMIZED_FROM, "w") as f:
+            json.dump(data, f)
+    except OSError:
+        pass
+
+
+def minimize():
+    """Send the focused window to the scratchpad and remember the workspace it left: the windows that are new in the scratchpad
+    afterwards came from the workspace in view (looking at what appeared is more reliable than at the focus, which the bar can hold)."""
+    before = {m["id"] for m in minimized()}
+    here = next((w["name"] for w in workspaces() if w["focused"]), None)
+    command("move scratchpad")
+    if here is None:
+        return
+    data = minimized_from()
+    for m in minimized():
+        if m["id"] not in before:
+            data[str(m["id"])] = here
+    save_minimized_from(data)
+
+
+def restore(window_id=None):
+    """Bring a minimized window back to the workspace it was minimized from (the last one without an id)."""
+    if window_id is None:
+        command("scratchpad show")
+        return
+    data = minimized_from()
+    name = data.pop(str(window_id), None)
+    if name is not None:
+        save_minimized_from(data)
+        if name != next((w["name"] for w in workspaces() if w["focused"]), None) and valid_workspace(name):
+            command(f'workspace "{name}"')
+    command(f"[con_id={window_id}] scratchpad show")
 
 
 def ipc(kind, payload=""):
@@ -119,12 +167,15 @@ def load():
         return {}
 
 
-def maximize():
+def maximize(want=None):
+    """Toggle; with want "on" or "off" only go to that state (an application asking for it twice does not undo itself)."""
     ws, n = focused()
     if n is None:
         return
     saved = load()
     key = str(n["id"])
+    if (want == "on" and key in saved) or (want == "off" and key not in saved):
+        return
     x, y, w, h, deco = geometry(n)
     if key in saved:
         x, y, w, h = saved.pop(key)
@@ -181,6 +232,18 @@ def workspace_list():
         if app is not None or n.get("window") is not None:
             out[ws["name"]]["windows"].append({"id": n["id"], "title": n.get("name") or "", "app": app or "", "focused": bool(n.get("focused"))})
 
+    # Minimized windows are in the scratchpad: list them under the workspace they came from (that one may be gone, it
+    # is shown anyway), dimmed by the bar.
+    came_from = minimized_from()
+    here = next((w["name"] for w in workspaces() if w["focused"]), FIRST_WORKSPACE)
+    for m in minimized():
+        name = came_from.get(str(m["id"]), here)
+        if name not in out:
+            if not valid_workspace(name):
+                name = here
+            out.setdefault(name, {"name": name, "focused": False, "visible": False, "windows": []})
+        out[name]["windows"].append({"id": m["id"], "title": m["title"], "app": m["app"], "focused": False, "minimized": True})
+
     def order(w):
         return (w["name"] != FIRST_WORKSPACE, not w["name"].isdigit(), int(w["name"]) if w["name"].isdigit() else 0, w["name"])
 
@@ -209,27 +272,39 @@ def new_workspace_name():
     return name
 
 
+THEME = os.path.expanduser("~/.config/gtk-3.0/dank-colors.css")
+
+
+def theme_stamp():
+    try:
+        return os.stat(THEME).st_mtime
+    except OSError:
+        return None
+
+
 def watch():
-    """Dragging a window sends sway no event, so look twice a second."""
+    """Dragging a window sends sway no event, so look twice a second (and at the shell's theme file: the title bar buttons follow it)."""
+    stamp = theme_stamp()
     while True:
         try:
             fit_all()
         except (OSError, ValueError, KeyError):
             return  # sway is gone
+        now = theme_stamp()
+        if now != stamp:
+            stamp = now
+            subprocess.run(["waydesk-titlebar-buttons", "colors"], check=False)
         time.sleep(0.5)
 
 
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "maximize":
-        maximize()
+        maximize(sys.argv[2] if len(sys.argv) > 2 else None)
     elif cmd == "minimize":
-        command("move scratchpad")
+        minimize()
     elif cmd == "restore":
-        if len(sys.argv) > 2 and sys.argv[2].isdigit():
-            command(f"[con_id={sys.argv[2]}] scratchpad show")
-        else:
-            command("scratchpad show")
+        restore(int(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2].isdigit() else None)
     elif cmd == "list":
         print(json.dumps(minimized()))
     elif cmd == "fit":

@@ -1,10 +1,53 @@
 #!/bin/sh
-# Round window buttons in the title bars (red closes, yellow minimizes, green maximizes). Needs the patched sway of
+# Window buttons in the title bars: three transparent segments of a capsule at the right end (minimize, maximize, close), only the marks
+# showing; the one under the pointer fills with a colour of the shell's theme (close: error, maximize: accent, minimize: text). This also
+# sets the colours of the title bars and borders from the theme file. Needs the patched sway of
 # packaging/sway: with Debian's own sway the command is unknown and nothing happens (the buttons of the shell's bar stay).
 # The shell's bar shows its own buttons for the focused window unless this file says the title bars have them.
+#   waydesk-titlebar-buttons          set the buttons and their colours (the session's sway config runs it)
+#   waydesk-titlebar-buttons colors   only the colours again (waydesk-windows watch runs it when the theme file changes)
+css="$HOME/.config/gtk-3.0/dank-colors.css"
+set_colors() {
+    # Hover colours of the buttons (close: error, maximize: accent, minimize: text) and the colours of the title bars and borders, from the
+    # shell's theme: the bar is a shade of the window colour, the border a darker one, light themes included.
+    [ -r "$css" ] || return 0
+    python3 - "$css" <<'PY' 2>/dev/null
+import re, subprocess, sys
+css = open(sys.argv[1]).read()
+def get(name):
+    m = re.search(r"@define-color %s (#[0-9a-fA-F]{6});" % name, css)
+    return m.group(1) if m else None
+def rgb(h): return [int(h[i:i + 2], 16) for i in (1, 3, 5)]
+def hexs(c): return "#%02x%02x%02x" % tuple(max(0, min(255, round(v))) for v in c)
+def mix(a, b, t): return [x + (y - x) * t for x, y in zip(a, b)]
+def sway(*a): subprocess.run(["swaymsg", "-q", *a], check=False)
+for button, name in (("close", "error_bg_color"), ("maximize", "accent_bg_color"), ("minimize", "window_fg_color")):
+    c = get(name)
+    if c: sway("titlebar_button", "color", button, c)
+surface, fg = get("window_bg_color"), get("window_fg_color")
+if surface and fg:
+    s, f = rgb(surface), rgb(fg)
+    dark = sum(s) < 3 * 128
+    black = [0, 0, 0]
+    bar = mix(s, black, 0.25 if dark else 0.04)
+    # A thin very dark grey line, like the outline of a Mac window: a little towards the text colour on a dark theme, towards black on a light one.
+    border = mix(s, f, 0.14) if dark else mix(s, black, 0.25)
+    border_off = mix(s, f, 0.08) if dark else mix(s, black, 0.15)
+    text_off = mix(f, s, 0.5)
+    sway("client.focused", hexs(border), hexs(bar), fg, hexs(border), hexs(border))
+    for state in ("client.focused_inactive", "client.unfocused"):
+        sway(state, hexs(border_off), surface, hexs(text_off), hexs(border_off), hexs(border_off))
+PY
+    return 0
+}
+if [ "$1" = colors ]; then
+    set_colors
+    exit 0
+fi
 marker="${XDG_RUNTIME_DIR:-/tmp}/waydesk-titlebar-buttons"
 rm -f "$marker"
 swaymsg -q titlebar_button close kill || exit 0
 swaymsg -q titlebar_button minimize exec waydesk-windows minimize
 swaymsg -q titlebar_button maximize exec waydesk-windows maximize
+set_colors
 : > "$marker"
