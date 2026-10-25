@@ -10,17 +10,43 @@
  sway_cmd cmd_unbindswitch;
 --- a/include/sway/config.h
 +++ b/include/sway/config.h
-@@ -539,6 +539,8 @@
+@@ -539,6 +539,11 @@
  	bool auto_back_and_forth;
  	bool show_marks;
  	enum alignment title_align;
 +	// Window buttons in the title bar: commands for close, minimize and maximize (NULL: no button).
 +	char *titlebar_buttons[3];
++	// Colour of each button while the pointer is over it (titlebar_button color); unset: a default from the title bar colours.
++	float titlebar_button_hover[3][4];
++	bool titlebar_button_hover_set[3];
  	bool primary_selection;
  
  	bool tiling_drag;
---- sway-1.10.1/include/sway/tree/container.h	2025-01-26 13:43:46
-+++ work/include/sway/tree/container.h	2026-10-21 16:56:56
+--- a/include/sway/sway_text_node.h
++++ b/include/sway/sway_text_node.h
+@@ -10,6 +10,11 @@
+ 	bool pango_markup;
+ 	float color[4];
+ 	float background[4];
++	// Rounded background (a title bar button): corner radius in pixels, and the colour around it (the title bar), 0 for a plain rectangle.
++	float radius;
++	int corners; // which sides are rounded: 1 left, 2 right
++	int min_width; // the node is at least this wide, the text centred
++	float surround[4];
+ 
+ 	struct wlr_scene_node *node;
+ };
+@@ -22,6 +27,8 @@
+ void sway_text_node_set_text(struct sway_text_node *node, char *text);
+ 
+ void sway_text_node_set_max_width(struct sway_text_node *node, int max_width);
++
++void sway_text_node_set_shape(struct sway_text_node *node, float radius, int corners, int min_width, float surround[4]);
+ 
+ void sway_text_node_set_background(struct sway_text_node *node, float background[4]);
+ 
+--- a/include/sway/tree/container.h
++++ b/include/sway/tree/container.h
 @@ -79,6 +79,8 @@
  
  		struct sway_text_node *title_text;
@@ -30,7 +56,7 @@
  	} title_bar;
  
  	struct {
-@@ -360,6 +362,12 @@
+@@ -361,6 +363,17 @@
  int container_squash(struct sway_container *con);
  
  void container_arrange_title_bar(struct sway_container *con);
@@ -39,13 +65,28 @@
 + * The title bar button (0 close, 1 minimize, 2 maximize) at the position (lx, ly) relative to the
 + * container, or -1.
 + */
++/**
++ * Remembers which button of which container the pointer is over (con NULL: none) and redraws the two title bars that change.
++ */
++void container_titlebar_set_hover(struct sway_container *con, int button);
++
 +int container_titlebar_button_at(struct sway_container *con, double lx, double ly);
  
  void container_update(struct sway_container *con);
  
---- sway-1.10.1/sway/commands/titlebar_button.c	1970-01-01 01:00:00
-+++ work/sway/commands/titlebar_button.c	2026-10-21 16:56:56
-@@ -0,0 +1,50 @@
+--- a/include/sway/tree/view.h
++++ b/include/sway/tree/view.h
+@@ -128,6 +128,7 @@
+ 	struct wl_listener request_move;
+ 	struct wl_listener request_resize;
+ 	struct wl_listener request_maximize;
++	struct wl_listener request_minimize;
+ 	struct wl_listener request_fullscreen;
+ 	struct wl_listener set_title;
+ 	struct wl_listener set_app_id;
+--- a/sway/commands/titlebar_button.c
++++ b/sway/commands/titlebar_button.c
+@@ -0,0 +1,71 @@
 +#include <string.h>
 +#include "sway/commands.h"
 +#include "sway/config.h"
@@ -59,7 +100,19 @@
 +	}
 +}
 +
++static int button_index(const char *name) {
++	if (strcmp(name, "close") == 0) {
++		return 0;
++	} else if (strcmp(name, "minimize") == 0) {
++		return 1;
++	} else if (strcmp(name, "maximize") == 0) {
++		return 2;
++	}
++	return -1;
++}
++
 +// titlebar_button close|minimize|maximize <command>
++// titlebar_button color close|minimize|maximize <#rrggbb>   (colour of the button under the pointer)
 +// titlebar_button none
 +struct cmd_results *cmd_titlebar_button(int argc, char **argv) {
 +	struct cmd_results *error = NULL;
@@ -67,20 +120,29 @@
 +		return error;
 +	}
 +
-+	if (argc == 1 && strcmp(argv[0], "none") == 0) {
++	if (strcmp(argv[0], "color") == 0) {
++		if ((error = checkarg(argc, "titlebar_button", EXPECTED_EQUAL_TO, 3))) {
++			return error;
++		}
++		int which = button_index(argv[1]);
++		uint32_t rgba;
++		if (which < 0 || !parse_color(argv[2], &rgba)) {
++			return cmd_results_new(CMD_INVALID,
++					"Expected 'titlebar_button color close|minimize|maximize <#rrggbb>'");
++		}
++		config->titlebar_button_hover[which][0] = ((rgba >> 24) & 0xff) / 255.0f;
++		config->titlebar_button_hover[which][1] = ((rgba >> 16) & 0xff) / 255.0f;
++		config->titlebar_button_hover[which][2] = ((rgba >> 8) & 0xff) / 255.0f;
++		config->titlebar_button_hover[which][3] = (rgba & 0xff) / 255.0f;
++		config->titlebar_button_hover_set[which] = true;
++	} else if (argc == 1 && strcmp(argv[0], "none") == 0) {
 +		for (int i = 0; i < 3; i++) {
 +			free(config->titlebar_buttons[i]);
 +			config->titlebar_buttons[i] = NULL;
 +		}
 +	} else {
-+		int which;
-+		if (strcmp(argv[0], "close") == 0) {
-+			which = 0;
-+		} else if (strcmp(argv[0], "minimize") == 0) {
-+			which = 1;
-+		} else if (strcmp(argv[0], "maximize") == 0) {
-+			which = 2;
-+		} else {
++		int which = button_index(argv[0]);
++		if (which < 0) {
 +			return cmd_results_new(CMD_INVALID,
 +					"Expected 'titlebar_button close|minimize|maximize <command>' or 'titlebar_button none'");
 +		}
@@ -118,8 +180,91 @@
  	free(config->swaybg_command);
  	free(config->swaynag_command);
  	free((char *)config->current_config_path);
---- sway-1.10.1/sway/input/seatop_default.c	2025-01-26 13:43:46
-+++ work/sway/input/seatop_default.c	2026-10-21 18:39:20
+--- a/sway/desktop/xdg_shell.c
++++ b/sway/desktop/xdg_shell.c
+@@ -1,10 +1,14 @@
+ #include <float.h>
+ #include <stdbool.h>
++#include <stdio.h>
+ #include <stdlib.h>
+ #include <wayland-server-core.h>
+ #include <wlr/types/wlr_xdg_shell.h>
+ #include <wlr/util/edges.h>
++#include "list.h"
+ #include "log.h"
++#include "sway/commands.h"
++#include "sway/config.h"
+ #include "sway/decoration.h"
+ #include "sway/scene_descriptor.h"
+ #include "sway/desktop/transaction.h"
+@@ -369,13 +373,46 @@
+ 	wlr_scene_node_set_position(&popup->scene_tree->node, lx, ly);
+ }
+ 
++// An application that draws its own window buttons asks for maximize or minimize: do what the title bar buttons do
++// (titlebar_button), on that window. A floating window would otherwise ignore the request.
++static void run_window_button(struct sway_view *view, int which, const char *suffix) {
++	if (!config->titlebar_buttons[which] || !view->container || !view->surface || !view->surface->mapped) {
++		return;
++	}
++	struct sway_seat *seat = input_manager_current_seat();
++	seat_set_focus(seat, &view->container->node);
++	size_t len = strlen(config->titlebar_buttons[which]) + strlen(suffix) + 1;
++	char *copy = malloc(len);
++	if (copy) {
++		snprintf(copy, len, "%s%s", config->titlebar_buttons[which], suffix);
++		list_t *res_list = execute_command(copy, seat, view->container);
++		for (int i = 0; i < res_list->length; ++i) {
++			free_cmd_results(res_list->items[i]);
++		}
++		list_free(res_list);
++		free(copy);
++	}
++	transaction_commit_dirty();
++}
++
+ static void handle_request_maximize(struct wl_listener *listener, void *data) {
+ 	struct sway_xdg_shell_view *xdg_shell_view =
+ 		wl_container_of(listener, xdg_shell_view, request_maximize);
+ 	struct wlr_xdg_toplevel *toplevel = xdg_shell_view->view.wlr_xdg_toplevel;
++	// The state asked for goes back to the application (its button then asks for the opposite next time); the command gets
++	// "on" or "off" so that a repeated request does not undo itself.
++	bool want = toplevel->requested.maximized;
++	wlr_xdg_toplevel_set_maximized(toplevel, want);
+ 	wlr_xdg_surface_schedule_configure(toplevel->base);
++	run_window_button(&xdg_shell_view->view, 2, want ? " on" : " off");
+ }
+ 
++static void handle_request_minimize(struct wl_listener *listener, void *data) {
++	struct sway_xdg_shell_view *xdg_shell_view =
++		wl_container_of(listener, xdg_shell_view, request_minimize);
++	run_window_button(&xdg_shell_view->view, 1, "");
++}
++
+ static void handle_request_fullscreen(struct wl_listener *listener, void *data) {
+ 	struct sway_xdg_shell_view *xdg_shell_view =
+ 		wl_container_of(listener, xdg_shell_view, request_fullscreen);
+@@ -449,6 +486,7 @@
+ 
+ 	wl_list_remove(&xdg_shell_view->new_popup.link);
+ 	wl_list_remove(&xdg_shell_view->request_maximize.link);
++	wl_list_remove(&xdg_shell_view->request_minimize.link);
+ 	wl_list_remove(&xdg_shell_view->request_fullscreen.link);
+ 	wl_list_remove(&xdg_shell_view->request_move.link);
+ 	wl_list_remove(&xdg_shell_view->request_resize.link);
+@@ -492,6 +530,10 @@
+ 	xdg_shell_view->request_maximize.notify = handle_request_maximize;
+ 	wl_signal_add(&toplevel->events.request_maximize,
+ 			&xdg_shell_view->request_maximize);
++
++	xdg_shell_view->request_minimize.notify = handle_request_minimize;
++	wl_signal_add(&toplevel->events.request_minimize,
++			&xdg_shell_view->request_minimize);
+ 
+ 	xdg_shell_view->request_fullscreen.notify = handle_request_fullscreen;
+ 	wl_signal_add(&toplevel->events.request_fullscreen,
+--- a/sway/input/seatop_default.c
++++ b/sway/input/seatop_default.c
 @@ -1,10 +1,12 @@
  #include <float.h>
 +#include <math.h>
@@ -155,11 +300,10 @@
  static void handle_button(struct sway_seat *seat, uint32_t time_msec,
  		struct wlr_input_device *device, uint32_t button,
  		enum wl_pointer_button_state state) {
-@@ -354,6 +371,38 @@
- 
+@@ -355,6 +372,38 @@
  	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat->wlr_seat);
  	uint32_t modifiers = keyboard ? wlr_keyboard_get_modifiers(keyboard) : 0;
-+
+ 
 +	// The window buttons of a title bar (see titlebar_button): they act on the press and take the release.
 +	if (cont && !surface && button == BTN_LEFT) {
 +		int which = container_titlebar_button_at(cont,
@@ -191,9 +335,27 @@
 +			return;
 +		}
 +	}
++
+ 	bool mod_pressed = modifiers & config->floating_mod;
+ 	uint32_t mod_move_btn = config->floating_mod_inverse ? BTN_RIGHT : BTN_LEFT;
+ 	uint32_t mod_resize_btn = config->floating_mod_inverse ? BTN_LEFT : BTN_RIGHT;
+@@ -610,6 +659,16 @@
+ 	if (config->focus_follows_mouse != FOLLOWS_NO) {
+ 		check_focus_follows_mouse(seat, e, node);
+ 	}
++
++	// The window button under the pointer is drawn in its own colour (see titlebar_button color).
++	struct sway_container *hover_con = NULL;
++	int hover_button = -1;
++	if (!surface && node && node->type == N_CONTAINER) {
++		hover_con = node->sway_container;
++		hover_button = container_titlebar_button_at(hover_con,
++			cursor->cursor->x - hover_con->pending.x, cursor->cursor->y - hover_con->pending.y);
++	}
++	container_titlebar_set_hover(hover_button >= 0 ? hover_con : NULL, hover_button);
  
- 	// Handle mouse bindings
- 	if (trigger_pointer_button_binding(seat, device, button, state, modifiers,
+ 	if (surface) {
+ 		if (seat_is_input_allowed(seat, surface)) {
 --- a/sway/meson.build
 +++ b/sway/meson.build
 @@ -117,6 +117,7 @@
@@ -204,9 +366,104 @@
  	'commands/titlebar_padding.c',
  	'commands/unmark.c',
  	'commands/urgent.c',
---- sway-1.10.1/sway/tree/container.c	2025-01-26 13:43:46
-+++ work/sway/tree/container.c	2026-10-21 17:49:21
-@@ -108,7 +108,9 @@
+--- a/sway/sway_text_node.c
++++ b/sway/sway_text_node.c
+@@ -1,4 +1,5 @@
+ #include <drm_fourcc.h>
++#include <math.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -47,6 +48,7 @@
+ 	struct wlr_scene_buffer *buffer_node;
+ 	char *text;
+ 	struct sway_text_node props;
++	int text_width; // width of the text itself (props.width is at least min_width)
+ 
+ 	bool visible;
+ 	float scale;
+@@ -117,12 +119,36 @@
+ 	cairo_set_font_options(cairo, fo);
+ 	pango = pango_cairo_create_context(cairo);
+ 
+-	cairo_set_source_rgba(cairo, background[0], background[1], background[2], background[3]);
+-	cairo_rectangle(cairo, 0, 0, width, height);
+-	cairo_fill(cairo);
++	if (buffer->props.radius > 0) {
++		float *surround = (float *)&buffer->props.surround;
++		const double pi = 3.14159265358979323846;
++		double r = MIN(buffer->props.radius * scale, MIN(width, height) / 2.0);
++		cairo_set_source_rgba(cairo, surround[0], surround[1], surround[2], surround[3]);
++		cairo_rectangle(cairo, 0, 0, width, height);
++		cairo_fill(cairo);
++		double rl = (buffer->props.corners & 1) ? r : 0, rr = (buffer->props.corners & 2) ? r : 0;
++		cairo_new_sub_path(cairo);
++		cairo_move_to(cairo, rl, 0);
++		cairo_line_to(cairo, width - rr, 0);
++		if (rr > 0) cairo_arc(cairo, width - rr, rr, rr, -pi / 2, 0); else cairo_line_to(cairo, width, 0);
++		cairo_line_to(cairo, width, height - rr);
++		if (rr > 0) cairo_arc(cairo, width - rr, height - rr, rr, 0, pi / 2); else cairo_line_to(cairo, width, height);
++		cairo_line_to(cairo, rl, height);
++		if (rl > 0) cairo_arc(cairo, rl, height - rl, rl, pi / 2, pi); else cairo_line_to(cairo, 0, height);
++		cairo_line_to(cairo, 0, rl);
++		if (rl > 0) cairo_arc(cairo, rl, rl, rl, pi, 3 * pi / 2); else cairo_line_to(cairo, 0, 0);
++		cairo_close_path(cairo);
++		cairo_set_source_rgba(cairo, background[0], background[1], background[2], background[3]);
++		cairo_fill(cairo);
++	} else {
++		cairo_set_source_rgba(cairo, background[0], background[1], background[2], background[3]);
++		cairo_rectangle(cairo, 0, 0, width, height);
++		cairo_fill(cairo);
++	}
+ 
+ 	cairo_set_source_rgba(cairo, color[0], color[1], color[2], color[3]);
+-	cairo_move_to(cairo, 0, (config->font_baseline - buffer->props.baseline) * scale);
++	cairo_move_to(cairo, (get_text_width(&buffer->props) - buffer->text_width) / 2.0 * scale,
++		(config->font_baseline - buffer->props.baseline) * scale);
+ 
+ 	render_text(cairo, config->font_description, scale, buffer->props.pango_markup,
+ 		"%s", buffer->text);
+@@ -138,7 +164,7 @@
+ 
+ 	pixman_region32_t opaque;
+ 	pixman_region32_init(&opaque);
+-	if (background[3] == 1) {
++	if (background[3] == 1 && (buffer->props.radius <= 0 || buffer->props.surround[3] == 1)) {
+ 		pixman_region32_union_rect(&opaque, &opaque, 0, 0,
+ 			get_text_width(&buffer->props), buffer->props.height);
+ 	}
+@@ -208,6 +234,8 @@
+ 	get_text_size(c, config->font_description, &props->width, NULL,
+ 		&props->baseline, 1, props->pango_markup, "%s", buffer->text);
+ 	cairo_destroy(c);
++	buffer->text_width = props->width;
++	props->width = MAX(props->width, props->min_width);
+ 
+ 	wlr_scene_buffer_set_dest_size(buffer->buffer_node,
+ 		get_text_width(props), props->height);
+@@ -296,5 +324,19 @@
+ 		return;
+ 	}
+ 	memcpy(&node->background, background, sizeof(*background) * 4);
++	render_backing_buffer(buffer);
++}
++
++void sway_text_node_set_shape(struct sway_text_node *node, float radius, int corners, int min_width, float surround[4]) {
++	struct text_buffer *buffer = wl_container_of(node, buffer, props);
++	if (node->radius == radius && node->corners == corners && node->min_width == min_width &&
++			memcmp(&node->surround, surround, sizeof(*surround) * 4) == 0) {
++		return;
++	}
++	node->radius = radius;
++	node->corners = corners;
++	node->min_width = min_width;
++	memcpy(&node->surround, surround, sizeof(*surround) * 4);
++	text_calc_size(buffer);
+ 	render_backing_buffer(buffer);
+ }
+--- a/sway/tree/container.c
++++ b/sway/tree/container.c
+@@ -116,7 +116,9 @@
  		alloc_rect_node(c->title_bar.border, &failed);
  	}
  
@@ -217,64 +474,119 @@
  		alloc_rect_node(c->title_bar.background, &failed);
  	}
  
-@@ -296,6 +298,28 @@
+@@ -254,6 +256,31 @@
+ 	wlr_scene_rect_set_color(rect, premultiplied);
+ }
+ 
++// The three window buttons are one capsule: the outer ends of minimize (1) and close (0) are round, the joins are square.
++static const int button_corners[3] = {2, 1, 0}; // close: right end, minimize: left end, maximize: none
++#define BUTTON_MIN_WIDTH 30
++
++static struct sway_container *titlebar_hover_con = NULL;
++static int titlebar_hover_button = -1;
++
++void container_titlebar_set_hover(struct sway_container *con, int button) {
++	if (!con) {
++		button = -1;
++	}
++	if (titlebar_hover_con == con && titlebar_hover_button == button) {
++		return;
++	}
++	struct sway_container *old = titlebar_hover_con;
++	titlebar_hover_con = con;
++	titlebar_hover_button = button;
++	if (old && old != con) {
++		container_update(old);
++	}
++	if (con) {
++		container_update(con);
++	}
++}
++
+ void container_update(struct sway_container *con) {
+ 	struct border_colors *colors = container_get_current_colors(con);
+ 	list_t *siblings = NULL;
+@@ -307,6 +334,36 @@
  		sway_text_node_set_color(con->title_bar.marks_text, colors->text);
  		sway_text_node_set_background(con->title_bar.marks_text, colors->background);
  	}
 +
-+	// Red, yellow and green on the focused window, in the colour of the text, dimmed, on the others.
-+	static const float button_colors[3][4] = {
-+		{0.996f, 0.373f, 0.341f, 1.0f},
-+		{0.996f, 0.737f, 0.180f, 1.0f},
-+		{0.157f, 0.784f, 0.251f, 1.0f},
++	// Quiet rectangles: the colour of the text, faint, on the title bar; the one under the pointer takes its own colour
++	// (titlebar_button color, otherwise the text colour for minimize, a blue for maximize, a red for close).
++	static const float default_hover[3][4] = {
++		{0.949f, 0.722f, 0.710f, 1.0f},
++		{0.910f, 0.878f, 0.914f, 1.0f},
++		{0.816f, 0.737f, 1.000f, 1.0f},
 +	};
 +	bool focused = colors == &config->border_colors.focused;
 +	for (int i = 0; i < 3; i++) {
 +		if (!con->title_bar.buttons[i]) {
 +			continue;
 +		}
-+		float color[4];
-+		if (focused) {
-+			memcpy(color, button_colors[i], sizeof(color));
-+		} else {
-+			memcpy(color, colors->text, sizeof(color));
-+			color[3] *= 0.4f;
++		// Transparent at rest: the title bar colour with the mark faintly in the text colour; the one under the pointer fills with
++		// its own colour and shows the mark in the title bar colour.
++		float rest[4], glyph[4];
++		float amount = focused ? 0.38f : 0.22f;
++		memcpy(rest, colors->background, sizeof(rest));
++		for (int c = 0; c < 3; c++) {
++			glyph[c] = colors->background[c] + (colors->text[c] - colors->background[c]) * amount;
 +		}
-+		sway_text_node_set_color(con->title_bar.buttons[i], color);
-+		sway_text_node_set_background(con->title_bar.buttons[i], colors->background);
++		glyph[3] = 1.0f;
++		if (titlebar_hover_con == con && titlebar_hover_button == i && focused) {
++			memcpy(rest, config->titlebar_button_hover_set[i] ? config->titlebar_button_hover[i] : default_hover[i], sizeof(rest));
++			memcpy(glyph, colors->background, sizeof(glyph));
++		}
++		sway_text_node_set_shape(con->title_bar.buttons[i], 99.0f, button_corners[i], BUTTON_MIN_WIDTH, colors->background);
++		sway_text_node_set_color(con->title_bar.buttons[i], glyph);
++		sway_text_node_set_background(con->title_bar.buttons[i], rest);
 +	}
  }
  
  void container_update_itself_and_parents(struct sway_container *con) {
-@@ -338,6 +362,27 @@
+@@ -349,6 +406,37 @@
  	pixman_region32_t text_area;
  	pixman_region32_init(&text_area);
  
-+	// The window buttons come first, on the left; the title starts after them.
++	// The window buttons sit at the right end (minimize, maximize, close); the title may use the room to their left.
++	static const int button_order[3] = {1, 2, 0};
 +	int left = config->titlebar_h_padding;
-+	int button_gap = 6;
-+	int buttons_end = 0;
-+	for (int i = 0; i < 3; i++) {
-+		struct sway_text_node *node = con->title_bar.buttons[i];
++	int button_gap = 1;
++	int buttons_w = 0, buttons_n = 0;
++	for (int k = 0; k < 3; k++) {
++		struct sway_text_node *node = con->title_bar.buttons[button_order[k]];
++		if (node) {
++			buttons_w += node->width + (buttons_n++ ? button_gap : 0);
++		}
++	}
++	bool buttons_fit = buttons_n > 0 && width >= buttons_w + config->titlebar_h_padding * 3 + 40;
++	int buttons_x = width - config->titlebar_h_padding - buttons_w;
++	for (int k = 0; k < 3; k++) {
++		struct sway_text_node *node = con->title_bar.buttons[button_order[k]];
 +		if (!node) {
 +			continue;
 +		}
-+		bool fits = width >= left + buttons_end + (int)node->width + config->titlebar_h_padding * 2;
-+		wlr_scene_node_set_enabled(node->node, fits);
-+		if (!fits) {
++		wlr_scene_node_set_enabled(node->node, buttons_fit);
++		if (!buttons_fit) {
 +			continue;
 +		}
-+		wlr_scene_node_set_position(node->node, left + buttons_end, (height - node->height) >> 1);
++		wlr_scene_node_set_position(node->node, buttons_x, (height - node->height) >> 1);
 +		pixman_region32_union_rect(&text_area, &text_area,
 +			node->node->x, node->node->y, node->width, node->height);
-+		buttons_end += node->width + button_gap;
++		buttons_x += node->width + button_gap;
 +	}
-+	int title_min = left + buttons_end;
++	int title_min = left;
++	int title_right = buttons_fit ? width - config->titlebar_h_padding - buttons_w - config->titlebar_h_padding
++			: width - config->titlebar_h_padding;
 +
  	if (con->title_bar.marks_text) {
  		struct sway_text_node *node = con->title_bar.marks_text;
  		marks_buffer_width = node->width;
-@@ -372,10 +417,10 @@
+@@ -379,17 +467,17 @@
+ 
+ 		int h_padding;
+ 		if (title_align == ALIGN_RIGHT) {
+-			h_padding = width - config->titlebar_h_padding - node->width;
++			h_padding = title_right - node->width;
  		} else if (title_align == ALIGN_CENTER) {
  			h_padding = ((int)width - marks_buffer_width - node->width) >> 1;
  		} else {
@@ -286,8 +598,12 @@
 +		h_padding = MAX(h_padding, title_min);
  
  		int alloc_width = MIN((int) node->width,
- 			width - h_padding - config->titlebar_h_padding);
-@@ -416,6 +461,26 @@
+-			width - h_padding - config->titlebar_h_padding);
++			title_right - h_padding);
+ 		alloc_width = MAX(alloc_width, 0);
+ 
+ 		sway_text_node_set_max_width(node, alloc_width);
+@@ -427,6 +515,26 @@
  	container_update(con);
  }
  
@@ -314,11 +630,10 @@
  void container_update_marks(struct sway_container *con) {
  	char *buffer = NULL;
  
-@@ -477,6 +542,18 @@
- 
+@@ -489,6 +597,23 @@
  	con->title_bar.title_text = sway_text_node_create(con->title_bar.tree,
  		con->formatted_title, colors->text, config->pango_markup);
-+
+ 
 +	// Made again with the title: a font change changes their size too.
 +	for (int i = 0; i < 3; i++) {
 +		if (con->title_bar.buttons[i]) {
@@ -326,10 +641,27 @@
 +			con->title_bar.buttons[i] = NULL;
 +		}
 +		if (con->view && config->titlebar_buttons[i]) {
++			// close, minimize, maximize: the mark alone, the node is made wider and rounded in container_update
++			static char *const marks[3] = {"\u00d7", "\u2013", "\u25a1"};
 +			con->title_bar.buttons[i] = sway_text_node_create(con->title_bar.tree,
-+				"\u25cf", colors->text, false);
++				marks[i], colors->text, false);
++			if (con->title_bar.buttons[i]) {
++				sway_text_node_set_shape(con->title_bar.buttons[i], 99.0f, button_corners[i], BUTTON_MIN_WIDTH, colors->background);
++			}
 +		}
 +	}
- 
++
  	// we always have to remake these text buffers completely for text font
  	// changes etc...
+ 	if (con->title_bar.marks_text) {
+@@ -531,6 +656,10 @@
+ }
+ 
+ void container_begin_destroy(struct sway_container *con) {
++	if (con == titlebar_hover_con) {
++		titlebar_hover_con = NULL;
++		titlebar_hover_button = -1;
++	}
+ 	if (con->view) {
+ 		ipc_event_window(con, "close");
+ 	}

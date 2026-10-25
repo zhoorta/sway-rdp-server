@@ -31,7 +31,7 @@ mkdir -p subprojects && tar -xzf ../wlroots.tar.gz -C subprojects && mv subproje
 patch -p1 < /patch/waydesk-titlebar-buttons.patch >/dev/null
 meson setup build -Dwlroots:xwayland=enabled -Dwlroots:examples=false -Dwlroots:default_library=static -Ddefault-wallpaper=false -Dman-pages=disabled \
   -Dzsh-completions=false -Dbash-completions=false -Dfish-completions=false --buildtype=release --prefix=/usr/lib/waydesk >/dev/null
-ninja -C build >/dev/null
+ninja -C build >/tmp/ninja.log 2>&1 || { tail -40 /tmp/ninja.log; exit 1; }
 P=/build/pkg; B=$P/usr/lib/waydesk/bin
 mkdir -p $B $P/DEBIAN $P/usr/share/doc/waydesk-sway
 for f in sway/sway swaymsg/swaymsg swaybar/swaybar swaynag/swaynag; do install -s -m 755 build/$f $B/; done
