@@ -84,7 +84,8 @@ def place(con_id, x, y, w=None, h=None, deco=0):
 
 
 def fit_node(ws, n):
-    """Keep a floating window, title bar included, inside the usable area of its workspace."""
+    """Keep a floating window reachable: inside the usable area of its workspace, except that the bottom may go down behind the dock
+    (the title bar stays above it, so the window can always be dragged back)."""
     area = usable(ws["name"])
     if not area or n.get("fullscreen_mode"):
         return
@@ -92,7 +93,7 @@ def fit_node(ws, n):
     x, y, w, h, deco = geometry(n)
     nw, nh = min(w, aw), min(h, ah - deco)
     nx = min(max(x, ax), ax + aw - nw)
-    ny = min(max(y, ay), ay + ah - nh - deco)
+    ny = min(max(y, ay), ay + ah - deco)
     if (nx, ny, nw, nh) != (x, y, w, h):
         place(n["id"], nx, ny, nw, nh, deco)
 
