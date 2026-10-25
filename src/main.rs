@@ -6,6 +6,7 @@ mod audio;
 mod auth;
 mod capture;
 mod clipboard;
+mod cursors;
 mod egfx;
 mod encode;
 mod fdpass;
@@ -40,29 +41,6 @@ use proto::{Down, FrameKind};
 /// own credits in H.264 mode).
 const BITMAP_CREDITS: u16 = 3;
 
-/// The classic arrow (X = black, . = white), as a 32 bit pointer image: the pointer the client draws itself.
-fn arrow_pointer() -> RGBAPointer {
-    const ART: [&str; 19] = [
-        "X", "XX", "X.X", "X..X", "X...X", "X....X", "X.....X", "X......X", "X.......X", "X........X", "X.....XXXXX", "X..X..X", "X.X X..X",
-        "XX  X..X", "X    X..X", "     X..X", "      X..X", "      X..X", "       XX",
-    ];
-    const SIZE: usize = 32;
-    let mut data = vec![0u8; SIZE * SIZE * 4];
-    for (row, line) in ART.iter().enumerate() {
-        for (col, c) in line.chars().enumerate() {
-            let value = match c {
-                'X' => 0,
-                '.' => 255,
-                _ => continue,
-            };
-            // The rows of an RDP pointer image run from the bottom up; the pixels are blue, green, red, alpha.
-            let at = ((SIZE - 1 - row) * SIZE + col) * 4;
-            data[at..at + 4].copy_from_slice(&[value, value, value, 255]);
-        }
-    }
-    RGBAPointer { cache_index: 1, width: SIZE as u16, height: SIZE as u16, hot_x: 0, hot_y: 0, data }
-}
-
 struct Updates {
     link: Arc<Link>,
     egfx: Option<EgfxLink>,
@@ -73,6 +51,8 @@ struct Updates {
     max_qp: u8,
     /// The client was told to hide its own pointer.
     pointer_hidden: bool,
+    /// The shape the application asked for (a cursor name, see `cursors`): what the client's pointer looks like.
+    cursor: String,
 }
 
 struct EgfxLink {
@@ -101,8 +81,8 @@ impl RdpServerDisplayUpdates for Updates {
                     // A pointer shape with nothing in it: the Windows App did not take the "hidden pointer" update.
                     DisplayUpdate::RGBAPointer(RGBAPointer { cache_index: 0, width: 32, height: 32, hot_x: 0, hot_y: 0, data: vec![0; 32 * 32 * 4] })
                 } else {
-                    // The default pointer is left to the client, and FreeRDP draws nothing for it: give an arrow to draw.
-                    DisplayUpdate::RGBAPointer(arrow_pointer())
+                    // The default pointer is left to the client, and FreeRDP draws nothing for it: give a pointer to draw, in the shape asked for.
+                    DisplayUpdate::RGBAPointer(cursors::pointer(&self.cursor))
                 }));
             }
             // Graphics pipeline first: it is what the Windows App is built around. Give the client a
@@ -128,8 +108,8 @@ impl RdpServerDisplayUpdates for Updates {
             let event = match received {
                 Ok(event) => event.unwrap_or(Event::Closed),
                 Err(_) => {
-                    // Only the empty pointer has to be repeated: the client's own arrow comes back by itself.
-                    self.pointer_hidden = !capture::cursor_in_picture();
+                    // The client forgets the shape too: repeat the one in use (the empty pointer, or the shape).
+                    self.pointer_hidden = false;
                     continue;
                 }
             };
@@ -138,6 +118,13 @@ impl RdpServerDisplayUpdates for Updates {
                 Event::Closed => {
                     info!("the session process ended; closing this connection");
                     return Ok(None);
+                }
+                Event::Cursor(name) => {
+                    if name != self.cursor {
+                        info!(cursor = %name, "pointer shape changed");
+                        self.cursor = name;
+                        self.pointer_hidden = false; // the pointer is sent again, in the new shape
+                    }
                 }
                 Event::Resized(width, height) => {
                     if (width, height) != self.size {
@@ -380,7 +367,7 @@ impl RdpServerDisplay for Handler {
         }
         let egfx = self.egfx.as_ref().map(|(st, _)| EgfxLink { st: st.clone(), out: egfx::Out::new(st.clone(), size.0, size.1) });
         let max_qp = self.egfx.as_ref().map_or(0, |(_, t)| t.max_qp.clamp(1, 51));
-        Ok(Box::new(Updates { link, egfx, start: std::time::Instant::now(), size, mode: Mode::Undecided, max_qp, pointer_hidden: false }))
+        Ok(Box::new(Updates { link, egfx, start: std::time::Instant::now(), size, mode: Mode::Undecided, max_qp, pointer_hidden: false, cursor: "default".into() }))
     }
 
     fn request_layout(&mut self, layout: ironrdp_displaycontrol::pdu::DisplayControlMonitorLayout) {

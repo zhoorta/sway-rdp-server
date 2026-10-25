@@ -186,6 +186,19 @@ impl UpdateEncoder {
 
     fn rgba_pointer(ptr: RGBAPointer) -> Result<UpdateFragmenter> {
         let xor_mask = ptr.data;
+        // The AND mask: one bit per pixel, 1 where the pixel is transparent, rows from the bottom up like the image, each row padded to
+        // whole 16-bit words. A client that does not blend the alpha channel needs it, and a strict one (the Windows App) refuses a
+        // 32 bit pointer without it.
+        let (width, height) = (usize::from(ptr.width), usize::from(ptr.height));
+        let row_bytes = width.div_ceil(16) * 2;
+        let mut and_mask = vec![0u8; row_bytes * height];
+        for row in 0..height {
+            for col in 0..width {
+                if xor_mask.get((row * width + col) * 4 + 3).copied().unwrap_or(0) == 0 {
+                    and_mask[row * row_bytes + col / 8] |= 0x80 >> (col % 8);
+                }
+            }
+        }
 
         let hot_spot = Point16 {
             x: ptr.hot_x,
@@ -197,7 +210,7 @@ impl UpdateEncoder {
             width: ptr.width,
             height: ptr.height,
             xor_mask: &xor_mask,
-            and_mask: &[],
+            and_mask: &and_mask,
         };
         let ptr = PointerAttribute {
             xor_bpp: 32,

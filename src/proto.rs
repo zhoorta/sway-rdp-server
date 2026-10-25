@@ -103,6 +103,8 @@ pub enum Up {
     /// 20 ms chunk of 16-bit stereo PCM at 44.1 kHz.
     Audio { pcm: Vec<u8> },
     Clipboard { data: Vec<u8> },
+    /// The shape of the mouse pointer: a cursor name (`text`, `ew-resize`, ...).
+    Cursor { name: String },
     Bye,
 }
 
@@ -298,6 +300,10 @@ impl Up {
                 o.u8(5);
                 o.bytes(data);
             }
+            Up::Cursor { name } => {
+                o.u8(6);
+                o.str(name);
+            }
             Up::Bye => o.u8(255),
         }
         o.0
@@ -319,6 +325,7 @@ impl Up {
             }
             4 => Up::Audio { pcm: i.bytes()? },
             5 => Up::Clipboard { data: i.bytes()? },
+            6 => Up::Cursor { name: i.str()? },
             255 => Up::Bye,
             t => return Err(ProtoError::UnknownTag(t)),
         };
@@ -537,6 +544,7 @@ mod tests {
             Up::Frame { x: 3, y: 4, w: 1, h: 1, kind: FrameKind::Bgra, data: vec![1, 2, 3, 4] },
             Up::Audio { pcm: vec![0; 3528] },
             Up::Clipboard { data: Vec::new() },
+            Up::Cursor { name: "ew-resize".into() },
             Up::Bye,
         ]
     }

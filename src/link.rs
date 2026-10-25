@@ -116,6 +116,8 @@ pub enum Event {
     Frame { x: u16, y: u16, w: u16, h: u16, kind: FrameKind, data: Vec<u8> },
     /// The picture has a new size from now on; frames before this message have the old one.
     Resized(u16, u16),
+    /// The shape of the mouse pointer changed (a cursor name).
+    Cursor(String),
     /// The session process is gone.
     Closed,
 }
@@ -242,6 +244,12 @@ impl Link {
                             if let Some(sink) = reader.audio.lock().unwrap().as_ref() {
                                 sink(pcm);
                             }
+                        }
+                    }
+                    Ok(Up::Cursor { name }) => {
+                        // Untrusted: only a short plain name goes on.
+                        if crate::cursors::valid_name(&name) && ev_tx.send(Event::Cursor(name)).await.is_err() {
+                            break;
                         }
                     }
                     Ok(Up::Ready { .. }) => {}

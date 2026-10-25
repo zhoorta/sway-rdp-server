@@ -296,6 +296,11 @@ async fn serve_client(
     session.shared.force_full();
     let mut me = Worker { session: Some(session), enc: None, tuning: cfg.tuning, credits: 0, bitmaps: cfg.tuning.is_none(), up: up_tx.clone(), audio: Audio::new(up_tx.clone()), clipboard: Clipboard::new(up_tx), settle: None, settling: false, last_frame: tokio::time::Instant::now(), last_rect: None, last_change: tokio::time::Instant::now() };
     let _ = me.up.send(Up::Ready { width: w, height: h });
+    // The shape of the mouse pointer goes to the client as it changes (when the client draws the pointer itself).
+    if !crate::capture::cursor_in_picture() {
+        let up = me.up.clone();
+        std::thread::spawn(move || watch_cursor(&up));
+    }
 
     let mut tick = tokio::time::interval(Duration::from_secs(2));
     // The helper has gone away: no new clients can come, this one carries on.
@@ -641,4 +646,27 @@ mod private_bin_tests {
         let dir = Path::new("/usr/lib/waydesk/bin");
         assert_eq!(path_with_private_first(None, dir), OsStr::new("/usr/lib/waydesk/bin"));
     }
+}
+
+/// Follows the shape of the mouse pointer: the private sway (waydesk-sway) reports it as a tick event with the payload `cursor:NAME`
+/// every time an application or the window manager changes it. Ends when sway does.
+fn watch_cursor(up: &mpsc::UnboundedSender<Up>) {
+    use std::io::{BufRead as _, BufReader};
+    use std::process::{Command, Stdio};
+    let Ok(mut child) = Command::new("swaymsg").args(["-r", "-t", "subscribe", "-m", "[\"tick\"]"]).stdout(Stdio::piped()).stderr(Stdio::null()).spawn() else {
+        return;
+    };
+    if let Some(out) = child.stdout.take() {
+        for line in BufReader::new(out).lines() {
+            let Ok(line) = line else { break };
+            let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
+            if let Some(name) = event["payload"].as_str().and_then(|p| p.strip_prefix("cursor:")) {
+                if up.send(Up::Cursor { name: name.to_string() }).is_err() {
+                    break;
+                }
+            }
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
 }
