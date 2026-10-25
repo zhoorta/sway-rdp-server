@@ -206,7 +206,7 @@ impl Session {
 
     fn attach(output: &str, index: u32, workspace: &str, (w, h): (u16, u16), layout: &str, opts: &Options) -> Result<Self> {
         swaymsg(&["output", output, "mode", "--custom", &format!("{w}x{h}@60Hz"), "scale", "1"])?;
-        if !crate::capture::cursor_in_picture() {
+        if !crate::capture::cursor_in_picture() && !crate::cursors::sway_reports_cursor() {
             // A headless sway has no hardware cursor, so it draws the cursor into the picture whatever screencopy is asked
             // for: with the client's own pointer that makes two. Give sway a theme whose cursors have nothing in them.
             let _ = swaymsg(&["seat", "*", "xcursor_theme", "waydesk-blank", "24"]);

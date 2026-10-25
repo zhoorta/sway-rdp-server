@@ -118,6 +118,8 @@ pub enum Event {
     Resized(u16, u16),
     /// The shape of the mouse pointer changed (a cursor name).
     Cursor(String),
+    /// The pointer is a picture an application drew itself (see `cursors::pointer_from_image`).
+    CursorImage { hot_x: u16, hot_y: u16, width: u16, height: u16, data: Vec<u8> },
     /// The session process is gone.
     Closed,
 }
@@ -249,6 +251,17 @@ impl Link {
                     Ok(Up::Cursor { name }) => {
                         // Untrusted: only a short plain name goes on.
                         if crate::cursors::valid_name(&name) && ev_tx.send(Event::Cursor(name)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Ok(Up::CursorImage { hot_x, hot_y, width, height, data }) => {
+                        // Untrusted: a small picture of the size it says, or the arrow.
+                        let event = if crate::cursors::valid_image(width, height, data.len()) {
+                            Event::CursorImage { hot_x, hot_y, width, height, data }
+                        } else {
+                            Event::Cursor("default".into())
+                        };
+                        if ev_tx.send(event).await.is_err() {
                             break;
                         }
                     }

@@ -63,6 +63,17 @@ impl H264 {
         })
     }
 
+    /// Changes the bitrate the encoder aims for, while it runs (OpenH264 takes it for the next frames; it skips frames when it is over).
+    pub fn set_bitrate(&mut self, bps: u32) {
+        use openh264_sys2::{SBitrateInfo, ENCODER_OPTION_BITRATE, SPATIAL_LAYER_ALL};
+        let mut info = SBitrateInfo { iLayer: SPATIAL_LAYER_ALL, iBitrate: bps.min(i32::MAX as u32) as i32 };
+        // SAFETY: the option takes a pointer to an SBitrateInfo, which lives for the call.
+        let result = unsafe { self.encoder.raw_api().set_option(ENCODER_OPTION_BITRATE, (&raw mut info).cast()) };
+        if result != 0 {
+            tracing::warn!(bps, result, "the encoder did not take the new bitrate");
+        }
+    }
+
     /// The next frame will be a keyframe: it carries the whole picture again, not only the difference to the last one.
     pub fn force_keyframe(&mut self) {
         self.encoder.force_intra_frame();

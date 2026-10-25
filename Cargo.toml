@@ -17,6 +17,8 @@ ironrdp-svc = "0.8"
 ironrdp-pdu = "0.9"
 # H.264 comes from the system's libopenh264 (Debian ships it) loaded at run time: waydesk-server ships no encoder code of its own.
 openh264 = { version = "0.9", default-features = false, features = ["libloading"] }
+# The raw interface of the encoder, to change its bitrate while it runs (the link to the client may get slower or faster).
+openh264-sys2 = { version = "0.9", default-features = false, features = ["libloading"] }
 yuv = "0.8"
 anyhow = "1"
 serde_json = "1"

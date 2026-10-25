@@ -105,6 +105,8 @@ struct Worker {
     tuning: Option<Tuning>,
     /// Frames the daemon has room for.
     credits: u32,
+    /// The bitrate the daemon asked for (the link to the client is slower than the configured one), None: the configured one.
+    bitrate: Option<u32>,
     /// Send raw bitmaps instead of H.264.
     bitmaps: bool,
     up: mpsc::UnboundedSender<Up>,
@@ -294,10 +296,10 @@ async fn serve_client(
     };
     let (w, h) = (session.shared.width, session.shared.height);
     session.shared.force_full();
-    let mut me = Worker { session: Some(session), enc: None, tuning: cfg.tuning, credits: 0, bitmaps: cfg.tuning.is_none(), up: up_tx.clone(), audio: Audio::new(up_tx.clone()), clipboard: Clipboard::new(up_tx), settle: None, settling: false, last_frame: tokio::time::Instant::now(), last_rect: None, last_change: tokio::time::Instant::now() };
+    let mut me = Worker { session: Some(session), enc: None, tuning: cfg.tuning, credits: 0, bitrate: None, bitmaps: cfg.tuning.is_none(), up: up_tx.clone(), audio: Audio::new(up_tx.clone()), clipboard: Clipboard::new(up_tx), settle: None, settling: false, last_frame: tokio::time::Instant::now(), last_rect: None, last_change: tokio::time::Instant::now() };
     let _ = me.up.send(Up::Ready { width: w, height: h });
     // The shape of the mouse pointer goes to the client as it changes (when the client draws the pointer itself).
-    if !crate::capture::cursor_in_picture() {
+    if !crate::capture::cursor_in_picture() && crate::cursors::sway_reports_cursor() {
         let up = me.up.clone();
         std::thread::spawn(move || watch_cursor(&up));
     }
@@ -383,6 +385,12 @@ impl Worker {
                 let _ = session.input.send(input::Cmd::Wheel { vertical, horizontal });
             }
             Down::Credit { frames } => self.credits = (self.credits + u32::from(frames)).min(MAX_CREDITS),
+            Down::Bitrate { bps } => {
+                self.bitrate = Some(bps);
+                if let Some(enc) = self.enc.as_mut() {
+                    enc.set_bitrate(bps);
+                }
+            }
             Down::RequestFull => session.shared.force_full(),
             Down::UseBitmaps => {
                 self.bitmaps = true;
@@ -439,6 +447,7 @@ impl Worker {
         }
         if self.enc.is_none() {
             let tuning = self.tuning.context("no encoder settings")?;
+            let tuning = Tuning { bitrate: self.bitrate.unwrap_or(tuning.bitrate), ..tuning };
             self.enc = Some(H264::new(shared.width, shared.height, tuning)?);
         }
         match self.enc.as_mut().expect("encoder").encode(frame, w, h)? {
@@ -494,8 +503,16 @@ impl OwnSway {
             cmd.env("GSETTINGS_BACKEND", "memory");
         }
         if !crate::capture::cursor_in_picture() {
-            // The apps of the session load their cursors from this theme too (see session.rs): nothing of them in the picture.
-            cmd.env("XCURSOR_THEME", "waydesk-blank").env("XCURSOR_SIZE", "24");
+            if crate::cursors::sway_reports_cursor() {
+                // waydesk-sway draws no pointer and says what it would look like: the apps use a real cursor theme.
+                cmd.env("WAYDESK_REMOTE_CURSOR", "1").env("XCURSOR_SIZE", "24");
+                if std::path::Path::new("/usr/share/icons/Adwaita/cursors").is_dir() {
+                    cmd.env("XCURSOR_THEME", "Adwaita");
+                }
+            } else {
+                // The apps of the session load their cursors from this theme too (see session.rs): nothing of them in the picture.
+                cmd.env("XCURSOR_THEME", "waydesk-blank").env("XCURSOR_SIZE", "24");
+            }
         }
         let child = cmd
             .env("WLR_BACKENDS", "headless")
@@ -648,8 +665,8 @@ mod private_bin_tests {
     }
 }
 
-/// Follows the shape of the mouse pointer: the private sway (waydesk-sway) reports it as a tick event with the payload `cursor:NAME`
-/// every time an application or the window manager changes it. Ends when sway does.
+/// Follows the mouse pointer: the private sway (waydesk-sway) reports it as a tick event with the payload `cursor:NAME`, or
+/// `cursorimg:...` for a picture an application drew, every time an application or the window manager changes it. Ends when sway does.
 fn watch_cursor(up: &mpsc::UnboundedSender<Up>) {
     use std::io::{BufRead as _, BufReader};
     use std::process::{Command, Stdio};
@@ -660,8 +677,8 @@ fn watch_cursor(up: &mpsc::UnboundedSender<Up>) {
         for line in BufReader::new(out).lines() {
             let Ok(line) = line else { break };
             let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) else { continue };
-            if let Some(name) = event["payload"].as_str().and_then(|p| p.strip_prefix("cursor:")) {
-                if up.send(Up::Cursor { name: name.to_string() }).is_err() {
+            if let Some(message) = event["payload"].as_str().and_then(crate::cursors::message_from_tick) {
+                if up.send(message).is_err() {
                     break;
                 }
             }

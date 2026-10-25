@@ -21,6 +21,7 @@ enum Shape {
     ResizeNesw,
     NotAllowed,
     Grab,
+    Hidden,
 }
 
 /// The shape for a cursor name (the CSS names of cursor-shape-v1, and the older X names), the arrow for any other.
@@ -37,8 +38,62 @@ fn shape_of(name: &str) -> Shape {
         "nesw-resize" | "ne-resize" | "sw-resize" | "top_right_corner" | "bottom_left_corner" => Shape::ResizeNesw,
         "not-allowed" | "no-drop" | "crossed_circle" => Shape::NotAllowed,
         "grab" | "grabbing" => Shape::Grab,
+        "none" => Shape::Hidden,
         _ => Shape::Arrow,
     }
+}
+
+/// Whether the sway of the session reports the pointer (waydesk-sway does, a distribution's own sway does not). Then the compositor draws
+/// no pointer, the apps may use a real cursor theme, and the pointer the client draws follows what the apps ask for.
+pub fn sway_reports_cursor() -> bool {
+    std::path::Path::new("/usr/lib/waydesk/bin/sway").is_file()
+}
+
+/// A pointer picture from the session is untrusted: a small one, of the size it says.
+pub fn valid_image(width: u16, height: u16, len: usize) -> bool {
+    (1..=32).contains(&width) && (1..=32).contains(&height) && len == usize::from(width) * usize::from(height) * 4
+}
+
+/// The pointer for a picture an application drew itself: 32 bit BGRA, premultiplied, rows from the top; made into a 32 x 32 pointer
+/// image (straight alpha, rows from the bottom up).
+pub fn pointer_from_image(hot_x: u16, hot_y: u16, width: u16, height: u16, data: &[u8]) -> RGBAPointer {
+    let (w, h) = (usize::from(width).min(SIZE), usize::from(height).min(SIZE));
+    let stride = usize::from(width);
+    let mut out = vec![0u8; SIZE * SIZE * 4];
+    for y in 0..h {
+        for x in 0..w {
+            let src = (y * stride + x) * 4;
+            let Some(px) = data.get(src..src + 4) else { continue };
+            let a = u32::from(px[3]);
+            if a == 0 {
+                continue;
+            }
+            let straight = |c: u8| if a == 255 { c } else { ((u32::from(c) * 255 + a / 2) / a).min(255) as u8 };
+            let dst = ((SIZE - 1 - y) * SIZE + x) * 4;
+            out[dst..dst + 4].copy_from_slice(&[straight(px[0]), straight(px[1]), straight(px[2]), px[3]]);
+        }
+    }
+    RGBAPointer { cache_index: 15, width: SIZE as u16, height: SIZE as u16, hot_x: hot_x.min(SIZE as u16 - 1), hot_y: hot_y.min(SIZE as u16 - 1), data: out }
+}
+
+/// The message for a tick event payload of the private sway: `cursor:NAME` or `cursorimg:HOTX,HOTY,W,H,BASE64`, None for anything else.
+pub fn message_from_tick(payload: &str) -> Option<crate::proto::Up> {
+    use crate::proto::Up;
+    if let Some(name) = payload.strip_prefix("cursor:") {
+        return Some(Up::Cursor { name: name.to_string() });
+    }
+    let mut parts = payload.strip_prefix("cursorimg:")?.splitn(5, ',');
+    let (hot_x, hot_y, width, height) = (
+        parts.next()?.parse::<i32>().ok()?,
+        parts.next()?.parse::<i32>().ok()?,
+        parts.next()?.parse::<u16>().ok()?,
+        parts.next()?.parse::<u16>().ok()?,
+    );
+    let data = crate::base64::decode(parts.next()?)?;
+    if width > 64 || height > 64 || data.len() != usize::from(width) * usize::from(height) * 4 {
+        return None;
+    }
+    Some(Up::CursorImage { hot_x: hot_x.clamp(0, 63) as u16, hot_y: hot_y.clamp(0, 63) as u16, width, height, data })
 }
 
 /// A cursor name from the session is untrusted: short, and letters, digits, `-` and `_` only.
@@ -80,6 +135,7 @@ fn draw(shape: Shape) -> (Mask, (u16, u16)) {
             }
             (1, 1)
         }
+        Shape::Hidden => (0, 0),
         Shape::Text => {
             for y in 6..26 {
                 put(15, y);
@@ -233,6 +289,37 @@ mod tests {
         assert_eq!(shape_of("ew-resize"), Shape::ResizeH);
         assert_eq!(shape_of("left_ptr"), Shape::Arrow);
         assert_eq!(shape_of("something-new"), Shape::Arrow);
+    }
+
+    #[test]
+    fn none_is_a_pointer_with_nothing_in_it() {
+        let p = pointer("none");
+        assert!(p.data.iter().all(|&b| b == 0));
+        assert_eq!(p.data.len(), 32 * 32 * 4);
+    }
+
+    #[test]
+    fn pictures_become_pointers() {
+        // a 2 x 1 picture: an opaque red pixel and half transparent white one (premultiplied: 128, 128, 128, 128)
+        let data = [0, 0, 255, 255, 128, 128, 128, 128];
+        let p = pointer_from_image(1, 0, 2, 1, &data);
+        let last_row = 31 * 32 * 4; // the top row of the picture is the last row of the pointer
+        assert_eq!(&p.data[last_row..last_row + 4], &[0, 0, 255, 255]);
+        assert_eq!(&p.data[last_row + 4..last_row + 8], &[255, 255, 255, 128]);
+        assert_eq!((p.hot_x, p.hot_y, p.width, p.height), (1, 0, 32, 32));
+        assert!(valid_image(2, 1, 8) && !valid_image(2, 1, 7) && !valid_image(33, 1, 132) && !valid_image(0, 1, 0));
+    }
+
+    #[test]
+    fn tick_payloads_become_messages() {
+        use crate::proto::Up;
+        assert_eq!(message_from_tick("cursor:text"), Some(Up::Cursor { name: "text".into() }));
+        // base64 of the eight bytes 0 1 2 3 4 5 6 7
+        let up = message_from_tick("cursorimg:3,4,2,1,AAECAwQFBgc=");
+        assert_eq!(up, Some(Up::CursorImage { hot_x: 3, hot_y: 4, width: 2, height: 1, data: vec![0, 1, 2, 3, 4, 5, 6, 7] }));
+        assert_eq!(message_from_tick("cursorimg:3,4,2,2,AAECAwQFBgc="), None); // wrong size
+        assert_eq!(message_from_tick("cursorimg:3,4,2,1,@@@@"), None);
+        assert_eq!(message_from_tick("something"), None);
     }
 
     #[test]

@@ -2,9 +2,11 @@
 //! Each connection gets its own headless output (client size and scale), captured with wlr-screencopy,
 //! sent as H.264 over the graphics pipeline (bitmap updates as a fallback), with keyboard and pointer injected.
 
+mod allow;
 mod audio;
 mod auth;
 mod capture;
+mod base64;
 mod clipboard;
 mod cursors;
 mod egfx;
@@ -20,6 +22,7 @@ mod session;
 mod sessionaudio;
 mod sessionclip;
 mod spawn;
+mod tcpinfo;
 mod worker;
 
 use std::num::{NonZeroU16, NonZeroUsize};
@@ -51,8 +54,22 @@ struct Updates {
     max_qp: u8,
     /// The client was told to hide its own pointer.
     pointer_hidden: bool,
-    /// The shape the application asked for (a cursor name, see `cursors`): what the client's pointer looks like.
-    cursor: String,
+    /// What the client's pointer looks like: the shape an application asked for (a cursor name, see `cursors`), or the picture it drew.
+    pointer: PointerShape,
+}
+
+enum PointerShape {
+    Named(String),
+    Image { hot_x: u16, hot_y: u16, width: u16, height: u16, data: Vec<u8> },
+}
+
+impl PointerShape {
+    fn pointer(&self) -> RGBAPointer {
+        match self {
+            PointerShape::Named(name) => cursors::pointer(name),
+            PointerShape::Image { hot_x, hot_y, width, height, data } => cursors::pointer_from_image(*hot_x, *hot_y, *width, *height, data),
+        }
+    }
 }
 
 struct EgfxLink {
@@ -82,7 +99,7 @@ impl RdpServerDisplayUpdates for Updates {
                     DisplayUpdate::RGBAPointer(RGBAPointer { cache_index: 0, width: 32, height: 32, hot_x: 0, hot_y: 0, data: vec![0; 32 * 32 * 4] })
                 } else {
                     // The default pointer is left to the client, and FreeRDP draws nothing for it: give a pointer to draw, in the shape asked for.
-                    DisplayUpdate::RGBAPointer(cursors::pointer(&self.cursor))
+                    DisplayUpdate::RGBAPointer(self.pointer.pointer())
                 }));
             }
             // Graphics pipeline first: it is what the Windows App is built around. Give the client a
@@ -120,11 +137,16 @@ impl RdpServerDisplayUpdates for Updates {
                     return Ok(None);
                 }
                 Event::Cursor(name) => {
-                    if name != self.cursor {
+                    if !matches!(&self.pointer, PointerShape::Named(n) if *n == name) {
                         info!(cursor = %name, "pointer shape changed");
-                        self.cursor = name;
+                        self.pointer = PointerShape::Named(name);
                         self.pointer_hidden = false; // the pointer is sent again, in the new shape
                     }
+                }
+                Event::CursorImage { hot_x, hot_y, width, height, data } => {
+                    info!(width, height, "pointer picture changed");
+                    self.pointer = PointerShape::Image { hot_x, hot_y, width, height, data };
+                    self.pointer_hidden = false;
                 }
                 Event::Resized(width, height) => {
                     if (width, height) != self.size {
@@ -296,9 +318,11 @@ impl RdpServerDisplay for Handler {
             };
             return match result {
                 Ok(link) => {
-                    if let Some((st, _)) = &self.egfx {
+                    if let Some((st, tuning)) = &self.egfx {
                         let to = link.clone();
                         st.set_credit_sink(Box::new(move |frames| to.send(Down::Credit { frames })));
+                        let to = link.clone();
+                        st.set_bitrate_sink(tuning.bitrate, Box::new(move |bps| to.send(Down::Bitrate { bps })));
                     }
                     let (width, height) = link.size();
                     *self.slot.link.lock().unwrap() = Some(link);
@@ -320,9 +344,11 @@ impl RdpServerDisplay for Handler {
         }
         match Link::spawn(&self.cfg.exe, &self.cfg.args, &self.cfg.workspace, (client_size.width, client_size.height), klid, user.as_ref(), self.cfg.per_user).await {
             Ok(link) => {
-                if let Some((st, _)) = &self.egfx {
+                if let Some((st, tuning)) = &self.egfx {
                     let to = link.clone();
                     st.set_credit_sink(Box::new(move |frames| to.send(Down::Credit { frames })));
+                    let to = link.clone();
+                    st.set_bitrate_sink(tuning.bitrate, Box::new(move |bps| to.send(Down::Bitrate { bps })));
                 }
                 let (width, height) = link.size();
                 *self.slot.link.lock().unwrap() = Some(link);
@@ -367,7 +393,7 @@ impl RdpServerDisplay for Handler {
         }
         let egfx = self.egfx.as_ref().map(|(st, _)| EgfxLink { st: st.clone(), out: egfx::Out::new(st.clone(), size.0, size.1) });
         let max_qp = self.egfx.as_ref().map_or(0, |(_, t)| t.max_qp.clamp(1, 51));
-        Ok(Box::new(Updates { link, egfx, start: std::time::Instant::now(), size, mode: Mode::Undecided, max_qp, pointer_hidden: false, cursor: "default".into() }))
+        Ok(Box::new(Updates { link, egfx, start: std::time::Instant::now(), size, mode: Mode::Undecided, max_qp, pointer_hidden: false, pointer: PointerShape::Named("default".into()) }))
     }
 
     fn request_layout(&mut self, layout: ironrdp_displaycontrol::pdu::DisplayControlMonitorLayout) {
@@ -473,6 +499,8 @@ async fn main() -> anyhow::Result<()> {
     let mut per_user = false;
     let mut allow_users: Option<Vec<String>> = None;
     let mut require_group: Option<String> = None;
+    // Source addresses that may connect (see `allow`): none given = loopback allows all, any other address only local networks.
+    let mut allow_from: Option<String> = std::env::var("WAYDESK_ALLOW_FROM").ok();
     // The root helper (`--helper`), or the daemon using one (`--auth helper`).
     let mut run_helper = false;
     let mut helper_socket = PathBuf::from("/run/waydesk/helper.sock");
@@ -510,6 +538,7 @@ async fn main() -> anyhow::Result<()> {
             "--helper-socket" => helper_socket = PathBuf::from(args.next().context("--helper-socket needs a path")?),
             "--daemon-user" => daemon_user = args.next().context("--daemon-user needs an account name")?,
             "--per-user" => per_user = true,
+            "--allow-from" => allow_from = Some(args.next().context("--allow-from needs a list of addresses, ranges, private, loopback or any")?),
             "--require-group" => require_group = Some(args.next().context("--require-group needs a group name")?),
             "--allow-users" => allow_users = Some(args.next().context("--allow-users needs a comma separated list")?.split(',').map(str::to_owned).collect()),
             // A new connection ends the open one. It does so before the new client has logged in, so use
@@ -602,8 +631,13 @@ async fn main() -> anyhow::Result<()> {
 
     let addr = bind.parse::<std::net::SocketAddr>().context("bad --bind address")?;
     let listener = tokio::net::TcpListener::bind(addr).await.with_context(|| format!("cannot listen on {addr}"))?;
+    let allow = Arc::new(allow::Allow::from_config(allow_from.as_deref(), &addr).map_err(|e| anyhow::anyhow!("--allow-from / WAYDESK_ALLOW_FROM: {e}"))?);
+    if !addr.ip().is_loopback() && allow.is_any() {
+        warn!(%bind, "listening for any source address: the login is a password with no second factor, keep this port off the open internet (WAYDESK_ALLOW_FROM limits who may connect)");
+    }
+    let refusals = Arc::new(allow::RefusalLog::new());
     let permits = Arc::new(tokio::sync::Semaphore::new(max_sessions));
-    info!(%bind, max_sessions, "waydesk-server listening");
+    info!(%bind, max_sessions, allowed = %allow_from.as_deref().unwrap_or(if addr.ip().is_loopback() { "any (loopback)" } else { "private" }), "waydesk-server listening");
 
     // One RDP server per connection, all on this thread: connections are independent and each owns a session.
     let local = tokio::task::LocalSet::new();
@@ -618,6 +652,13 @@ async fn main() -> anyhow::Result<()> {
                         continue;
                     }
                 };
+                // Nothing is said to an address that is not allowed: no TLS, no login, no permit.
+                if !allow.permits(peer.ip()) {
+                    if let Some(more) = refusals.note() {
+                        warn!(%peer, also_refused = more, "connection refused: the source address is not in the allowed list (WAYDESK_ALLOW_FROM)");
+                    }
+                    continue;
+                }
                 // Counts connections, not only logged-in ones: an unauthenticated flood can use up the permits.
                 let Ok(permit) = permits.clone().try_acquire_owned() else {
                     warn!(%peer, "too many connections, refused");
@@ -654,6 +695,24 @@ fn limit_stall(stream: &tokio::net::TcpStream, peer: std::net::SocketAddr) {
     set(libc::IPPROTO_TCP, libc::TCP_KEEPIDLE, 30);
     set(libc::IPPROTO_TCP, libc::TCP_KEEPINTVL, 10);
     set(libc::IPPROTO_TCP, libc::TCP_KEEPCNT, 3);
+    set_congestion_control(fd, peer);
+}
+
+/// The congestion control of the connection: BBR unless `WAYDESK_TCP_CONGESTION` names another one (empty: the system's default). On a link
+/// that loses packets at random (wireless, mobile, a long way away) CUBIC takes every loss for congestion and ends up with a fraction of what
+/// the link carries (measured: 0.3 Mbit/s against 2 to 4 with BBR, and stalls of a second after each loss that made typed letters arrive in
+/// bursts); BBR does not. A process that is not root may only use what `net.ipv4.tcp_allowed_congestion_control` lists: the package adds bbr to it and
+/// loads the module. Where it is not there the connection keeps the system's default.
+fn set_congestion_control(fd: std::os::fd::RawFd, peer: std::net::SocketAddr) {
+    static REPORTED: AtomicBool = AtomicBool::new(false);
+    let name = std::env::var("WAYDESK_TCP_CONGESTION").unwrap_or_else(|_| "bbr".into());
+    if name.is_empty() {
+        return;
+    }
+    let r = unsafe { libc::setsockopt(fd, libc::IPPROTO_TCP, libc::TCP_CONGESTION, name.as_ptr().cast(), name.len() as libc::socklen_t) };
+    if r != 0 && !REPORTED.swap(true, Ordering::Relaxed) {
+        info!(%peer, "TCP congestion control {name} is not available ({}): connections keep the system's default", std::io::Error::last_os_error());
+    }
 }
 
 /// How long a connection may take to log in.
@@ -713,6 +772,10 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
     // Set when a login was accepted, whichever way logins are checked.
     let authed = Arc::new(AtomicBool::new(false));
     let egfx_state = Arc::new(egfx::EgfxState::default());
+    {
+        use std::os::fd::AsRawFd;
+        egfx_state.set_socket(stream.as_raw_fd()); // the kernel tells what the link delivers (see egfx::Flow)
+    }
     let handler = Handler {
         slot: slot.clone(),
         cfg: common.cfg.clone(),
@@ -772,6 +835,7 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
         r = server.run_connection(stream) => r,
         _ = login_deadline => Err(anyhow::anyhow!("no login within {} s", PRE_LOGIN_TIMEOUT.as_secs())),
     };
+    egfx_state.clear_socket(); // the connection is closed
     match &result {
         Ok(()) => info!(%peer, duration = ?started.elapsed(), "client disconnected"),
         Err(e) => info!(%peer, duration = ?started.elapsed(), error = %format!("{e:#}"), "client disconnected"),

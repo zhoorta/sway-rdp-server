@@ -77,6 +77,8 @@ pub enum Down {
     Wheel { vertical: f64, horizontal: f64 },
     /// The daemon can take this many more frames (flow control; replaces the EGFX backpressure check).
     Credit { frames: u16 },
+    /// The bitrate the encoder should aim for from now on, bits per second (the link to the client got slower or faster).
+    Bitrate { bps: u32 },
     /// Send the whole picture again.
     RequestFull,
     /// Prefer bitmaps: the client has no H.264.
@@ -105,6 +107,8 @@ pub enum Up {
     Clipboard { data: Vec<u8> },
     /// The shape of the mouse pointer: a cursor name (`text`, `ew-resize`, ...).
     Cursor { name: String },
+    /// The picture of a pointer an application drew itself: width x height pixels of 32 bit BGRA (premultiplied, rows from the top).
+    CursorImage { hot_x: u16, hot_y: u16, width: u16, height: u16, data: Vec<u8> },
     Bye,
 }
 
@@ -231,6 +235,10 @@ impl Down {
                 o.u8(7);
                 o.u16(*frames);
             }
+            Down::Bitrate { bps } => {
+                o.u8(14);
+                o.u32(*bps);
+            }
             Down::RequestFull => o.u8(8),
             Down::UseBitmaps => o.u8(9),
             Down::ClipboardOn => o.u8(11),
@@ -255,6 +263,7 @@ impl Down {
             5 => Down::Button { code: i.u32()?, pressed: i.bool()? },
             6 => Down::Wheel { vertical: i.f64()?, horizontal: i.f64()? },
             7 => Down::Credit { frames: i.u16()? },
+            14 => Down::Bitrate { bps: i.u32()? },
             8 => Down::RequestFull,
             9 => Down::UseBitmaps,
             10 => Down::Clipboard { data: i.bytes()? },
@@ -304,6 +313,14 @@ impl Up {
                 o.u8(6);
                 o.str(name);
             }
+            Up::CursorImage { hot_x, hot_y, width, height, data } => {
+                o.u8(7);
+                o.u16(*hot_x);
+                o.u16(*hot_y);
+                o.u16(*width);
+                o.u16(*height);
+                o.bytes(data);
+            }
             Up::Bye => o.u8(255),
         }
         o.0
@@ -326,6 +343,7 @@ impl Up {
             4 => Up::Audio { pcm: i.bytes()? },
             5 => Up::Clipboard { data: i.bytes()? },
             6 => Up::Cursor { name: i.str()? },
+            7 => Up::CursorImage { hot_x: i.u16()?, hot_y: i.u16()?, width: i.u16()?, height: i.u16()?, data: i.bytes()? },
             255 => Up::Bye,
             t => return Err(ProtoError::UnknownTag(t)),
         };
@@ -526,6 +544,7 @@ mod tests {
             Down::Button { code: 0x110, pressed: false },
             Down::Wheel { vertical: -1.5, horizontal: 0.25 },
             Down::Credit { frames: 4 },
+            Down::Bitrate { bps: 1_500_000 },
             Down::RequestFull,
             Down::UseBitmaps,
             Down::Clipboard { data: b"hello".to_vec() },
@@ -545,6 +564,7 @@ mod tests {
             Up::Audio { pcm: vec![0; 3528] },
             Up::Clipboard { data: Vec::new() },
             Up::Cursor { name: "ew-resize".into() },
+            Up::CursorImage { hot_x: 1, hot_y: 2, width: 2, height: 1, data: vec![1, 2, 3, 4, 5, 6, 7, 8] },
             Up::Bye,
         ]
     }

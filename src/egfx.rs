@@ -2,7 +2,7 @@
 //! The Windows App on macOS is built around this path and mishandles the older bitmap updates.
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -14,6 +14,7 @@ use ironrdp_server::{EgfxServerMessage, GfxDvcBridge, GfxServerFactory, GfxServe
 use tracing::{debug, info, warn};
 
 use crate::capture::Rect;
+use crate::tcpinfo::Link;
 use crate::encode::surface_size;
 
 
@@ -23,6 +24,11 @@ pub struct EgfxState {
     ready: AtomicBool,
     /// Where credits go: to the session process, which only encodes while it holds one.
     credit_sink: Mutex<Option<Box<dyn Fn(u16) + Send + Sync>>>,
+    /// Where a new bitrate for the encoder goes (to the session process), and the highest one there may be (the configured one).
+    bitrate_sink: Mutex<Option<Box<dyn Fn(u32) + Send + Sync>>>,
+    max_bitrate: AtomicU32,
+    /// The connection's socket (-1: none), to ask the kernel what the link delivers.
+    socket: AtomicI32, // fd + 1, 0: none
     sent: AtomicU64,
     acked: AtomicU64,
     handle: Mutex<Option<GfxServerHandle>>,
@@ -53,17 +59,49 @@ pub fn max_credits() -> u16 {
     fixed_window().unwrap_or(MAX_WINDOW as u16)
 }
 
-/// The adaptive credit window of one connection. `issued` counts the credits out there (held by the session or attached to a
-/// frame in flight); an acknowledgement ends a frame and tops `issued` up to `window`, so a larger window hands out extra
-/// credits and a smaller one simply gives fewer back.
+/// The lowest bitrate the encoder is asked for, however slow the link: below it the picture is not worth sending.
+const MIN_BITRATE: u32 = 300_000;
+/// How long the frames waiting for the link may take to get there, at the delivery rate measured: the byte budget in flight.
+const QUEUE_SECONDS: f64 = 0.4;
+/// Share of the delivery rate the encoder aims for.
+const BITRATE_SHARE: f64 = 0.7;
+/// A delivery rate measured while the link was full is trusted this long.
+const CAPACITY_AGE: Duration = Duration::from_secs(30);
+/// A frame tells the delay of the path only when it is this small: a big one takes seconds to send on a slow link, and that is not the path.
+const DELAY_FRAME_MAX: u32 = 4096;
+
+/// A frame in flight.
+struct Sent {
+    id: u32,
+    at: Instant,
+    size: u32,
+    /// Bytes that were in flight when it was sent: nothing means it went into an empty pipe.
+    queue_ahead: u64,
+}
+
+/// The flow control of one connection: how many frames and how many bytes may be on their way to the client.
+///
+/// `issued` counts the credits out there (held by the session or attached to a frame in flight); an acknowledgement ends a frame and
+/// tops `issued` up to `window`, so a larger window hands out extra credits and a smaller one simply gives fewer back. The window follows the
+/// delay of the path (see `sample`). On a link that cannot carry what the encoder makes that is not enough, because the frames then wait in
+/// the queue for seconds: while acknowledgements arrive with frames queued behind them the delivery rate is measured, and then no credit is
+/// given while more than `QUEUE_SECONDS` of it is in flight, and the encoder is asked for a bitrate that fits (`bitrate_for`).
 struct Flow {
     window: u32,
     issued: u32,
-    sent_at: VecDeque<(u32, Instant)>,
+    sent: VecDeque<Sent>,
+    inflight_bytes: u64,
     period_start: Instant,
     period_min: Option<Duration>,
+    /// The delay of the path itself: the lowest round trip of a frame that went into an empty pipe (it creeps up slowly, so that a longer
+    /// route is followed in the end).
+    base: Option<Duration>,
     /// Acknowledgements still to ignore: the first frame is the whole picture and takes far longer than any later one.
     skip: u32,
+    /// What the link delivered when it was full, in bytes per second, and when that was measured.
+    capacity: Option<(f64, Instant)>,
+    last_bitrate: u32,
+    last_bitrate_at: Instant,
 }
 
 impl Default for Flow {
@@ -75,11 +113,111 @@ impl Default for Flow {
 impl Flow {
     fn new() -> Self {
         let window = fixed_window().map_or(MIN_WINDOW + 1, u32::from);
-        Self { window, issued: 0, sent_at: VecDeque::new(), period_start: Instant::now(), period_min: None, skip: FIRST_FRAMES }
+        Self {
+            window,
+            issued: 0,
+            sent: VecDeque::new(),
+            inflight_bytes: 0,
+            period_start: Instant::now(),
+            period_min: None,
+            base: None,
+            skip: FIRST_FRAMES,
+            capacity: None,
+            last_bitrate: 0,
+            last_bitrate_at: Instant::now(),
+        }
     }
 
-    /// Notes a round trip sample; at the end of a period moves the window towards what the lowest round trip needs
-    /// (the lowest, because the queueing a big window causes would otherwise make it ask for even more).
+    fn reset(&mut self) {
+        self.issued = self.window;
+        self.sent.clear();
+        self.inflight_bytes = 0;
+        self.last_bitrate = 0;
+    }
+
+    fn frame_sent(&mut self, id: u32, size: usize) {
+        if self.sent.len() >= 128 {
+            if let Some(old) = self.sent.pop_front() {
+                self.inflight_bytes = self.inflight_bytes.saturating_sub(u64::from(old.size));
+            }
+        }
+        let size = size.min(u32::MAX as usize) as u32;
+        self.sent.push_back(Sent { id, at: Instant::now(), size, queue_ahead: self.inflight_bytes });
+        self.inflight_bytes += u64::from(size);
+    }
+
+    /// A frame was acknowledged: what the flow control learns from it, how many credits to hand out, and a new bitrate for the encoder if
+    /// it should change.
+    fn frame_acked(&mut self, id: u32, max_bitrate: u32, link: Option<Link>) -> (u16, Option<u32>) {
+        let now = Instant::now();
+        // The frames before it that were never acknowledged are gone.
+        let mut found = None;
+        while let Some(f) = self.sent.pop_front() {
+            self.inflight_bytes = self.inflight_bytes.saturating_sub(u64::from(f.size));
+            if f.id == id {
+                found = Some(f);
+                break;
+            }
+        }
+        if let Some(f) = found {
+            // Only a frame that went into an empty pipe tells the delay of the path: the others waited behind ours.
+            if f.queue_ahead == 0 && f.size <= DELAY_FRAME_MAX {
+                self.sample(now.duration_since(f.at));
+            }
+        }
+        self.note_link(now, link);
+        self.issued = self.issued.saturating_sub(1);
+        let mut give = self.window.saturating_sub(self.issued);
+        // Too much on its way for the link: wait for acknowledgements (the next frame then carries the picture as it is by then). The last
+        // one in flight is never held back, or nothing would come back to say it is time to go on.
+        if !self.sent.is_empty() && self.budget().is_some_and(|budget| self.inflight_bytes > budget) {
+            give = 0;
+        }
+        self.issued += give;
+        (give as u16, self.bitrate_for(now, max_bitrate))
+    }
+
+    /// What the kernel says the connection has been delivering. While the sender had always more to send (not application limited) that is what
+    /// the link carries; when the picture was the limit it says nothing about the link, and the last measurement is kept (it expires).
+    fn note_link(&mut self, now: Instant, link: Option<Link>) {
+        if let Some(Link { delivery_rate, app_limited: false }) = link {
+            if delivery_rate > 0.0 {
+                let smoothed = match self.capacity {
+                    Some((c, at)) if at.elapsed() < CAPACITY_AGE => (c + delivery_rate) / 2.0,
+                    _ => delivery_rate,
+                };
+                self.capacity = Some((smoothed, now));
+            }
+        }
+    }
+
+    /// The most bytes there may be in flight, None while the link has not been seen full (then only the window limits).
+    fn budget(&self) -> Option<u64> {
+        let (rate, at) = self.capacity?;
+        (at.elapsed() < CAPACITY_AGE).then(|| (rate * QUEUE_SECONDS).clamp(30_000.0, 2_000_000.0) as u64)
+    }
+
+    /// The bitrate for the encoder when it differs enough from the last one: what the link delivers when it is full, or the configured
+    /// one again, in steps, when it has not been full for a while.
+    fn bitrate_for(&mut self, now: Instant, max_bitrate: u32) -> Option<u32> {
+        let max = max_bitrate.max(MIN_BITRATE);
+        let target = match self.capacity {
+            Some((rate, at)) if at.elapsed() < CAPACITY_AGE => ((rate * 8.0 * BITRATE_SHARE) as u32).clamp(MIN_BITRATE, max),
+            // not seen full for a while: back up towards the configured bitrate in steps, the link may be slow still
+            _ if self.last_bitrate == 0 => max,
+            _ => (self.last_bitrate / 2 * 3).clamp(MIN_BITRATE, max),
+        };
+        let last = if self.last_bitrate == 0 { max } else { self.last_bitrate };
+        if target.abs_diff(last) * 5 > last && now.duration_since(self.last_bitrate_at) >= Duration::from_millis(1500) {
+            self.last_bitrate = target;
+            self.last_bitrate_at = now;
+            return Some(target);
+        }
+        None
+    }
+
+    /// Notes a round trip of a frame that went into an empty pipe; at the end of a period moves the window towards what the delay of the
+    /// path needs (the lowest of the period, and the lowest ever for the path itself).
     fn sample(&mut self, rtt: Duration) {
         if fixed_window().is_some() {
             return;
@@ -92,12 +230,18 @@ impl Flow {
         if self.period_start.elapsed() < PERIOD {
             return;
         }
-        let wanted = (self.period_min.take().map_or(0, |m| m.as_millis() as u32).div_ceil(TARGET_FRAME_MS) + 2).clamp(MIN_WINDOW, MAX_WINDOW);
+        let Some(lowest) = self.period_min.take() else { return };
         self.period_start = Instant::now();
-        // Up at once, down one step at a time.
-        let next = if wanted > self.window { wanted } else { self.window.saturating_sub(1).max(wanted) };
+        let base = self.base.map_or(lowest, |b| lowest.min(b + b / 50));
+        self.base = Some(base);
+        let wanted = ((base.as_millis() as u32).div_ceil(TARGET_FRAME_MS) + 2).clamp(MIN_WINDOW, MAX_WINDOW);
+        let next = if wanted > self.window {
+            wanted // up at once
+        } else {
+            self.window.saturating_sub(1).max(wanted) // down one step at a time
+        };
         if next != self.window {
-            info!(from = self.window, to = next, "frames in flight adjusted to the round trip");
+            info!(from = self.window, to = next, base_ms = base.as_millis() as u64, "frames in flight adjusted to the round trip");
             self.window = next;
         }
     }
@@ -121,36 +265,52 @@ impl EgfxState {
 
     /// A new connection, or one that restarted from zero credits (after a resize): hands out a whole window.
     pub fn reset_credits(&self) {
-        let window = {
+        let (window, unmeasured) = {
             let mut flow = self.flow.lock().unwrap();
-            flow.issued = flow.window;
-            flow.sent_at.clear();
-            flow.window
+            flow.reset();
+            (flow.window, flow.capacity.is_none())
         };
         self.grant(window as u16);
+        // A session that outlives its clients may still have the low bitrate of the last one: the link of this one has not been measured.
+        let max = self.max_bitrate.load(Ordering::Relaxed);
+        if unmeasured && max > 0 {
+            self.send_bitrate(max);
+        }
     }
 
-    fn frame_sent(&self, frame_id: u32) {
-        let mut flow = self.flow.lock().unwrap();
-        if flow.sent_at.len() >= 64 {
-            flow.sent_at.pop_front();
-        }
-        flow.sent_at.push_back((frame_id, Instant::now()));
+    fn frame_sent(&self, frame_id: u32, size: usize) {
+        self.flow.lock().unwrap().frame_sent(frame_id, size);
     }
 
-    /// A frame was acknowledged: measures its round trip and returns how many credits to hand out.
-    fn frame_acked(&self, frame_id: u32) -> u16 {
-        let mut flow = self.flow.lock().unwrap();
-        while let Some((id, at)) = flow.sent_at.pop_front() {
-            if id == frame_id {
-                flow.sample(at.elapsed());
-                break;
-            }
+    /// A frame was acknowledged: the credits to hand out, and a new bitrate for the encoder when the link needs one.
+    fn frame_acked(&self, frame_id: u32) -> (u16, Option<u32>) {
+        let max = self.max_bitrate.load(Ordering::Relaxed);
+        let link = match self.socket.load(Ordering::Relaxed) {
+            0 => None,
+            fd => crate::tcpinfo::read(fd - 1),
+        };
+        self.flow.lock().unwrap().frame_acked(frame_id, max, link)
+    }
+
+    /// The socket of the connection, for the kernel's numbers; `clear_socket` before it is closed.
+    pub fn set_socket(&self, fd: std::os::fd::RawFd) {
+        self.socket.store(fd + 1, Ordering::Relaxed);
+    }
+
+    pub fn clear_socket(&self) {
+        self.socket.store(0, Ordering::Relaxed);
+    }
+
+    /// Sets where the new bitrate goes, and the highest bitrate (the configured one).
+    pub fn set_bitrate_sink(&self, max_bitrate: u32, sink: Box<dyn Fn(u32) + Send + Sync>) {
+        self.max_bitrate.store(max_bitrate, Ordering::Relaxed);
+        *self.bitrate_sink.lock().unwrap() = Some(sink);
+    }
+
+    fn send_bitrate(&self, bps: u32) {
+        if let Some(sink) = self.bitrate_sink.lock().unwrap().as_ref() {
+            sink(bps);
         }
-        flow.issued = flow.issued.saturating_sub(1);
-        let give = flow.window.saturating_sub(flow.issued);
-        flow.issued += give;
-        give as u16
     }
 
     pub fn grant(&self, frames: u16) {
@@ -200,8 +360,12 @@ impl GraphicsPipelineHandler for Handler {
     }
 
     fn on_frame_ack(&mut self, frame_id: u32, queue_depth: u32, total_frames_decoded: u32) {
-        let give = if queue_depth == ACKS_SUSPENDED { 1000 } else { self.st.frame_acked(frame_id) };
+        let (give, bitrate) = if queue_depth == ACKS_SUSPENDED { (1000, None) } else { self.st.frame_acked(frame_id) };
         self.st.grant(give);
+        if let Some(bps) = bitrate {
+            info!(bitrate = bps, "the encoder's bitrate follows what the link delivers");
+            self.st.send_bitrate(bps);
+        }
         let n = self.st.acked.fetch_add(1, Ordering::Relaxed) + 1;
         if n <= 3 || n % 200 == 0 {
             info!(frame_id, queue_depth, total_frames_decoded, acked = n, sent = self.st.sent.load(Ordering::Relaxed), "client acknowledged frame");
@@ -318,7 +482,7 @@ impl Out {
             info!(n, bytes = data.len(), ?dirty, left = region.left, top = region.top, right = region.right, bottom = region.bottom, "sending first frames");
         }
         match server.send_avc420_frame(surface, data, &[region], ts) {
-            Some(frame_id) => self.st.frame_sent(frame_id),
+            Some(frame_id) => self.st.frame_sent(frame_id, data.len()),
             None => {
                 // Refused frames are never acknowledged, so the credit would be lost for good.
                 self.st.grant(1);
@@ -350,8 +514,60 @@ mod tests {
             period(&mut flow, 1);
         }
         assert_eq!(flow.window, MIN_WINDOW);
-        period(&mut flow, 5000);
-        assert_eq!(flow.window, MAX_WINDOW);
+    }
+
+    #[test]
+    fn a_full_link_limits_the_bytes_in_flight_and_the_bitrate() {
+        let mut flow = Flow::new();
+        flow.skip = 100;
+        flow.last_bitrate_at = Instant::now() - Duration::from_secs(5);
+        // the kernel says the link delivers 200 kB/s and the sender was not the limit
+        for _ in 0..4 {
+            flow.note_link(Instant::now(), Some(Link { delivery_rate: 200_000.0, app_limited: false }));
+        }
+        let (rate, _) = flow.capacity.expect("the delivery rate was taken");
+        assert!((190_000.0..210_000.0).contains(&rate), "{rate}");
+        assert_eq!(flow.budget(), Some((rate * QUEUE_SECONDS) as u64)); // 0.4 s of it: 80 kB
+        let bitrate = flow.bitrate_for(Instant::now(), 10_000_000).expect("a new bitrate");
+        assert!((1_000_000..1_200_000).contains(&bitrate), "{bitrate}"); // 0.7 of 1.6 Mbit/s
+    }
+
+    #[test]
+    fn a_rate_held_down_by_the_picture_says_nothing_about_the_link() {
+        let mut flow = Flow::new();
+        flow.note_link(Instant::now(), Some(Link { delivery_rate: 50_000.0, app_limited: true }));
+        flow.note_link(Instant::now(), None);
+        assert!(flow.capacity.is_none());
+        assert_eq!(flow.budget(), None);
+        flow.last_bitrate_at = Instant::now() - Duration::from_secs(5);
+        assert_eq!(flow.bitrate_for(Instant::now(), 10_000_000), None); // stays at the configured bitrate
+    }
+
+    #[test]
+    fn the_bitrate_comes_back_in_steps_when_the_link_is_not_full_any_more() {
+        let mut flow = Flow::new();
+        flow.last_bitrate = 400_000;
+        flow.last_bitrate_at = Instant::now() - Duration::from_secs(5);
+        assert_eq!(flow.bitrate_for(Instant::now(), 10_000_000), Some(600_000)); // 1.5 times
+    }
+
+    #[test]
+    fn credits_are_held_back_over_the_budget_but_not_for_the_last_frame() {
+        let mut flow = Flow::new();
+        flow.skip = 100;
+        flow.window = 8;
+        flow.issued = 8;
+        flow.capacity = Some((100_000.0, Instant::now())); // budget 40 kB
+        for i in 0..6 {
+            flow.frame_sent(i, 20_000); // 120 kB in flight
+        }
+        let (give, _) = flow.frame_acked(0, 10_000_000, None);
+        assert_eq!(give, 0); // 100 kB still in flight, over the budget
+        for i in 1..5 {
+            flow.frame_acked(i, 10_000_000, None);
+        }
+        let (give, _) = flow.frame_acked(5, 10_000_000, None); // the last one
+        assert!(give >= 1);
     }
 
     #[test]
