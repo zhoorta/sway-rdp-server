@@ -417,7 +417,13 @@ if command -v gsettings >/dev/null 2>&1; then
         if [ "${WAYDESK_CURSOR:-client}" = server ]; then
             gsettings reset org.gnome.desktop.interface cursor-theme 2>/dev/null
         else
-            gs cursor-theme waydesk-blank
+            # With waydesk-sway nothing of the pointer is in the picture and the apps use a real theme (their cursors reach the client);
+            # with another sway the pointer would be drawn twice, so the apps get the cursors with nothing in them.
+            if [ -x /usr/lib/waydesk/bin/sway ] && [ -d /usr/share/icons/Adwaita/cursors ]; then
+                gs cursor-theme Adwaita
+            else
+                gs cursor-theme waydesk-blank
+            fi
         fi
         gs color-scheme prefer-dark
         gsettings set org.gnome.desktop.wm.preferences button-layout ':minimize,maximize,close' 2>/dev/null

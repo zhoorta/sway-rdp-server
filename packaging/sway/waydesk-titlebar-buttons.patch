@@ -22,13 +22,25 @@
  	bool primary_selection;
  
  	bool tiling_drag;
+--- a/include/sway/input/cursor.h
++++ b/include/sway/input/cursor.h
+@@ -69,6 +69,8 @@
+ 
+ 	struct wl_listener request_set_cursor;
+ 	struct wl_listener image_surface_destroy;
++	// The image of the cursor an application drew itself changed (a new frame, or a first one): see waydesk_cursor_payload.
++	struct wl_listener image_surface_commit;
+ 
+ 	struct wl_listener constraint_commit;
+ 
 --- a/include/sway/ipc-server.h
 +++ b/include/sway/ipc-server.h
-@@ -18,6 +18,7 @@
+@@ -18,6 +18,8 @@
  void ipc_event_barconfig_update(struct bar_config *bar);
  void ipc_event_bar_state_update(struct bar_config *bar);
  void ipc_event_mode(const char *mode, bool pango);
 +void ipc_event_cursor(const char *name);
++void ipc_event_cursor_image(const char *payload);
  void ipc_event_shutdown(const char *reason);
  void ipc_event_binding(struct sway_binding *binding);
  void ipc_event_input(const char *change, struct sway_input_device *device);
@@ -121,13 +133,14 @@
  	struct wl_listener set_app_id;
 --- a/include/sway/waydesk_draw.h
 +++ b/include/sway/waydesk_draw.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,47 @@
 +#ifndef _SWAY_WAYDESK_DRAW_H
 +#define _SWAY_WAYDESK_DRAW_H
 +#include <stdbool.h>
 +#include <cairo.h>
 +#include <wlr/types/wlr_buffer.h>
 +#include <wlr/types/wlr_scene.h>
++#include <wlr/types/wlr_compositor.h>
 +
 +/**
 + * A buffer of width x height pixels (ARGB, premultiplied) with a cairo context to draw in. The context lives as long as the buffer.
@@ -159,6 +172,13 @@
 + */
 +struct wlr_buffer *waydesk_corner_buffer(int radius, int scale, bool right,
 +		const float fill[4], const float line[4]);
++
++/**
++ * The picture of the cursor an application drew itself (a surface), as the payload of a tick event: "cursorimg:HOTX,HOTY,W,H,DATA", the
++ * pixels as base64 of W x H 32 bit ARGB (premultiplied, rows from the top), the hotspot in pixels. NULL when there is no picture yet or
++ * it is bigger than 64 x 64. The caller frees the string.
++ */
++char *waydesk_cursor_payload(struct wlr_surface *surface, int hotspot_x, int hotspot_y);
 +
 +#endif
 --- a/sway/commands/titlebar_button.c
@@ -352,15 +372,74 @@
  	wl_signal_add(&toplevel->events.request_fullscreen,
 --- a/sway/input/cursor.c
 +++ b/sway/input/cursor.c
-@@ -19,6 +19,7 @@
+@@ -19,6 +19,8 @@
  #include "log.h"
  #include "util.h"
  #include "sway/commands.h"
 +#include "sway/ipc-server.h"
++#include "sway/waydesk_draw.h"
  #include "sway/input/cursor.h"
  #include "sway/input/keyboard.h"
  #include "sway/input/tablet.h"
-@@ -987,6 +988,7 @@
+@@ -957,6 +959,42 @@
+ 	seatop_swipe_end(cursor->seat, event);
+ }
+ 
++// With WAYDESK_REMOTE_CURSOR set the pointer is drawn by the client of the remote desktop, not here: the compositor draws no cursor
++// (nothing of it in the picture), and tells whoever listens (tick events) what it would look like: a name, or the image an
++// application asked for.
++static bool remote_cursor(void) {
++	static int value = -1;
++	if (value < 0) {
++		value = getenv("WAYDESK_REMOTE_CURSOR") != NULL;
++	}
++	return value;
++}
++
++static void publish_surface_cursor(struct sway_cursor *cursor) {
++	static char *last = NULL;
++	char *payload = cursor->image_surface ?
++		waydesk_cursor_payload(cursor->image_surface, cursor->hotspot_x, cursor->hotspot_y) : NULL;
++	if (!payload) {
++		// no image yet (the application has not committed one) or one that is too big: the arrow meanwhile
++		ipc_event_cursor(cursor->image_surface ? "default" : "none");
++		free(last);
++		last = NULL;
++		return;
++	}
++	if (last && strcmp(last, payload) == 0) {
++		free(payload);
++		return;
++	}
++	free(last);
++	last = payload;
++	ipc_event_cursor_image(payload);
++}
++
++static void handle_image_surface_commit(struct wl_listener *listener, void *data) {
++	struct sway_cursor *cursor = wl_container_of(listener, cursor, image_surface_commit);
++	publish_surface_cursor(cursor);
++}
++
+ static void handle_image_surface_destroy(struct wl_listener *listener,
+ 		void *data) {
+ 	struct sway_cursor *cursor =
+@@ -968,11 +1006,14 @@
+ static void set_image_surface(struct sway_cursor *cursor,
+ 		struct wlr_surface *surface) {
+ 	wl_list_remove(&cursor->image_surface_destroy.link);
++	wl_list_remove(&cursor->image_surface_commit.link);
+ 	cursor->image_surface = surface;
+ 	if (surface) {
+ 		wl_signal_add(&surface->events.destroy, &cursor->image_surface_destroy);
++		wl_signal_add(&surface->events.commit, &cursor->image_surface_commit);
+ 	} else {
+ 		wl_list_init(&cursor->image_surface_destroy.link);
++		wl_list_init(&cursor->image_surface_commit.link);
+ 	}
+ }
+ 
+@@ -987,11 +1028,17 @@
  	cursor->image = image;
  	cursor->hotspot_x = cursor->hotspot_y = 0;
  	cursor->image_client = client;
@@ -368,14 +447,51 @@
  
  	if (cursor->hidden) {
  		return;
-@@ -1011,6 +1013,7 @@
+ 	}
+ 
++	if (remote_cursor()) {
++		wlr_cursor_unset_image(cursor->cursor);
++		return;
++	}
++
+ 	if (!image) {
+ 		wlr_cursor_unset_image(cursor->cursor);
+ 	} else if (!current_image || strcmp(current_image, image) != 0) {
+@@ -1011,11 +1058,17 @@
  	cursor->hotspot_x = hotspot_x;
  	cursor->hotspot_y = hotspot_y;
  	cursor->image_client = client;
-+	ipc_event_cursor("default");
++	publish_surface_cursor(cursor);
  
  	if (cursor->hidden) {
  		return;
+ 	}
+ 
++	if (remote_cursor()) {
++		wlr_cursor_unset_image(cursor->cursor);
++		return;
++	}
++
+ 	wlr_cursor_set_surface(cursor->cursor, surface, hotspot_x, hotspot_y);
+ }
+ 
+@@ -1027,6 +1080,7 @@
+ 	wl_event_source_remove(cursor->hide_source);
+ 
+ 	wl_list_remove(&cursor->image_surface_destroy.link);
++	wl_list_remove(&cursor->image_surface_commit.link);
+ 	wl_list_remove(&cursor->hold_begin.link);
+ 	wl_list_remove(&cursor->hold_end.link);
+ 	wl_list_remove(&cursor->pinch_begin.link);
+@@ -1079,6 +1133,8 @@
+ 
+ 	wl_list_init(&cursor->image_surface_destroy.link);
+ 	cursor->image_surface_destroy.notify = handle_image_surface_destroy;
++	wl_list_init(&cursor->image_surface_commit.link);
++	cursor->image_surface_commit.notify = handle_image_surface_commit;
+ 
+ 	wl_signal_add(&wlr_cursor->events.hold_begin, &cursor->hold_begin);
+ 	cursor->hold_begin.notify = handle_pointer_hold_begin;
 --- a/sway/input/seatop_default.c
 +++ b/sway/input/seatop_default.c
 @@ -1,10 +1,12 @@
@@ -471,7 +587,7 @@
  		if (seat_is_input_allowed(seat, surface)) {
 --- a/sway/ipc-server.c
 +++ b/sway/ipc-server.c
-@@ -492,6 +492,22 @@
+@@ -492,6 +492,28 @@
  	json_object_put(json);
  }
  
@@ -488,6 +604,12 @@
 +	snprintf(last, sizeof(last), "%s", name);
 +	char payload[64];
 +	snprintf(payload, sizeof(payload), "cursor:%s", name);
++	ipc_event_tick(payload);
++}
++
++// The image of a cursor an application drew itself, as the payload of a tick event ("cursorimg:HOTX,HOTY,W,H,BASE64"), see
++// waydesk_cursor_payload.
++void ipc_event_cursor_image(const char *payload) {
 +	ipc_event_tick(payload);
 +}
 +
@@ -930,14 +1052,17 @@
  	}
 --- a/sway/waydesk_draw.c
 +++ b/sway/waydesk_draw.c
-@@ -0,0 +1,224 @@
+@@ -0,0 +1,279 @@
 +#include <drm_fourcc.h>
 +#include <math.h>
++#include <stdio.h>
 +#include <stdlib.h>
 +#include <string.h>
 +#include <cairo.h>
 +#include <wlr/interfaces/wlr_buffer.h>
 +#include <wlr/types/wlr_buffer.h>
++#include <wlr/render/wlr_texture.h>
++#include <wlr/types/wlr_compositor.h>
 +#include <wlr/types/wlr_scene.h>
 +#include "log.h"
 +#include "sway/waydesk_draw.h"
@@ -1154,4 +1279,56 @@
 +	cairo_fill(cairo);
 +	cairo_surface_flush(cairo_get_target(cairo));
 +	return buffer;
++}
++
++// ---- the cursor of an application ----
++
++static size_t base64_encode(const uint8_t *in, size_t len, char *out) {
++	static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
++	size_t n = 0;
++	for (size_t i = 0; i < len; i += 3) {
++		uint32_t v = in[i] << 16;
++		if (i + 1 < len) v |= in[i + 1] << 8;
++		if (i + 2 < len) v |= in[i + 2];
++		out[n++] = table[(v >> 18) & 63];
++		out[n++] = table[(v >> 12) & 63];
++		out[n++] = i + 1 < len ? table[(v >> 6) & 63] : '=';
++		out[n++] = i + 2 < len ? table[v & 63] : '=';
++	}
++	return n;
++}
++
++char *waydesk_cursor_payload(struct wlr_surface *surface, int hotspot_x, int hotspot_y) {
++	struct wlr_texture *texture = wlr_surface_get_texture(surface);
++	if (!texture || texture->width <= 0 || texture->height <= 0 || texture->width > 64 || texture->height > 64) {
++		return NULL;
++	}
++	int w = texture->width, h = texture->height;
++	uint32_t stride = w * 4;
++	uint8_t *pixels = calloc(h, stride);
++	if (!pixels) {
++		return NULL;
++	}
++	struct wlr_texture_read_pixels_options options = {
++		.data = pixels,
++		.format = DRM_FORMAT_ARGB8888,
++		.stride = stride,
++	};
++	if (!wlr_texture_read_pixels(texture, &options)) {
++		free(pixels);
++		return NULL;
++	}
++	// The hotspot is in surface coordinates: in pixels it is scaled by the buffer scale.
++	int scale = surface->current.scale > 0 ? surface->current.scale : 1;
++	size_t length = 64 + ((size_t)h * stride + 2) / 3 * 4 + 1;
++	char *payload = malloc(length);
++	if (!payload) {
++		free(pixels);
++		return NULL;
++	}
++	int head = snprintf(payload, length, "cursorimg:%d,%d,%d,%d,", hotspot_x * scale, hotspot_y * scale, w, h);
++	size_t n = base64_encode(pixels, (size_t)h * stride, payload + head);
++	payload[head + n] = '\0';
++	free(pixels);
++	return payload;
 +}
