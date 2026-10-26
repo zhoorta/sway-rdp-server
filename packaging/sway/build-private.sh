@@ -5,7 +5,7 @@
 # 0.19, and sway 1.12 would need libwayland 1.24, which Debian 13 does not have: that is why 1.11 with its own wlroots.
 #
 #   packaging/sway/build-private.sh [arch [image]]      arch: arm64 (default) or amd64; image: debian:13 (default) or ubuntu:26.04
-# Output: packaging/out/waydesk-sway_1.11+waydesk2+<tag>_<arch>.deb  (tag: deb13, ubuntu26.04, from the image). The dependencies come from the binaries (dpkg-shlibdeps).
+# Output: packaging/out/waydesk-sway_1.11+waydesk3+<tag>_<arch>.deb  (tag: deb13, ubuntu26.04, from the image). The dependencies come from the binaries (dpkg-shlibdeps).
 set -e
 cd "$(dirname "$0")/../.."
 ARCH=${1:-arm64}
@@ -47,7 +47,7 @@ mkdir -p /tmp/dh/debian && cd /tmp/dh && printf "Source: waydesk-sway\n\nPackage
 DEPS=$(dpkg-shlibdeps -O $B/sway $B/swaymsg $B/swaybar $B/swaynag 2>/dev/null | sed "s/^shlibs:Depends=//")
 cat > $P/DEBIAN/control <<CTL
 Package: waydesk-sway
-Version: 1.11+waydesk2+$TAG
+Version: 1.11+waydesk3+$TAG
 Architecture: $ARCH
 Maintainer: José Mendonça <jmendonca@gmail.com>
 Section: x11
@@ -59,6 +59,6 @@ Description: sway 1.11 with window buttons in the title bar, for Waydesk session
  /usr/lib/waydesk/bin so that every distribution runs the same compositor in the
  Waydesk session. It does not replace the distribution'"'"'s sway.
 CTL
-dpkg-deb --root-owner-group -b $P /out/waydesk-sway_1.11+waydesk2+${TAG}_${ARCH}.deb >/dev/null
+dpkg-deb --root-owner-group -b $P /out/waydesk-sway_1.11+waydesk3+${TAG}_${ARCH}.deb >/dev/null
 chown $UID_HOST:$GID_HOST /out/waydesk-sway_*.deb
 echo "Depends: $DEPS"'
