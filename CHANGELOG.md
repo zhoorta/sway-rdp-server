@@ -2,7 +2,7 @@
 
 What changed, newest first. The numbered releases are the ones in the apt repository.
 
-## 2026-10-27 · 0.3.1
+## 2026-10-26 · 0.3.1
 
 **Through an SSH tunnel.** The flow control looks at the socket's send queue: while more than about 190 kB is queued the next frame waits, and while the queue is deep the capacity is how fast the peer acknowledges (the kernel's delivery rate is the first hop then, the loopback to `sshd`, which says nothing about the real link). Before, an SSH tunnel in front of a slow link let 3 MB build up, which is seconds between a click and its picture, while the encoder aimed for 10 to 40 Mbit/s. The log shows the queue next to the bitrate.
 
@@ -12,7 +12,7 @@ A browser by default: `waydesk-desktop` installs Chromium from Flathub (about 19
 
 `waydesk-setup` finds a program that a vendor's script has just installed in the home directory (`~/.opencode/bin`, `~/.local/bin`, `~/.cargo/bin`, `~/.bun/bin`): before, OpenCode got no launcher entry ("not installed", because the folder is only in `.bashrc`) and was installed again at every run, and the launcher entries of such programs use the full path. `waydesk-setup` runs as the account that typed it, also under `sudo waydesk-setup`, and refuses to run as plain root: Claude Code, OpenCode, mise, uv and the other tools of the wizard install into the home of whoever runs it, and as root they ended up in `/root`. Run it as the administrator account, without sudo.
 
-## 2026-10-27 · 0.3.0
+## 2026-10-26 · 0.3.0
 
 **Keyboard.** A keyboard whose keys reach the server at other places than the layout of its locale expects gets a layout of its own: the new **Keyboard** window in the launcher (or `~/.config/waydesk/keyboard`, one xkb layout name) picks it, and the session follows within a second, with no reconnect. `waydeskmac` is for the built-in keyboard of a Portuguese MacBook through the Windows App; a layout of your own goes in `/etc/xkb/symbols`.
 
