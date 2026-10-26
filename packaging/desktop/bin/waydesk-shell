@@ -239,6 +239,15 @@ if changed:
         json.dump(settings, f, indent=2)
 PY
 fi
+# The shell conveniences (aliases, fzf, zoxide, mise ...: each is wired only when its program is installed, see setup/shell.sh) for every
+# account, once: waydesk-setup put the line in the .bashrc of the account that ran it only. The package's own file is read, so an update of it
+# reaches every account.
+if [ ! -e "$dms_dir/.bashrc-shell" ] && [ -r /usr/share/waydesk/setup/shell.sh ]; then
+    if ! grep -qs 'shell\.sh' "$HOME/.bashrc"; then
+        printf '\n# waydesk: shell conveniences\n[ -r /usr/share/waydesk/setup/shell.sh ] && . /usr/share/waydesk/setup/shell.sh\n' >> "$HOME/.bashrc"
+    fi
+    mkdir -p "$dms_dir" && : > "$dms_dir/.bashrc-shell"
+fi
 # The dock starts with a browser, the file manager and the terminal pinned, whichever of them is installed (the browser may come later,
 # with waydesk-setup: each one is pinned once, when it is there, and an account that unpins it is not given it again). Not while the shell
 # runs: it keeps its own copy of the file and would write it back.
@@ -291,6 +300,7 @@ try:
 except (OSError, ValueError):
     sys.exit(0)
 prefs.setdefault("browser", {})["custom_chrome_frame"] = False
+prefs["browser"]["session_restore_infobar_times_shown"] = 10  # the "Continue where you left off" bar: shown as often as it ever is
 with open(path, "w") as f:
     json.dump(prefs, f, separators=(",", ":"))
 PY
@@ -321,6 +331,7 @@ try:
 except (OSError, ValueError):
     prefs = {}
 prefs.setdefault("browser", {})["custom_chrome_frame"] = False
+prefs["browser"]["session_restore_infobar_times_shown"] = 10  # the "Continue where you left off" bar: shown as often as it ever is
 with open(path, "w") as f:
     json.dump(prefs, f, separators=(",", ":"))
 PY

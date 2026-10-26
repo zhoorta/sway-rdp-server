@@ -11,7 +11,7 @@ use ironrdp_egfx::pdu::{Avc420Region, CapabilitySet};
 use ironrdp_egfx::server::{GraphicsPipelineHandler, GraphicsPipelineServer};
 use ironrdp_server::tokio::sync::mpsc::UnboundedSender;
 use ironrdp_server::{EgfxServerMessage, GfxDvcBridge, GfxServerFactory, GfxServerHandle, ServerEvent, ServerEventSender};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::capture::Rect;
 use crate::tcpinfo::Link;
@@ -492,7 +492,7 @@ impl Out {
             None => {
                 // Refused frames are never acknowledged, so the credit would be lost for good.
                 self.st.grant(1);
-                warn!("send_avc420_frame refused a frame after encoding it");
+                debug!("send_avc420_frame refused a frame after encoding it (no credit: the link is the limit)");
             }
         }
         self.st.flush(&mut server)

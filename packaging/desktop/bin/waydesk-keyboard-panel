@@ -1,0 +1,7 @@
+#!/bin/sh
+# Keyboard: the window where the account that is logged in picks the layout of its keys (a small Quickshell window of its own, next to the shell;
+# it writes ~/.config/waydesk/keyboard, which the session follows). The window's app id is the name of the launcher entry
+# (waydesk-keyboard.desktop), so the dock shows its own icon and name.
+export QS_APP_ID=waydesk-keyboard
+export QT_QPA_PLATFORMTHEME=qt6ct QT_QUICK_CONTROLS_STYLE=Fusion
+exec quickshell -p /usr/share/waydesk/keyboard-panel

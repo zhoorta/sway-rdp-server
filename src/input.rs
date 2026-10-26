@@ -30,6 +30,8 @@ pub enum Cmd {
     Button { code: u32, pressed: bool },
     /// Wheel notches, positive = away from the user (RDP convention); converted for Wayland here.
     Wheel { vertical: f64, horizontal: f64 },
+    /// A new keyboard layout (an xkb layout name): the session's keyboard is replaced by one with that keymap.
+    SetLayout(String),
 }
 
 /// RDP (XT set 1) scancode to Linux evdev keycode.
@@ -84,6 +86,10 @@ pub fn spawn(output_name: Option<String>, extent: (u32, u32), layout: String) ->
 
 struct Injector {
     conn: Connection,
+    /// What a keyboard with another keymap is made from.
+    seat: wl_seat::WlSeat,
+    vk_mgr: ZwpVirtualKeyboardManagerV1,
+    qh: QueueHandle<State>,
     xkb_state: xkb::State,
     mods: (u32, u32, u32, u32),
     vk: ZwpVirtualKeyboardV1,
@@ -93,6 +99,25 @@ struct Injector {
     scroll: [f64; 2],
     /// Multiplies every wheel amount (`WAYDESK_SCROLL_SCALE`, 1 = a notch is a notch).
     scroll_scale: f64,
+}
+
+/// The keymap of an xkb layout name, and the file the compositor reads it from (keep it open until the request is sent).
+fn compile_keymap(layout: &str) -> Result<(xkb::Keymap, std::fs::File, u32)> {
+    let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
+    let keymap = xkb::Keymap::new_from_names(&ctx, "", "", layout, "", None, xkb::COMPILE_NO_FLAGS)
+        .with_context(|| format!("cannot compile an xkb keymap for layout {layout:?}"))?;
+    let mut text = keymap.get_as_string(xkb::KEYMAP_FORMAT_TEXT_V1).into_bytes();
+    text.push(0);
+    let raw = unsafe { libc::memfd_create(c"waydesk-server-keymap".as_ptr(), libc::MFD_CLOEXEC) };
+    anyhow::ensure!(raw >= 0, "memfd_create failed: {}", std::io::Error::last_os_error());
+    let file = unsafe { std::fs::File::from_raw_fd(raw) };
+    file.set_len(text.len() as u64)?;
+    {
+        use std::io::Write as _;
+        (&file).write_all(&text)?;
+    }
+    let len = text.len() as u32;
+    Ok((keymap, file, len))
 }
 
 fn setup(want_output: Option<&str>, layout: &str) -> Result<Injector> {
@@ -122,27 +147,15 @@ fn setup(want_output: Option<&str>, layout: &str) -> Result<Injector> {
         .context("output for the pointer not found")?;
 
     // Keyboard: compile a keymap from the layout name and hand it to the compositor.
-    let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
-    let keymap = xkb::Keymap::new_from_names(&ctx, "", "", layout, "", None, xkb::COMPILE_NO_FLAGS)
-        .with_context(|| format!("cannot compile an xkb keymap for layout {layout:?}"))?;
-    let mut text = keymap.get_as_string(xkb::KEYMAP_FORMAT_TEXT_V1).into_bytes();
-    text.push(0);
-    let raw = unsafe { libc::memfd_create(c"waydesk-server-keymap".as_ptr(), libc::MFD_CLOEXEC) };
-    anyhow::ensure!(raw >= 0, "memfd_create failed: {}", std::io::Error::last_os_error());
-    let file = unsafe { std::fs::File::from_raw_fd(raw) };
-    file.set_len(text.len() as u64)?;
-    {
-        use std::io::Write as _;
-        (&file).write_all(&text)?;
-    }
+    let (keymap, file, len) = compile_keymap(layout)?;
     let vk = vk_mgr.create_virtual_keyboard(&seat, &qh, ());
-    vk.keymap(1, file.as_fd(), text.len() as u32); // 1 = XKB_V1
+    vk.keymap(1, file.as_fd(), len); // 1 = XKB_V1
 
     let ptr = ptr_mgr.create_virtual_pointer_with_output(Some(&seat), Some(&output), &qh, ());
     queue.roundtrip(&mut state).context("roundtrip after creating virtual devices")?;
     let xkb_state = xkb::State::new(&keymap);
     let scroll_scale = std::env::var("WAYDESK_SCROLL_SCALE").ok().and_then(|v| v.parse::<f64>().ok()).filter(|v| *v > 0.0).unwrap_or(1.0);
-    Ok(Injector { conn, xkb_state, mods: (0, 0, 0, 0), vk, ptr, start: Instant::now(), scroll: [0.0; 2], scroll_scale })
+    Ok(Injector { conn, seat, vk_mgr, qh, xkb_state, mods: (0, 0, 0, 0), vk, ptr, start: Instant::now(), scroll: [0.0; 2], scroll_scale })
 }
 
 impl Injector {
@@ -166,6 +179,22 @@ impl Injector {
                         self.vk.modifiers(mods.0, mods.1, mods.2, mods.3);
                     }
                 }
+                Cmd::SetLayout(layout) => match compile_keymap(&layout) {
+                    Ok((keymap, file, len)) => {
+                        let vk = self.vk_mgr.create_virtual_keyboard(&self.seat, &self.qh, ());
+                        vk.keymap(1, file.as_fd(), len);
+                        // The new keyboard has to be there before the old one goes, and the file must reach the compositor first.
+                        if let Err(e) = self.conn.flush() {
+                            tracing::warn!("wayland flush failed: {e}");
+                        }
+                        self.vk.destroy();
+                        self.vk = vk;
+                        self.xkb_state = xkb::State::new(&keymap);
+                        self.mods = (0, 0, 0, 0);
+                        tracing::info!(%layout, "keyboard layout changed");
+                    }
+                    Err(e) => tracing::warn!("keyboard layout {layout:?} not used: {e:#}"),
+                },
                 Cmd::SetExtent { w, h } => extent = (w.max(1), h.max(1)),
                 Cmd::Move { x, y } => {
                     self.ptr.motion_absolute(t, x.min(extent.0 - 1), y.min(extent.1 - 1), extent.0, extent.1);

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Keyboard
+Comment=The layout of the keys you type with
+Exec=waydesk-keyboard-panel
+Icon=input-keyboard
+Categories=System;Settings;
+Terminal=false

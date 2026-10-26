@@ -2,9 +2,15 @@
 
 What changed, newest first. The numbered releases are the ones in the apt repository.
 
-## 2026-10-27 · 0.2.2
+## 2026-10-27 · 0.3.0
 
-The file manager (`pcmanfm-qt` `+waydesk2`) no longer recommends `lxqt-qtplugin` and `lxqt-policykit`: they pulled in `lxqt-session` and with it about a hundred xscreensaver screensavers in the launcher (no icon, none of them can run in a session), `lxqt-config`, `qps`, `qlipper` and the Hibernate, Leave and Logout entries, about 60 MB. On a server that has them, `sudo apt autoremove` removes them after the update. The dock starts with a browser, the file manager and the terminal pinned (each once, when it is installed), and the Chromium icon is no longer put on the desktop, which keeps Home and Trash. A shortcut added with `waydesk-add-to-desktop` is marked trusted with the right key (`metadata::trusted`), so the file manager shows no "!" on it.
+**Keyboard.** A keyboard whose keys reach the server at other places than the layout of its locale expects gets a layout of its own: the new **Keyboard** window in the launcher (or `~/.config/waydesk/keyboard`, one xkb layout name) picks it, and the session follows within a second, with no reconnect. `waydeskmac` is for the built-in keyboard of a Portuguese MacBook through the Windows App; a layout of your own goes in `/etc/xkb/symbols`.
+
+**Fewer things you did not ask for.** The file manager (`pcmanfm-qt` `+waydesk2`) no longer recommends `lxqt-qtplugin` and `lxqt-policykit`: they pulled in `lxqt-session` and with it about a hundred xscreensaver screensavers in the launcher (no icon, none of them can run in a session), `lxqt-config`, `qps`, `qlipper` and the Hibernate, Leave and Logout entries, about 60 MB. On a server that has them, `sudo apt autoremove` removes them after the update. `waydesk-setup` no longer offers the shell (it comes with `waydesk`), and every account gets the shell conveniences of `waydesk-setup` (aliases, fzf, zoxide, each only when installed) in its `.bashrc`, once.
+
+**A desktop that starts ready.** The dock starts with a browser, the file manager and the terminal pinned (each once, when it is installed), and the Chromium icon is no longer put on the desktop, which keeps Home and Trash. A shortcut added with `waydesk-add-to-desktop` is marked trusted with the right key (`metadata::trusted`), so the file manager shows no "!" on it. Chromium no longer shows "Continue where you left off" on a new profile.
+
+**Smaller.** `waydesk-server --version` and `waydesk-admin --version`; a frame that the flow control holds back is a debug line, not a warning in the log.
 
 ## 2026-10-26 · 0.2.1
 

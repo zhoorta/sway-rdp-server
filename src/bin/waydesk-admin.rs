@@ -231,6 +231,10 @@ fn run() -> Result<()> {
         ["users", "sudo", name, onoff] => users_sudo(name, parse_onoff(onoff)?),
         ["sessions", "list"] => sessions_list(json_out),
         ["status"] => status(json_out),
+        ["--version"] | ["-V"] => {
+            println!("waydesk-admin {}", env!("CARGO_PKG_VERSION"));
+            Ok(())
+        }
         // Who can reach the port, what certificate it shows, a VPN for it: shell scripts that check every value they are given
         // (they ask for root themselves where they change something).
         [which @ ("access" | "cert" | "vpn"), rest @ ..] => run_admin_script(which, rest),

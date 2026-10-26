@@ -144,7 +144,7 @@ replaces the open one; that is on by default only for loopback, because the old 
 
 ## Keyboard
 
-The layout of a session follows the keyboard layout that the client reports (Portuguese, English, German and so on) and stays the same until the session ends. A keyboard whose keys are not where that layout expects them gets its own layout: put the name of an xkb layout in `~/.config/waydesk/keyboard` of the account (a line of its own, `#` for comments), end the session and log in again. `waydeskmac` is for the built-in keyboard of a Portuguese MacBook through the Windows App (measured: its `º ´ ' + § ~ \` keys arrive at the places of other keys, and the left Option key is AltGr); the file is `/etc/xkb/symbols/waydeskmac`, and you can add layouts of your own next to it.
+The layout of a session follows the keyboard layout that the client reports (Portuguese, English, German and so on). An account that types on a keyboard whose keys do not arrive where that layout expects them picks its own in the **Keyboard** window (in the launcher), which writes `~/.config/waydesk/keyboard`: a line of its own with the name of an xkb layout (`#` for comments). The session follows the file while it runs, within a second; removing it goes back to the client's layout. `waydeskmac` is for the built-in keyboard of a Portuguese MacBook through the Windows App (measured: its `º ´ ' + § ~ \` keys arrive at the places of other keys, and the left Option key is AltGr); the file is `/etc/xkb/symbols/waydeskmac`, and you can add layouts of your own next to it.
 
 ## Session hook
 

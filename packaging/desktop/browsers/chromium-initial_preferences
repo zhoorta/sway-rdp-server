@@ -9,7 +9,8 @@
     "show_home_button": true,
     "has_seen_welcome_page": true,
     "check_default_browser": false,
-    "custom_chrome_frame": false
+    "custom_chrome_frame": false,
+    "session_restore_infobar_times_shown": 10
   },
   "profile": {
     "default_content_setting_values": {

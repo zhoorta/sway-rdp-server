@@ -63,6 +63,7 @@ mkdir -p $D/usr/share/waydesk/qt6ct && install -m 644 packaging/desktop/qt6ct/* 
 mkdir -p $D/etc/xdg-desktop-portal && install -m 644 packaging/desktop/xdg-desktop-portal/*.conf $D/etc/xdg-desktop-portal/
 mkdir -p $D/usr/share/waydesk/users-panel && install -m 644 packaging/desktop/users-panel/*.qml $D/usr/share/waydesk/users-panel/
 mkdir -p $D/usr/share/waydesk/passwd-panel && install -m 644 packaging/desktop/passwd-panel/*.qml $D/usr/share/waydesk/passwd-panel/
+mkdir -p $D/usr/share/waydesk/keyboard-panel && install -m 644 packaging/desktop/keyboard-panel/*.qml $D/usr/share/waydesk/keyboard-panel/
 mkdir -p $D/usr/share/applications && install -m 644 packaging/desktop/applications/*.desktop $D/usr/share/applications/
 install -m 755 packaging/debian/postinst-desktop $D/DEBIAN/postinst
 mkdir -p $D/usr/share/waydesk/dms-plugin && cp -r packaging/desktop/dms-plugin/. $D/usr/share/waydesk/dms-plugin/ && chmod -R go-w,a+rX $D/usr/share/waydesk/dms-plugin

@@ -25,16 +25,14 @@ preset=$(ui --title "Remote desktop setup" --menu "What will this desktop be use
   minimal   "Base only: browser, office, essentials" \
   custom    "Choose everything yourself") || exit 1
 
-on_desktop=ON; on_dev=OFF; on_creative=OFF; on_ai=OFF
+on_dev=OFF; on_creative=OFF; on_ai=OFF
 case "$preset" in
   developer) on_dev=ON; on_ai=ON ;;
   creative)  on_creative=ON ;;
   both)      on_dev=ON; on_creative=ON; on_ai=ON ;;
-  minimal)   on_desktop=OFF ;;
 esac
 
-layers=$(ui --title "Layers" --checklist "Base is always installed. Pick extra layers (space to toggle):" 16 70 4 \
-  desktop  "Desktop shell (DankMaterialShell)" "$on_desktop" \
+layers=$(ui --title "Layers" --checklist "Base is always installed (the desktop shell comes with waydesk). Pick extra layers (space to toggle):" 15 70 3 \
   dev      "Developer tools"  "$on_dev" \
   creative "Creative apps"    "$on_creative" \
   ai       "AI tools"         "$on_ai") || exit 1

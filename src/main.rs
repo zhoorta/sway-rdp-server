@@ -282,7 +282,7 @@ impl Handler {
             input::Cmd::Move { x, y } => Down::PointerMove { x, y },
             input::Cmd::Button { code, pressed } => Down::Button { code, pressed },
             input::Cmd::Wheel { vertical, horizontal } => Down::Wheel { vertical, horizontal },
-            input::Cmd::SetExtent { .. } => return,
+            input::Cmd::SetExtent { .. } | input::Cmd::SetLayout(_) => return,
         });
     }
 }
@@ -528,6 +528,10 @@ async fn main() -> anyhow::Result<()> {
             "--no-egfx" => no_egfx = true,
             "--session-worker" => worker = true,
             "--own-sway" => own_sway = true,
+            "--version" | "-V" => {
+                println!("waydesk-server {}", env!("CARGO_PKG_VERSION"));
+                return Ok(());
+            }
             "--helper" => run_helper = true,
             "--systemd-sessions" => systemd_sessions = true,
             "--min-available-mb" => min_available_mb = Some(args.next().context("--min-available-mb needs a number (0 = no check)")?.parse()?),

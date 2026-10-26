@@ -260,12 +260,14 @@ async fn serve_client(
     // First client: make the session. Later clients: it exists; give it the new client's size.
     let session = match session {
         None => {
-            let layout = account_keyboard()
-                .unwrap_or_else(|| if klid == 0 { cfg.opts.default_layout.clone() } else { session::xkb_layout_for_klid(klid).to_owned() });
+            let layout = keyboard_layout(klid, &cfg.opts.default_layout);
             info!(width, height, klid = format!("{klid:#06x}"), %layout, "creating session");
             let opts = cfg.opts.clone();
             match tokio::task::spawn_blocking(move || Session::create((width, height), &layout, &opts)).await {
-                Ok(Ok(s)) => s,
+                Ok(Ok(s)) => {
+                    watch_keyboard(s.input.clone(), klid, cfg.opts.default_layout.clone());
+                    s
+                }
                 Ok(Err(e)) => {
                     error!("cannot create the session: {e:#}");
                     finish(writer, reader);
@@ -608,6 +610,35 @@ pub const PRIVATE_QML: &str = "/usr/lib/waydesk/qml";
 const SWAY_OWN_CONFIGS: [&str; 2] = ["/etc/sway/config", "/usr/lib/waydesk/etc/sway/config"];
 /// Used when nothing else exists, so that a server without the desktop package still gets a session (sway refuses to start without a config).
 const MINIMAL_CONFIG: &str = "/usr/share/waydesk/sway-minimal.conf";
+
+/// The layout of a session: the one this account asked for, else the one of the client's locale (`default` when the client reports none).
+fn keyboard_layout(klid: u32, default: &str) -> String {
+    account_keyboard().unwrap_or_else(|| if klid == 0 { default.to_owned() } else { session::xkb_layout_for_klid(klid).to_owned() })
+}
+
+/// Follows `~/.config/waydesk/keyboard` while the session lives: a change (the desktop settings write it) puts the new layout on the session's
+/// keyboard at once, and removing the file goes back to the layout of the client's locale. Looks once a second; ends when the session's input does.
+fn watch_keyboard(input: std::sync::mpsc::Sender<input::Cmd>, klid: u32, default: String) {
+    let modified = || {
+        let home = std::env::var_os("HOME")?;
+        std::fs::metadata(std::path::Path::new(&home).join(".config/waydesk/keyboard")).and_then(|m| m.modified()).ok()
+    };
+    tokio::spawn(async move {
+        let mut seen = modified();
+        let mut tick = tokio::time::interval(Duration::from_secs(1));
+        loop {
+            tick.tick().await;
+            let now = modified();
+            if now == seen {
+                continue;
+            }
+            seen = now;
+            if input.send(input::Cmd::SetLayout(keyboard_layout(klid, &default))).is_err() {
+                break;
+            }
+        }
+    });
+}
 
 /// The keyboard layout this account asked for: the name of an xkb layout in `~/.config/waydesk/keyboard` (first line that is not a comment),
 /// for a keyboard whose keys the client reports at other places than the layout of its Windows locale, such as a Mac's (`waydeskmac`).
