@@ -89,7 +89,7 @@ def add(path):
         return True
     shutil.copyfile(path, dst)
     os.chmod(dst, 0o755)
-    trust = subprocess.run(["gio", "set", dst, "metadata::trust", "true"], capture_output=True, text=True)
+    trust = subprocess.run(["gio", "set", dst, "metadata::trusted", "true"], capture_output=True, text=True)
     if trust.returncode != 0:
         print(f"added {dst}, but could not mark it trusted (is gvfs installed?): {trust.stderr.strip()}", file=sys.stderr)
         return False

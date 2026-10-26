@@ -268,7 +268,9 @@ if [ ! -e "$dms_dir/.flatpak-chromium" ] && { [ -d /var/lib/flatpak/app/org.chro
     desk="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
     for exp in /var/lib/flatpak/exports/share/applications "$HOME/.local/share/flatpak/exports/share/applications"; do
         if [ -f "$exp/org.chromium.Chromium.desktop" ] && [ -d "$desk" ] && [ ! -e "$desk/org.chromium.Chromium.desktop" ]; then
-            cp "$exp/org.chromium.Chromium.desktop" "$desk/" && chmod +x "$desk/org.chromium.Chromium.desktop"
+            # executable and trusted (metadata::trusted): without the second the file manager puts a "!" on the icon
+            cp "$exp/org.chromium.Chromium.desktop" "$desk/" && chmod +x "$desk/org.chromium.Chromium.desktop" \
+                && gio set "$desk/org.chromium.Chromium.desktop" metadata::trusted true 2>/dev/null
         fi
     done
     flags="$flatpak_chromium/config/chromium-flags.conf"

@@ -30,5 +30,6 @@ try 50-material-wallpapers.py Modules/Settings/WallpaperColorsTab.qml
 try 70-lean-shell.py DMSShell.qml
 try 80-launch-feedback.py Services/SessionService.qml Modules/SurfaceWidgets/ApplicationStrip.qml Modules/Dock/DockAppButton.qml
 try 90-dock-overlay.py Modules/Dock/DockBody.qml
+try 100-hide-screensavers.py Services/AppSearchService.qml
 try 60-power-menu.py Modules/PowerMenu/PowerMenuContent.qml DCommon/Session/PowerMenuView.qml
 [ "$applied" -gt 0 ]
