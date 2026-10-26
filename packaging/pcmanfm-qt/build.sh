@@ -25,7 +25,7 @@ dpkg-source -x pcmanfm-qt_*.dsc >/dev/null
 cd pcmanfm-qt-*/
 # The file manager recommends lxqt-qtplugin and lxqt-policykit, and those pull in lxqt-session and with it xscreensaver (a hundred screensavers in the
 # launcher), lxqt-config, qps and qlipper: a session of ours uses qt6ct for the Qt theme and the shell for the polkit prompt, so neither is needed.
-perl -0pi -e "s/\\s*lxqt-(qtplugin|policykit),?//g" debian/control
+perl -0pi -e "s/\\s*lxqt-(qtplugin|policykit)(\\s*\\([^)]*\\))?\\s*,?//g" debian/control
 if grep -qE "lxqt-(qtplugin|policykit)" debian/control; then echo "pcmanfm-qt: debian/control still names lxqt-qtplugin or lxqt-policykit" >&2; exit 1; fi
 mk-build-deps -i -r -t "apt-get -y -qq --no-install-recommends" debian/control >/dev/null
 for p in waydesk-menus waydesk-no-mnemonics; do
