@@ -1,10 +1,10 @@
 # Changelog
 
-What changed, newest first. The numbered releases are the ones in the apt repository; the first block is in the repository but not released yet.
+What changed, newest first. The numbered releases are the ones in the apt repository.
 
-## In the repository, not released yet
+## 2026-10-26 · 0.2.0
 
-Who can reach the port is set with one command each: `waydesk-admin access` (this machine, a local network or a VPN; the daemon closes source addresses that are not allowed before TLS and before any login), `cert local-ca` (a certificate that clients can verify), `vpn init` and `vpn add` (WireGuard), and `waydesk-setup-admin` asks how you will connect. X11 applications run (XWayland, one server per account). The mouse pointer has its real shapes (text cursor, resize arrows, hand), also for applications that draw their own cursor. TCP BBR for the connection, and flow control that follows the link: frames and bytes in flight, and a video bitrate that follows what the link delivers. Title bars and borders in the colours of the theme (dark or light), window buttons as a capsule, soft shadows and rounded title-bar corners. The dock floats over the bottom of the screen and bounces while an application starts. Flatpak and GTK applications no longer wait minutes for a dead portal after a login.
+Who can reach the port is set with one command each: `waydesk-admin access` (this machine, a local network or a VPN; the daemon closes source addresses that are not allowed before TLS and before any login), `cert local-ca` (a certificate that clients can verify), `vpn init` and `vpn add` (WireGuard), and `waydesk-setup-admin` asks how you will connect. X11 applications run (XWayland, one server per account). The mouse pointer has its real shapes (text cursor, resize arrows, hand), also for applications that draw their own cursor. TCP BBR for the connection, and flow control that follows the link: frames and bytes in flight, and a video bitrate that follows the best rate the link delivered in the last 10 seconds (it aims for 80 % of it: on a lossy 5 Mbit/s link it went from 1-2.7 to 3.4-4.7 Mbit/s). The H.264 encoder runs at low complexity by default (15-36 % less CPU under motion), with environment overrides and `waydesk-encbench` to measure them. Title bars and borders in the colours of the theme (dark or light), window buttons as a capsule, soft shadows and rounded title-bar corners. The dock floats over the bottom of the screen and bounces while an application starts. Flatpak and GTK applications no longer wait minutes for a dead portal after a login.
 
 ## 2026-10-24 · 0.1.0
 
