@@ -12,6 +12,9 @@ What is planned or open, in no particular order inside a group. Nothing here is 
 - **Flow control that follows the link (written, being tested).** The server measures what the link delivers while it is full, keeps no more than a few tenths of a
   second of it in flight, and lowers the encoder's bitrate to fit (floor 300 kbit/s, ceiling the configured one). Before, a slow link built a queue of seconds.
 
+- **H.264 CPU on a lightly changing desktop.** Screen mode costs about 8 ms per frame at 720p whatever changed. Convert only the changed rectangles to YUV and take a
+  cheaper path for tiny damage; compare real text legibility of screen and camera mode (PSNR says 12 dB lower at rest). Numbers in `docs/MEASUREMENTS.md`.
+
 ## In progress
 
 - **Mouse pointer pictures.** The pointer follows the shape an application asks for (text cursor, resize arrows, hand, ...), done for

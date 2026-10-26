@@ -140,7 +140,30 @@ conversion, H.264) was profiled with `perf record -F 999 -g` while a full-screen
   `/etc/default/waydesk`. Scrolling text in a terminal (4 % CPU, 1.5 against 1.7 Mbit/s) is the same in both modes, so ordinary work does not care.
 - Not done: the same comparison on the CAX11 itself (the server was deleted before this), the picture quality of camera mode on text (not looked at), a switch
   that picks the mode by itself when the CPU is short.
+- Correction (2026-10-26, encoder benchmark): the "same in both modes" line above holds for a terminal, not for every desktop. See the next section.
 - Trap while measuring: logging in again right after `loginctl terminate-user` can time out on `user@UID.service` (90 s); wait until the old user manager has stopped.
+
+## H.264 encoder benchmark (2026-10-26, Nuremberg test server, x86, 2 vCPU)
+`waydesk-encbench` (src/bin) encodes synthetic scenes with the same OpenH264 settings as the server, 120 frames at 30 fps, bitrate cap 10 Mbit/s, CPU as a
+share of one core. Scenes: `pattern` (worst case, everything moves), `video` (moving gradients), `desktop` (mostly still, one area scrolls), `settle` (the desktop at rest).
+
+| Scene, size | Camera | Screen, medium | Screen, low |
+|---|---|---|---|
+| pattern 720p | 42-45 %, 10 Mbit/s | 41-43 %, 6.7 Mbit/s | 26-29 %, 6.9 Mbit/s |
+| video 720p | 22 %, 3.7 Mbit/s | 33 %, 0.71 Mbit/s | 28-30 %, 0.60 Mbit/s |
+| desktop 720p | 9-10 %, 1.7-2.0 Mbit/s | 30 %, 0.93-1.06 Mbit/s | 30 % |
+| desktop 1680x1050 | 20 %, 2.7 Mbit/s | 54 %, 1.4 Mbit/s | 54 % |
+| at rest 720p | 8.6 %, 1.08 Mbit/s, PSNR 42.3 dB | 24.7 %, 0.56 Mbit/s, PSNR 30.6 dB | 25.2 % |
+| at rest 1680x1050 | 17 %, 1.73 Mbit/s, PSNR 42.0 dB | 46 %, 0.86 Mbit/s, PSNR 30.0 dB | 45 % |
+
+- Screen mode has an almost constant cost per frame (about 8 ms at 720p, 15 ms at 1680x1050) whatever the content; camera mode is very cheap on pictures that hardly change.
+  The "three times" comes from there, not from motion.
+- Low complexity saves 15-36 % under heavy motion at the same bits and PSNR, and nothing on a still desktop. It is the default since this run.
+- Scene-change detection, background detection, adaptive quantisation, long-term references and the thread count change almost nothing (OpenH264 turns the
+  background and adaptive quantisation off in screen mode by itself).
+- PSNR on screen mode is about 12 dB lower at rest. Not yet judged on real text: PSNR on synthetic text may not show legibility.
+- The benchmark encodes every frame; the server only encodes when something changed, so an idle desktop costs nothing. The numbers apply to scrolling and animation.
+- Idea, not done: convert only the changed rectangles to YUV and use a cheaper path for tiny damage.
 
 ## Chromium memory flags (2026-10-22, dev VM, one account, fresh profile, Wikipedia + Hacker News + debian.org, PSS 75 s after start)
 Where the 396 MB went (default flags): renderers 5 processes 146 MB, browser 116 MB, GPU process 60 MB, utility 36 MB, zygotes 26 MB.
