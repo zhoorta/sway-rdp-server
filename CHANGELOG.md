@@ -2,7 +2,7 @@
 
 What changed, newest first. The numbered releases are the ones in the apt repository.
 
-## 0.3.1 (in preparation)
+## 2026-10-27 · 0.3.1
 
 **Through an SSH tunnel.** The flow control looks at the socket's send queue: while more than about 190 kB is queued the next frame waits, and while the queue is deep the capacity is how fast the peer acknowledges (the kernel's delivery rate is the first hop then, the loopback to `sshd`, which says nothing about the real link). Before, an SSH tunnel in front of a slow link let 3 MB build up, which is seconds between a click and its picture, while the encoder aimed for 10 to 40 Mbit/s. The log shows the queue next to the bitrate.
 
