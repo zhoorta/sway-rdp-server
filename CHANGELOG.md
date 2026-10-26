@@ -8,7 +8,7 @@ A browser by default: `waydesk-desktop` installs Chromium from Flathub (about 19
 
 `waydesk-desktop` also adds the Flathub remote when it is installed (it needs the network; without it the install goes on and says how to add it later). Before, the Explore page of the Software app was empty on a fresh install, because there was no remote to read apps from.
 
-`waydesk-setup` runs as the account that typed it, also under `sudo waydesk-setup`, and refuses to run as plain root: Claude Code, OpenCode, mise, uv and the other tools of the wizard install into the home of whoever runs it, and as root they ended up in `/root`. Run it as the administrator account, without sudo.
+`waydesk-setup` finds a program that a vendor's script has just installed in the home directory (`~/.opencode/bin`, `~/.local/bin`, `~/.cargo/bin`, `~/.bun/bin`): before, OpenCode got no launcher entry ("not installed", because the folder is only in `.bashrc`) and was installed again at every run, and the launcher entries of such programs use the full path. `waydesk-setup` runs as the account that typed it, also under `sudo waydesk-setup`, and refuses to run as plain root: Claude Code, OpenCode, mise, uv and the other tools of the wizard install into the home of whoever runs it, and as root they ended up in `/root`. Run it as the administrator account, without sudo.
 
 ## 2026-10-27 · 0.3.0
 

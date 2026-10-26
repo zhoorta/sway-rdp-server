@@ -10,6 +10,9 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST="$DIR/packages.tsv"
 SUDO=""; [ "$(id -u)" -eq 0 ] || SUDO="sudo"
 export INSTALLER_DIR="$DIR"
+# The vendors' install scripts put their program in a folder of the home directory and add it to ~/.bashrc, which this run has not read: look there
+# too, or a program that was just installed is "not installed" below (no launcher entry) and is installed again at the next run.
+export PATH="$HOME/.local/bin:$HOME/.opencode/bin:$HOME/.cargo/bin:$HOME/.bun/bin:$PATH"
 
 # Prints manifest rows without comments or blank lines.
 rows() { grep -vE '^\s*(#|$)' "$MANIFEST"; }
@@ -119,7 +122,9 @@ echo "==> app list entries"
 # Programs without a .desktop file of their own get one, so they show up in the DMS app list.
 while IFS=$'\t' read -r id name cmd icon cats term; do
   printf '%s\n' "${selected[@]}" | grep -qxF "$id" || continue
-  command -v "${cmd%% *}" >/dev/null 2>&1 || { echo "skip $name (not installed)"; continue; }
+  prog=$(command -v "${cmd%% *}" 2>/dev/null) || { echo "skip $name (not installed)"; continue; }
+  # the full path: the session that starts it from the launcher does not have the folders that the .bashrc adds
+  cmd="$prog${cmd#"${cmd%% *}"}"
   args=(--name "$name" --exec "$cmd" --icon "$icon" --categories "$cats")
   [ "$term" = yes ] && args+=(--terminal)
   "$DIR/add-app.sh" "${args[@]}"
