@@ -4,6 +4,8 @@ What changed, newest first. The numbered releases are the ones in the apt reposi
 
 ## 0.3.1 (in preparation)
 
+**Through an SSH tunnel.** The flow control looks at the socket's send queue: while more than about 190 kB is queued the next frame waits, and while the queue is deep the capacity is how fast the peer acknowledges (the kernel's delivery rate is the first hop then, the loopback to `sshd`, which says nothing about the real link). Before, an SSH tunnel in front of a slow link let 3 MB build up, which is seconds between a click and its picture, while the encoder aimed for 10 to 40 Mbit/s. The log shows the queue next to the bitrate.
+
 A browser by default: `waydesk-desktop` installs Chromium from Flathub (about 190 MB) where the archive has no Chromium package, which is Ubuntu: its recommend of `chromium` is now versioned, so that Ubuntu's stub (it installs the snap, which the shell neither tunes nor pins) is not taken for it. Debian keeps the Chromium deb. The browser is pinned first in the dock.
 
 `waydesk-desktop` also adds the Flathub remote when it is installed (it needs the network; without it the install goes on and says how to add it later). Before, the Explore page of the Software app was empty on a fresh install, because there was no remote to read apps from.

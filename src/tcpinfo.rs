@@ -61,6 +61,11 @@ pub struct Link {
     pub delivery_rate: f64,
     /// The sender had nothing more to send: the rate is a lower bound, not what the link carries.
     pub app_limited: bool,
+    /// Bytes in the socket's send queue (sent and not yet acknowledged, or not yet sent). A queue of seconds means the path is slower than the
+    /// connection's first hop: with an SSH tunnel that hop is the loopback to sshd, and the kernel's rate for it says nothing about the real link.
+    pub queued: u64,
+    /// Bytes the peer has acknowledged so far: how fast it grows while the queue is full is what the path carries.
+    pub bytes_acked: u64,
 }
 
 /// The kernel's numbers for the connection on `fd`, None when it cannot say (not a TCP socket, an old kernel).
@@ -72,7 +77,12 @@ pub fn read(fd: RawFd) -> Option<Link> {
     if r != 0 || (len as usize) < std::mem::offset_of!(TcpInfo, delivery_rate) + 8 {
         return None;
     }
-    Some(Link { delivery_rate: info.delivery_rate as f64, app_limited: info.flags & 1 != 0 })
+    // SIOCOUTQ: unacknowledged and unsent bytes together (what `ss` shows as Send-Q); the unsent ones alone miss what a slow reader leaves queued.
+    let mut queued: libc::c_int = 0;
+    // SAFETY: the argument is a c_int, which is what TIOCOUTQ writes on a TCP socket.
+    let q = unsafe { libc::ioctl(fd, libc::TIOCOUTQ as _, &raw mut queued) };
+    let queued = if q == 0 { u64::try_from(queued).unwrap_or(0) } else { u64::from(info.notsent_bytes) };
+    Some(Link { delivery_rate: info.delivery_rate as f64, app_limited: info.flags & 1 != 0, queued, bytes_acked: info.bytes_acked })
 }
 
 #[cfg(test)]

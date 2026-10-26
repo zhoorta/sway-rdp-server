@@ -67,6 +67,13 @@ const QUEUE_SECONDS: f64 = 0.4;
 const BITRATE_SHARE: f64 = 0.8;
 /// The link's capacity is the best delivery rate of this long: a single sample dips whenever the kernel recovers a lost packet.
 const RATE_WINDOW: Duration = Duration::from_secs(10);
+/// More than this in the socket's send queue and no new frame is let go: the path is slower than what we make, and the queue is delay.
+const QUEUE_HOLD: u64 = 192_000;
+/// More than this queued and the path is the limit (until it is under half of it again): the kernel's delivery rate is not trusted then, the
+/// rate at which the peer acknowledges is.
+const QUEUE_FULL: u64 = 96_000;
+/// How long the acknowledged bytes are counted over for that rate.
+const DRAIN_WINDOW: Duration = Duration::from_millis(1500);
 /// A delivery rate measured while the link was full is trusted this long.
 const CAPACITY_AGE: Duration = Duration::from_secs(30);
 /// A frame tells the delay of the path only when it is this small: a big one takes seconds to send on a slow link, and that is not the path.
@@ -104,6 +111,11 @@ struct Flow {
     capacity: Option<(f64, Instant)>,
     /// The delivery rates the capacity is the highest of (within `RATE_WINDOW`).
     rates: VecDeque<(Instant, f64)>,
+    /// Bytes in the socket's send queue at the last acknowledgement.
+    queued: u64,
+    /// The queue is deep: the path is the limit. The window the acknowledged bytes are counted over: when it began and how many there were.
+    link_full: bool,
+    drain: Option<(Instant, u64)>,
     last_bitrate: u32,
     last_bitrate_at: Instant,
 }
@@ -128,6 +140,9 @@ impl Flow {
             skip: FIRST_FRAMES,
             capacity: None,
             rates: VecDeque::new(),
+            queued: 0,
+            link_full: false,
+            drain: None,
             last_bitrate: 0,
             last_bitrate_at: Instant::now(),
         }
@@ -175,7 +190,7 @@ impl Flow {
         let mut give = self.window.saturating_sub(self.issued);
         // Too much on its way for the link: wait for acknowledgements (the next frame then carries the picture as it is by then). The last
         // one in flight is never held back, or nothing would come back to say it is time to go on.
-        if !self.sent.is_empty() && self.budget().is_some_and(|budget| self.inflight_bytes > budget) {
+        if !self.sent.is_empty() && (self.queued > QUEUE_HOLD || self.budget().is_some_and(|budget| self.inflight_bytes > budget)) {
             give = 0;
         }
         self.issued += give;
@@ -184,16 +199,47 @@ impl Flow {
 
     /// What the kernel says the connection has been delivering. While the sender had always more to send (not application limited) that is what
     /// the link carries; when the picture was the limit it says nothing about the link, and the last measurement is kept (it expires).
+    ///
+    /// A deep send queue says the path is slower than the first hop of the connection (an SSH tunnel: the loopback to sshd, which takes data far
+    /// faster than the real link): then the kernel's rate is dropped and the rate at which the acknowledged bytes grow is the capacity.
     fn note_link(&mut self, now: Instant, link: Option<Link>) {
-        if let Some(Link { delivery_rate, app_limited: false }) = link {
-            if delivery_rate > 0.0 {
-                self.rates.push_back((now, delivery_rate));
-                while self.rates.front().is_some_and(|(at, _)| now.duration_since(*at) > RATE_WINDOW) {
-                    self.rates.pop_front();
+        let Some(link) = link else { return };
+        self.queued = link.queued;
+        let was_full = self.link_full;
+        if link.queued > QUEUE_FULL {
+            self.link_full = true;
+        } else if link.queued < QUEUE_FULL / 2 {
+            self.link_full = false;
+        }
+        if self.link_full {
+            if !was_full {
+                self.rates.clear();
+                self.drain = Some((now, link.bytes_acked));
+            } else if let Some((since, acked)) = self.drain {
+                let span = now.duration_since(since);
+                if span >= DRAIN_WINDOW {
+                    let rate = link.bytes_acked.saturating_sub(acked) as f64 / span.as_secs_f64();
+                    self.drain = Some((now, link.bytes_acked));
+                    self.add_rate(now, rate);
                 }
-                let best = self.rates.iter().map(|(_, r)| *r).fold(0.0, f64::max);
-                self.capacity = Some((best, now));
             }
+            return;
+        }
+        self.drain = None;
+        if !link.app_limited {
+            self.add_rate(now, link.delivery_rate);
+        }
+    }
+
+    /// A rate that the path carried: the capacity is the best of those of the last `RATE_WINDOW`.
+    fn add_rate(&mut self, now: Instant, rate: f64) {
+        if rate > 0.0 {
+            self.rates.push_back((now, rate));
+            while self.rates.front().is_some_and(|(at, _)| now.duration_since(*at) > RATE_WINDOW) {
+                self.rates.pop_front();
+            }
+            let best = self.rates.iter().map(|(_, r)| *r).fold(0.0, f64::max);
+            self.capacity = Some((best, now));
         }
     }
 
@@ -288,6 +334,11 @@ impl EgfxState {
         self.flow.lock().unwrap().frame_sent(frame_id, size);
     }
 
+    /// Bytes in the socket's send queue at the last acknowledgement.
+    fn queued(&self) -> u64 {
+        self.flow.lock().unwrap().queued
+    }
+
     /// A frame was acknowledged: the credits to hand out, and a new bitrate for the encoder when the link needs one.
     fn frame_acked(&self, frame_id: u32) -> (u16, Option<u32>) {
         let max = self.max_bitrate.load(Ordering::Relaxed);
@@ -369,7 +420,7 @@ impl GraphicsPipelineHandler for Handler {
         let (give, bitrate) = if queue_depth == ACKS_SUSPENDED { (1000, None) } else { self.st.frame_acked(frame_id) };
         self.st.grant(give);
         if let Some(bps) = bitrate {
-            info!(bitrate = bps, "the encoder's bitrate follows what the link delivers");
+            info!(bitrate = bps, queued_kb = self.st.queued() / 1000, "the encoder's bitrate follows what the link delivers");
             self.st.send_bitrate(bps);
         }
         let n = self.st.acked.fetch_add(1, Ordering::Relaxed) + 1;
@@ -503,6 +554,16 @@ impl Out {
 mod tests {
     use super::*;
 
+    /// What the kernel says about a connection with an empty send queue.
+    fn link(delivery_rate: f64, app_limited: bool) -> Link {
+        Link { delivery_rate, app_limited, queued: 0, bytes_acked: 0 }
+    }
+
+    /// And one with a queue, `acked` bytes acknowledged so far.
+    fn queued_link(queued: u64, acked: u64) -> Link {
+        Link { delivery_rate: 5_000_000.0, app_limited: false, queued, bytes_acked: acked }
+    }
+
     fn period(flow: &mut Flow, rtt_ms: u64) {
         flow.period_start = Instant::now() - PERIOD;
         flow.sample(Duration::from_millis(rtt_ms));
@@ -529,7 +590,7 @@ mod tests {
         flow.last_bitrate_at = Instant::now() - Duration::from_secs(5);
         // the kernel says the link delivers 200 kB/s and the sender was not the limit
         for _ in 0..4 {
-            flow.note_link(Instant::now(), Some(Link { delivery_rate: 200_000.0, app_limited: false }));
+            flow.note_link(Instant::now(), Some(link(200_000.0, false)));
         }
         let (rate, _) = flow.capacity.expect("the delivery rate was taken");
         assert!((190_000.0..210_000.0).contains(&rate), "{rate}");
@@ -539,10 +600,53 @@ mod tests {
     }
 
     #[test]
+    fn a_deep_send_queue_holds_back_the_credits_but_not_for_the_last_frame() {
+        let mut flow = Flow::new();
+        flow.skip = 100;
+        flow.window = 8;
+        flow.issued = 8;
+        for i in 0..4 {
+            flow.frame_sent(i, 1_000);
+        }
+        // the kernel says: 3 MB queued, as with an SSH tunnel in front of a slow link
+        let (give, _) = flow.frame_acked(0, 10_000_000, Some(queued_link(3_000_000, 0)));
+        assert_eq!(give, 0);
+        let (give, _) = flow.frame_acked(1, 10_000_000, Some(queued_link(3_000_000, 0)));
+        assert_eq!(give, 0);
+        flow.frame_acked(2, 10_000_000, Some(queued_link(3_000_000, 0)));
+        let (give, _) = flow.frame_acked(3, 10_000_000, Some(queued_link(3_000_000, 0))); // the last one in flight
+        assert!(give >= 1);
+        // the queue is gone: credits flow again
+        flow.frame_sent(4, 1_000);
+        flow.frame_sent(5, 1_000);
+        let (give, _) = flow.frame_acked(4, 10_000_000, Some(link(1_000_000.0, false)));
+        assert!(give >= 1);
+    }
+
+    #[test]
+    fn with_a_deep_queue_the_capacity_is_what_the_peer_acknowledges_not_the_kernels_rate() {
+        let mut flow = Flow::new();
+        let t0 = Instant::now();
+        // before the queue: the first hop (loopback to sshd) looks like 5 MB/s
+        flow.note_link(t0, Some(link(5_000_000.0, false)));
+        assert_eq!(flow.capacity.map(|(r, _)| r), Some(5_000_000.0));
+        // the queue builds up: that rate is dropped, and 600 kB acknowledged in two seconds make 300 kB/s
+        flow.note_link(t0 + Duration::from_millis(100), Some(queued_link(300_000, 1_000_000)));
+        assert_eq!(flow.capacity.map(|(r, _)| r), Some(5_000_000.0)); // nothing new yet (the window has not run its length), the old one stays
+        flow.note_link(t0 + Duration::from_millis(2_100), Some(queued_link(300_000, 1_600_000)));
+        let (rate, _) = flow.capacity.expect("a capacity from the drain");
+        assert!((290_000.0..310_000.0).contains(&rate), "{rate}");
+        assert!(flow.link_full);
+        // and the queue is empty again
+        flow.note_link(t0 + Duration::from_millis(2_200), Some(link(200_000.0, true)));
+        assert!(!flow.link_full);
+    }
+
+    #[test]
     fn a_dip_in_the_delivery_rate_does_not_lower_the_capacity() {
         let mut flow = Flow::new();
         for rate in [400_000.0, 150_000.0, 250_000.0] {
-            flow.note_link(Instant::now(), Some(Link { delivery_rate: rate, app_limited: false }));
+            flow.note_link(Instant::now(), Some(link(rate, false)));
         }
         assert_eq!(flow.capacity.map(|(r, _)| r), Some(400_000.0));
     }
@@ -550,7 +654,7 @@ mod tests {
     #[test]
     fn a_rate_held_down_by_the_picture_says_nothing_about_the_link() {
         let mut flow = Flow::new();
-        flow.note_link(Instant::now(), Some(Link { delivery_rate: 50_000.0, app_limited: true }));
+        flow.note_link(Instant::now(), Some(link(50_000.0, true)));
         flow.note_link(Instant::now(), None);
         assert!(flow.capacity.is_none());
         assert_eq!(flow.budget(), None);
