@@ -64,7 +64,9 @@ const MIN_BITRATE: u32 = 300_000;
 /// How long the frames waiting for the link may take to get there, at the delivery rate measured: the byte budget in flight.
 const QUEUE_SECONDS: f64 = 0.4;
 /// Share of the delivery rate the encoder aims for.
-const BITRATE_SHARE: f64 = 0.7;
+const BITRATE_SHARE: f64 = 0.8;
+/// The link's capacity is the best delivery rate of this long: a single sample dips whenever the kernel recovers a lost packet.
+const RATE_WINDOW: Duration = Duration::from_secs(10);
 /// A delivery rate measured while the link was full is trusted this long.
 const CAPACITY_AGE: Duration = Duration::from_secs(30);
 /// A frame tells the delay of the path only when it is this small: a big one takes seconds to send on a slow link, and that is not the path.
@@ -100,6 +102,8 @@ struct Flow {
     skip: u32,
     /// What the link delivered when it was full, in bytes per second, and when that was measured.
     capacity: Option<(f64, Instant)>,
+    /// The delivery rates the capacity is the highest of (within `RATE_WINDOW`).
+    rates: VecDeque<(Instant, f64)>,
     last_bitrate: u32,
     last_bitrate_at: Instant,
 }
@@ -123,6 +127,7 @@ impl Flow {
             base: None,
             skip: FIRST_FRAMES,
             capacity: None,
+            rates: VecDeque::new(),
             last_bitrate: 0,
             last_bitrate_at: Instant::now(),
         }
@@ -182,11 +187,12 @@ impl Flow {
     fn note_link(&mut self, now: Instant, link: Option<Link>) {
         if let Some(Link { delivery_rate, app_limited: false }) = link {
             if delivery_rate > 0.0 {
-                let smoothed = match self.capacity {
-                    Some((c, at)) if at.elapsed() < CAPACITY_AGE => (c + delivery_rate) / 2.0,
-                    _ => delivery_rate,
-                };
-                self.capacity = Some((smoothed, now));
+                self.rates.push_back((now, delivery_rate));
+                while self.rates.front().is_some_and(|(at, _)| now.duration_since(*at) > RATE_WINDOW) {
+                    self.rates.pop_front();
+                }
+                let best = self.rates.iter().map(|(_, r)| *r).fold(0.0, f64::max);
+                self.capacity = Some((best, now));
             }
         }
     }
@@ -529,7 +535,16 @@ mod tests {
         assert!((190_000.0..210_000.0).contains(&rate), "{rate}");
         assert_eq!(flow.budget(), Some((rate * QUEUE_SECONDS) as u64)); // 0.4 s of it: 80 kB
         let bitrate = flow.bitrate_for(Instant::now(), 10_000_000).expect("a new bitrate");
-        assert!((1_000_000..1_200_000).contains(&bitrate), "{bitrate}"); // 0.7 of 1.6 Mbit/s
+        assert!((1_200_000..1_400_000).contains(&bitrate), "{bitrate}"); // 0.8 of 1.6 Mbit/s
+    }
+
+    #[test]
+    fn a_dip_in_the_delivery_rate_does_not_lower_the_capacity() {
+        let mut flow = Flow::new();
+        for rate in [400_000.0, 150_000.0, 250_000.0] {
+            flow.note_link(Instant::now(), Some(Link { delivery_rate: rate, app_limited: false }));
+        }
+        assert_eq!(flow.capacity.map(|(r, _)| r), Some(400_000.0));
     }
 
     #[test]
