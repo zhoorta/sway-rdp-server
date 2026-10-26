@@ -25,7 +25,6 @@
     <a href="#apps">apps</a>
     <a href="#connect">connect</a>
     <a href="#install">install</a>
-    <a href="#support">support</a>
     <a href="#architecture">architecture</a>
     <a href="#measurements">measurements</a>
     <a href="#security">security</a>
@@ -59,27 +58,27 @@
 <div class="grid">
   <div class="win card">
     <div class="bar"><span class="t">slow or lossy links</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>TCP BBR for the connection</h3><p>On one distant link with about 4&nbsp;% packet loss the connection went from 0.3 to <span class="num">2 to 4 Mbit/s</span>, and typed letters stopped arriving in bursts.</p><p class="more">One link, one afternoon: method under Measurements.</p></div>
+    <div class="body"><h3>TCP BBR for the connection</h3><p>On a distant link with about 4&nbsp;% loss the connection went from 0.3 to <span class="num">2 to 4 Mbit/s</span>, and typing stopped arriving in bursts.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">flow control</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>The picture follows the link</h3><p>Frames and bytes in flight follow the path, and the video bitrate follows what the link delivers, from <span class="num">300 kbit/s</span> up to the configured 10 Mbit/s. No queue of seconds.</p></div>
+    <div class="body"><h3>The picture follows the link</h3><p>Frames and bytes in flight follow the path; the video bitrate follows what the link delivers, from <span class="num">300 kbit/s</span> to 10 Mbit/s.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">H.264</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Tuned for screens, in software</h3><p>Screen-content mode, only the changed rectangles, a refinement when the picture stops: about <span class="num">half the bandwidth</span> of the camera mode for moving pictures. No GPU needed.</p></div>
+    <div class="body"><h3>Tuned for screens, in software</h3><p>Screen-content mode, only the changed rectangles: about <span class="num">half the bandwidth</span> of the camera mode. No GPU.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">pointer</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>The pointer has no delay</h3><p>The client draws it, with the real shape (text cursor, resize arrows, hand): it moves at once and only the shape arrives a round trip late.</p></div>
+    <div class="body"><h3>The pointer has no delay</h3><p>The client draws it with its real shape, so it moves at once; only the shape arrives a round trip late.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">memory</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Ceilings, compressed swap, a refusal</h3><p>A memory ceiling per account, idle pages in compressed swap, and a new login refused when the machine is full: <span class="num">7 to 8 heavy sessions</span> on an 8 GB server.</p></div>
+    <div class="body"><h3>Ceilings, compressed swap, a refusal</h3><p>A memory ceiling per account, compressed swap, and a refusal when the machine is full: <span class="num">7 to 8 heavy sessions</span> on 8 GB.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">isolation</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>One session per account</h3><p>Each account in its own session and its own systemd slice. The daemon has no privileges; a small root helper starts sessions as the account.</p></div>
+    <div class="body"><h3>One session per account</h3><p>Each account in its own session and systemd slice; the daemon has no privileges, and a small root helper starts sessions.</p></div>
   </div>
 </div>
 
@@ -90,38 +89,71 @@
 <div class="grid">
   <div class="win card">
     <div class="bar"><span class="t">X11</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>X11 applications run</h3><p>Applications that only speak X11 run through XWayland: one Xwayland server per account, started when the first one opens, and closed to the other accounts. Checked with CoreX Hardware Monitor, <code>xeyes</code> and GIMP.</p></div>
+    <div class="body"><h3>X11 applications run</h3><p>Applications that only speak X11 run through XWayland, one server per account, closed to the others. Checked with CoreX, <code>xeyes</code> and GIMP.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">Flathub</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Flatpak, out of the box</h3><p>Flathub works as it is. Checked in a session: Chromium, VS Code, LibreOffice Calc, Obsidian, Slack, GNOME Text Editor and GIMP.</p></div>
+    <div class="body"><h3>Flatpak, out of the box</h3><p>Flathub works as it is. Checked: Chromium, VS Code, LibreOffice Calc, Obsidian, Slack, GNOME Text Editor and GIMP.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">windows</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Real windows</h3><p>Every window has a title bar with minimize, maximize and close, in the colours of the theme (dark or light), and soft shadows. A dock shows what is open and bounces while an application starts.</p></div>
+    <div class="body"><h3>Real windows</h3><p>Title bars with minimize, maximize and close in the theme's colours (dark or light), soft shadows, and a dock that bounces while an app starts.</p></div>
   </div>
 </div>
 
 <section class="band" id="connect">
 <h2>Connect your way</h2>
-<p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect, and <code>waydesk-admin access</code> changes it later. The details are in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md">docs/ACCESS.md</a>.</p>
+<p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect; <code>waydesk-admin access</code> changes it later (<a href="https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md">docs/ACCESS.md</a>).</p>
 </section>
+<div class="dg">
+<svg viewBox="0 0 520 250" role="img" aria-labelledby="adt ads">
+<title id="adt">How a client reaches the RDP port</title>
+<desc id="ads">The RDP client reaches the waydesk daemon in one of three ways: through an SSH tunnel (the default, the port listens on this machine only), over the local network (only the allowed addresses), or over a WireGuard VPN (recommended). On the server the daemon checks the source address against the allowed list, then the TLS certificate, then the account's password, and only then starts a session.</desc>
+<defs><marker id="ah2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ee9a45"/></marker></defs>
+<rect class="zone" x="330" y="8" width="182" height="234" rx="8"/>
+<text class="zl" x="344" y="28">this server</text>
+<rect class="box" x="8" y="97" width="104" height="56" rx="6"/>
+<text class="nm" x="60" y="122" text-anchor="middle">RDP client</text>
+<text class="dm" x="60" y="140" text-anchor="middle">any client</text>
+<rect class="box" x="170" y="26" width="136" height="52" rx="6"/>
+<text class="nm" x="238" y="49" text-anchor="middle">SSH tunnel</text>
+<text class="dm" x="238" y="66" text-anchor="middle">the default</text>
+<rect class="box" x="170" y="99" width="136" height="52" rx="6"/>
+<text class="nm" x="238" y="122" text-anchor="middle">local network</text>
+<text class="dm" x="238" y="139" text-anchor="middle">allowlist</text>
+<rect class="box" x="170" y="172" width="136" height="52" rx="6"/>
+<text class="nm" x="238" y="195" text-anchor="middle">WireGuard VPN</text>
+<text class="dm" x="238" y="212" text-anchor="middle">recommended</text>
+<rect class="box root" x="346" y="46" width="152" height="182" rx="6"/>
+<text class="nm" x="422" y="70" text-anchor="middle">waydesk daemon</text>
+<text class="dm" x="422" y="108" text-anchor="middle">1 source address</text>
+<text class="dm" x="422" y="132" text-anchor="middle">2 TLS certificate</text>
+<text class="dm" x="422" y="156" text-anchor="middle">3 account password</text>
+<text class="rn" x="422" y="196" text-anchor="middle">then a session</text>
+<path class="arrow" d="M112 118 L170 52" marker-end="url(#ah2)"/>
+<path class="arrow" d="M112 125 L170 125" marker-end="url(#ah2)"/>
+<path class="arrow" d="M112 132 L170 198" marker-end="url(#ah2)"/>
+<path class="arrow" d="M306 52 L346 100" marker-end="url(#ah2)"/>
+<path class="arrow" d="M306 125 L346 125" marker-end="url(#ah2)"/>
+<path class="arrow" d="M306 198 L346 150" marker-end="url(#ah2)"/>
+</svg>
+</div>
 <div class="grid">
   <div class="win card">
     <div class="bar"><span class="t">this machine or an SSH tunnel</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>The default <span class="tag def">default</span></h3><p>The port listens on <code>127.0.0.1</code> only. One <code>ssh -L</code> and the client connects to localhost. Nothing to configure.</p></div>
+    <div class="body"><h3>The default <span class="tag def">default</span></h3><p>Listens on <code>127.0.0.1</code> only. One <code>ssh -L</code> and the client connects to localhost.</p></div>
   </div>
   <div class="win card">
-    <div class="bar"><span class="t">a trusted local network</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Directly, on a LAN</h3><p><code>sudo waydesk-admin access lan</code> opens the port to this server's network and nothing else: the daemon closes every other source address before TLS and before any login. Narrow it further with a list of ranges.</p></div>
+    <div class="bar"><span class="t">a local network</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3>Directly, on a LAN</h3><p><code>waydesk-admin access lan</code> opens the port to this network only; other addresses are closed before TLS.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">a VPN</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>WireGuard in two commands <span class="tag rec">recommended</span></h3><p><code>waydesk-admin vpn init</code> makes the VPN and opens the port to it only; <code>vpn add NAME</code> makes a client, with a QR code. <code>vpn remove</code> cuts a client off at once. Keep the port off the open internet: it is a password login with no second factor.</p></div>
+    <div class="body"><h3>WireGuard <span class="tag rec">recommended</span></h3><p><code>vpn init</code>, then <code>vpn add NAME</code>: a client with a QR code. <code>vpn remove</code> cuts one off.</p></div>
   </div>
   <div class="win card">
-    <div class="bar"><span class="t">a certificate clients can verify</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>No fingerprint to compare</h3><p><code>waydesk-admin cert local-ca</code> makes a certificate authority of your own and a certificate for this server. Each client imports the authority once, then checks every connection. A certificate from Let's Encrypt works too.</p></div>
+    <div class="bar"><span class="t">a certificate</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3>One you can verify</h3><p><code>cert local-ca</code> makes an authority of your own; clients import it once and check every connection.</p></div>
   </div>
 </div>
 
@@ -130,75 +162,43 @@
 <div class="win">
 <div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
 <div class="body">
+<h3>1. Add the repository and check the key</h3>
 <pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
 <span class="p">$</span> sudo apt install ./waydesk-repo.deb
-<span class="p">$</span> sudo apt install waydesk
-<span class="p">$</span> sudo waydesk-setup-admin
-<span class="p">$</span> sudo waydesk-admin status
+<span class="p">$</span> gpg --show-keys --with-fingerprint /usr/share/keyrings/waydesk-archive-keyring.gpg</code></pre>
+<p>The first download cannot be verified by the repository itself, so compare the key with this fingerprint (ed25519, expires 2029-10-21). If it differs, stop and tell us.</p>
+<div class="fp">C646 72B2 5ECD 4773 196C&nbsp; 3958 9D8E 8874 E676 17F4</div>
+<h3>2. Install, and make the first administrator</h3>
+<pre><code><span class="p">$</span> sudo apt install waydesk
+<span class="p">$</span> sudo waydesk-setup-admin       <span class="c"># asks how you will connect; there is no default account or password</span>
+<span class="p">$</span> sudo waydesk-setup             <span class="c"># optional: choose the shell, browsers, office and developer apps</span></code></pre>
+<h3>3. See what it does</h3>
+<pre><code><span class="p">$</span> sudo waydesk-admin status
 <span class="c">Memory    7.6 GB in all, 504 MB available
 Swap      zram0 7.6 GB (7.5 GB used)
-Load      1.01 1.26 1.29 (4 cores)
 Sessions  7 running; a new one would be REFUSED: 504 MB available, 1161 MB needed
 
 ACCOUNT   SESSION  MEMORY  SWAP    CPU  LIMIT   PROGRAMS (resident)
 u1        running  416 MB  1.0 GB   3%  3.8 GB  code 194 MB, qs 132 MB, chrome 120 MB
 u2        running  472 MB  1.0 GB   4%  3.8 GB  code 263 MB, qs 133 MB, chrome 126 MB
-u3        running  438 MB  1.1 GB   3%  3.8 GB  code 186 MB, chrome 176 MB, qs 134 MB
-u4        running  455 MB  1.1 GB   3%  3.8 GB  chrome 219 MB, code 206 MB, qs 138 MB
-u5        running  477 MB  1.0 GB   4%  3.8 GB  chrome 277 MB, code 252 MB, qs 138 MB
-u6        running  858 MB  672 MB   7%  3.8 GB  code 529 MB, chrome 437 MB, qs 173 MB
 u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 265 MB</span></code></pre>
-<p class="method">Real output: Ubuntu 26.04, 4 vCPU, 7.6 GB, seven accounts each with Chromium, LibreOffice Calc and VS Code open, 2026-10-24. Accounts that were idle for a while have most of their memory in compressed swap, which is why the eighth one is refused only now.</p>
-
-<p>Run as an administrator of the server. The port listens on 127.0.0.1 only; see <a href="#security">reaching it</a>.</p>
-
-<h3>1. Add the repository</h3>
-<p>One small package: the signing key, the apt source for your release (<code>trixie</code> or <code>resolute</code>, chosen from <code>VERSION_CODENAME</code>) and a pin so these packages win over third-party builds of the same names.</p>
-<pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
-<span class="p">$</span> sudo apt install ./waydesk-repo.deb</code></pre>
-
-<h3>2. Check the key</h3>
-<p>This first download cannot be verified by the repository itself. Compare the key you got with this fingerprint (ed25519, expires 2029-10-21):</p>
-<pre><code><span class="p">$</span> gpg --show-keys --with-fingerprint /usr/share/keyrings/waydesk-archive-keyring.gpg</code></pre>
-<div class="fp">C646 72B2 5ECD 4773 196C&nbsp; 3958 9D8E 8874 E676 17F4</div>
-<p class="dim">If it differs, stop and tell us.</p>
-
-<h3>3. Install</h3>
-<pre><code><span class="p">$</span> sudo apt update
-<span class="p">$</span> sudo apt install waydesk</code></pre>
-<p>Installs the RDP daemon, the root helper, <code>waydesk-admin</code>, our sway build, zram swap and the desktop package. <code>waydesk-server</code> alone is enough for a session with a plain terminal (a minimal sway config ships with it).</p>
-
-<h3>4. Shell and first administrator</h3>
-<pre><code><span class="p">$</span> sudo waydesk-setup           <span class="c"># wizard: shell, Chromium, LibreOffice, VS Code, ...</span>
-<span class="p">$</span> sudo waydesk-setup-admin     <span class="c"># the account that logs in over RDP and manages the others</span></code></pre>
-<p>There is no default account and no default password. <code>waydesk-setup-admin</code> prints the certificate fingerprint to expect on the first connection.</p>
-
-</div>
-</div>
-</section>
-
-<section class="sect" id="support">
-<h2>Support</h2>
-<div class="win">
-<div class="bar"><span class="t">contact</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
+<p class="method">Real output, trimmed: Ubuntu 26.04, 4 vCPU, 7.6 GB, seven accounts each with Chromium, LibreOffice Calc and VS Code open.</p>
+<h3>Tested on</h3>
 <div class="tw"><table>
-<tr><th>Distribution</th><th>amd64</th><th>arm64</th><th>Notes</th></tr>
-<tr><td>Debian 13 (trixie)</td><td class="ok">tested</td><td class="ok">tested</td><td>clean install from the published repository, RDP session with the shell, Chromium, LibreOffice, VS Code</td></tr>
-<tr><td>Ubuntu 26.04 LTS (resolute)</td><td class="ok">tested</td><td class="ok">tested</td><td>sway, quickshell and pcmanfm-qt are our builds under <code>/usr/lib/waydesk</code>; Chromium and Firefox come from Flathub (no Chromium deb)</td></tr>
+<tr><th>System</th><th>amd64</th><th>arm64</th><th>Notes</th></tr>
+<tr><td>Debian 13 (trixie)</td><td class="ok">tested</td><td class="ok">tested</td><td>clean install from the repository, a session with the shell, Chromium, LibreOffice, VS Code</td></tr>
+<tr><td>Ubuntu 26.04 LTS</td><td class="ok">tested</td><td class="ok">tested</td><td>Chromium and Firefox come from Flathub (no Chromium deb)</td></tr>
 <tr><td>Ubuntu 24.04, Fedora, Arch</td><td colspan="2" class="dim">not yet</td><td>different Qt and wlroots; no rpm yet</td></tr>
 </table></div>
-<p class="method">"Tested": a clean server, SSH hardened first, then exactly the four steps above, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on macOS was also used; Microsoft Remote Desktop and mstsc on Windows were not tested.</p>
-
+<p class="method">Tested means a clean server, SSH hardened first, these steps, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on macOS was also used; Microsoft's Windows clients were not tested.</p>
 </div>
 </div>
 </section>
 
-<section class="sect" id="architecture">
+<section class="band" id="architecture">
 <h2>Architecture</h2>
-<div class="win">
-<div class="bar"><span class="t">diagram</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
+<p>Three parts with different rights: the network-facing daemon has none, a small root helper checks passwords and starts sessions, and each session runs as the account itself.</p>
+</section>
 <div class="dg">
 <svg viewBox="0 0 520 556" role="img" aria-labelledby="dgt dgd">
 <title id="dgt">How a login reaches a session</title>
@@ -250,55 +250,50 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <text x="484" y="451" text-anchor="end">audio, clipboard</text>
 </svg>
 </div>
-<div class="tw"><table>
-<tr><th>Part</th><th>Runs as</th><th>Does</th><th>Never does</th></tr>
-<tr><td><code>waydesk</code></td><td>waydesk</td><td>TLS, RDP protocol, channel framing, rate limits per address</td><td>touch user files, call PAM, keep passwords after the check</td></tr>
-<tr><td><code>waydesk-helper</code></td><td>root</td><td>checks the password through PAM, starts and finds sessions, admits or refuses by memory</td><td>parse RDP or TLS, listen on the network</td></tr>
-<tr><td><code>waydesk-session@UID</code></td><td>the account</td><td>its sway, capture, encoder, input, audio, clipboard, hooks</td><td>anything as another user</td></tr>
-</table></div>
-<p>A session is a systemd unit of the account, so it survives a disconnect, sits in <code>user-UID.slice</code> (limits there apply) and is killed with its control group. A second login from the same account takes the running session over. Design notes: <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MULTIUSER-DESIGN.md"><code>docs/MULTIUSER-DESIGN.md</code></a> in the repository.</p>
-
+<div class="grid">
+  <div class="win card">
+    <div class="bar"><span class="t">runs as waydesk, no privileges</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3><code>waydesk</code></h3><p><span class="k2">does</span> TLS, the RDP protocol, channel framing, rate limits per address.</p><p><span class="k2">never</span> touches user files, calls PAM, keeps a password after the check.</p></div>
+  </div>
+  <div class="win card">
+    <div class="bar"><span class="t">runs as root, no network</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3><code>waydesk-helper</code></h3><p><span class="k2">does</span> checks the password through PAM, starts and finds sessions, admits or refuses by memory.</p><p><span class="k2">never</span> parses RDP or TLS, listens on the network.</p></div>
+  </div>
+  <div class="win card">
+    <div class="bar"><span class="t">runs as the account</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3><code>waydesk-session@UID</code></h3><p><span class="k2">does</span> its sway, capture, encoder, input, audio, clipboard, hooks.</p><p><span class="k2">never</span> anything as another user.</p></div>
+  </div>
 </div>
-</div>
-</section>
+<p class="note">A session is a systemd unit of the account: it survives a disconnect, sits in <code>user-UID.slice</code> (limits there apply) and is killed with its control group. A second login from the same account takes the running session over. Design notes: <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MULTIUSER-DESIGN.md"><code>docs/MULTIUSER-DESIGN.md</code></a>.</p>
 
 <section class="sect" id="measurements">
 <h2>Measurements</h2>
 <div class="win">
 <div class="bar"><span class="t">figures and methods</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
 <div class="body">
-<p>All figures are from our own servers (Hetzner cloud, no GPU), with the method next to them. Full tables and the failed attempts are in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MEASUREMENTS.md"><code>docs/MEASUREMENTS.md</code></a> in the repository.</p>
-
-<h3>Heavy users on 8 GB, 4 vCPU (x86_64)</h3>
-<p>Available memory (<code>free</code>'s figure) after each user has logged in over RDP and opened Chromium (Wikipedia, BBC News, debian.org), LibreOffice Calc with a 300,000 x 10 CSV and VS Code on a source tree.</p>
-<div class="tw"><table>
-<tr><th class="n">users</th><th class="n">Debian 13</th><th class="n">Ubuntu 26.04</th></tr>
-<tr><td class="n">1</td><td class="n">5.4 GB</td><td class="n">5.2 GB</td></tr>
-<tr><td class="n">2</td><td class="n">3.9 GB</td><td class="n">3.4 GB</td></tr>
-<tr><td class="n">3</td><td class="n">2.4 GB</td><td class="n">2.1 GB</td></tr>
-<tr><td class="n">4</td><td class="n">1.6 GB</td><td class="n">2.2 GB</td></tr>
-<tr><td class="n">5</td><td class="n">1.7 GB</td><td class="n">2.0 GB</td></tr>
-<tr><td class="n">6</td><td class="n">1.6 GB</td><td class="n">1.7 GB</td></tr>
-<tr><td class="n">7</td><td class="n">1.6 GB</td><td class="n warn">810 MB, next refused</td></tr>
-<tr><td class="n">8</td><td class="n">1.1 GB</td><td class="n bad">refused</td></tr>
-<tr><td class="n">9</td><td class="n bad">refused</td><td class="n dim"></td></tr>
-</table></div>
-<p class="method">Method: one account at a time, 70 s after its last application started, applications left idle (an upper bound for idle load, no figure for active work). The server refuses a session when less than about 1.1 GB is available; the refusal reaches the client as <code>ERRINFO_OUT_OF_MEMORY</code>. No out-of-memory kill in any run; memory pressure ("some", 60 s average) 0.3 to 2.4&nbsp;%. One heavy user costs 1.85 GB (Debian) to 2.0 GB (Ubuntu, Flatpak builds of Chromium and VS Code, a 30 MB tree instead of 25 MB).</p>
-
-<h3>Compressed swap</h3>
-<p>zram with zstd compresses this load about 4.5 to 5 : 1 (Ubuntu: 6.6 GB of data in 1.3 GB of RAM at seven users). The package sizes the device like the RAM (at most 16 GiB). With Debian's default of half the RAM, six heavy users fit instead of eight.</p>
-
-<h3>Other figures</h3>
-<div class="tw"><table>
-<tr><th>What</th><th>Result</th><th>Method</th></tr>
-<tr><td>idle session with the shell</td><td>430 to 600 MB</td><td>cgroup of the account, Debian 13 arm64 and Ubuntu 26.04 x86, nothing else open</td></tr>
-<tr><td>browser users on arm64, 3.7 GB</td><td>4 fit, the 5th refused (754 MB available, 900 MB needed)</td><td>Chromium, same three pages, one account at a time</td></tr>
-<tr><td>moving screens, 2 vCPU</td><td>two busy screens use about 90&nbsp;% of the CPU, three drop to a choppy frame rate</td><td>video in a window, software H.264 (no hardware encoder)</td></tr>
-<tr><td>stalled client</td><td>connection closed 80 s after the freeze (TCP_USER_TIMEOUT 60 s)</td><td>client frozen but answering zero-window probes, Debian 13 arm64</td></tr>
-<tr><td>RDP over a link with 4&nbsp;% packet loss</td><td>0.3 to 2 to 4 Mbit/s with BBR instead of CUBIC; typed letters no longer arrive in bursts</td><td>one distant link, the connection inside WireGuard, <code>ss -ti</code> before and after, one afternoon; kernel 6.12</td></tr>
-</table></div>
+<p class="small">Our own servers (Hetzner cloud, no GPU). Each chart says how it was measured; all tables and the failed attempts are in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MEASUREMENTS.md"><code>docs/MEASUREMENTS.md</code></a>.</p>
+<div class="tiles"><div class="tile"><div class="big">430 to 600 MB</div><div class="cap2">an idle session with the shell</div></div><div class="tile"><div class="big">7 to 8</div><div class="cap2">heavy users on an 8 GB server</div></div><div class="tile"><div class="big">4.5 : 1</div><div class="cap2">compressed swap, zstd</div></div><div class="tile"><div class="big">60 s</div><div class="cap2">a frozen client is cut off</div></div></div>
+<div class="charts">
+<figure><h3>Where the memory goes</h3><svg viewBox="0 0 352 330" role="img" aria-labelledby="c1t c1d">
+<title id="c1t">Available memory as heavy users log in, 8 GB server</title>
+<desc id="c1d">On Debian 13 the available memory falls from 5.4 GB with one user to 1.1 GB with eight; the ninth login is refused. On Ubuntu 26.04 it falls from 5.2 GB to 0.8 GB with seven users; the eighth is refused. A new login is refused when less than about 1.2 GB is available.</desc>
+<line class="gl" x1="42" x2="342" y1="272.0" y2="272.0"/><text class="ax" x="35" y="277.0" text-anchor="end">0</text><line class="gl" x1="42" x2="342" y1="229.0" y2="229.0"/><text class="ax" x="35" y="234.0" text-anchor="end">1</text><line class="gl" x1="42" x2="342" y1="186.0" y2="186.0"/><text class="ax" x="35" y="191.0" text-anchor="end">2</text><line class="gl" x1="42" x2="342" y1="143.0" y2="143.0"/><text class="ax" x="35" y="148.0" text-anchor="end">3</text><line class="gl" x1="42" x2="342" y1="100.0" y2="100.0"/><text class="ax" x="35" y="105.0" text-anchor="end">4</text><line class="gl" x1="42" x2="342" y1="57.0" y2="57.0"/><text class="ax" x="35" y="62.0" text-anchor="end">5</text><line class="gl" x1="42" x2="342" y1="14.0" y2="14.0"/><text class="ax" x="35" y="19.0" text-anchor="end">6</text><text class="ax" x="42.0" y="292" text-anchor="middle">1</text><text class="ax" x="79.5" y="292" text-anchor="middle">2</text><text class="ax" x="117.0" y="292" text-anchor="middle">3</text><text class="ax" x="154.5" y="292" text-anchor="middle">4</text><text class="ax" x="192.0" y="292" text-anchor="middle">5</text><text class="ax" x="229.5" y="292" text-anchor="middle">6</text><text class="ax" x="267.0" y="292" text-anchor="middle">7</text><text class="ax" x="304.5" y="292" text-anchor="middle">8</text><text class="ax" x="342.0" y="292" text-anchor="middle">9</text>
+<line class="th" x1="42" x2="342" y1="222.1" y2="222.1"/>
+<text class="lb warn2" x="50" y="242.1">refused below 1.2 GB</text>
+<line class="ln deb" x1="170" x2="196" y1="40" y2="40"/><text class="lb deb" x="204" y="45">Debian 13</text>
+<line class="ln ubu" x1="170" x2="196" y1="64" y2="64"/><text class="lb ubu" x="204" y="69">Ubuntu 26.04</text>
+<polyline class="ln deb" points="42.0,39.8 79.5,104.3 117.0,168.8 154.5,203.2 192.0,198.9 229.5,203.2 267.0,203.2 304.5,224.7"/><polyline class="ln ubu" points="42.0,48.4 79.5,125.8 117.0,181.7 154.5,177.4 192.0,186.0 229.5,198.9 267.0,237.2"/>
+<circle class="dt deb" cx="42.0" cy="39.8" r="3.5"/><circle class="dt deb" cx="79.5" cy="104.3" r="3.5"/><circle class="dt deb" cx="117.0" cy="168.8" r="3.5"/><circle class="dt deb" cx="154.5" cy="203.2" r="3.5"/><circle class="dt deb" cx="192.0" cy="198.9" r="3.5"/><circle class="dt deb" cx="229.5" cy="203.2" r="3.5"/><circle class="dt deb" cx="267.0" cy="203.2" r="3.5"/><circle class="dt deb" cx="304.5" cy="224.7" r="3.5"/>
+<circle class="dt ubu" cx="42.0" cy="48.4" r="3.5"/><circle class="dt ubu" cx="79.5" cy="125.8" r="3.5"/><circle class="dt ubu" cx="117.0" cy="181.7" r="3.5"/><circle class="dt ubu" cx="154.5" cy="177.4" r="3.5"/><circle class="dt ubu" cx="192.0" cy="186.0" r="3.5"/><circle class="dt ubu" cx="229.5" cy="198.9" r="3.5"/><circle class="dt ubu" cx="267.0" cy="237.2" r="3.5"/>
+<text class="ax" x="192" y="324" text-anchor="middle">heavy users logged in</text>
+<text class="ax" x="11" y="143" text-anchor="middle" transform="rotate(-90 11 143)">available memory, GB</text>
+</svg><figcaption>Available memory (<code>free</code>) after each user logged in over RDP and opened Chromium, LibreOffice Calc with a 300,000-row sheet and VS Code, one at a time, left idle. 4 vCPU, 7.6 GB.</figcaption></figure>
+<figure><h3>A slow, lossy link</h3><svg viewBox="0 0 352 330" role="img" aria-labelledby="c2t c2d"><title id="c2t">TCP BBR against CUBIC on a link with 4 % packet loss</title><desc id="c2d">Throughput rose from about 0.3 Mbit/s with CUBIC to 2 to 4 Mbit/s with BBR, and the data waiting unsent on the server fell from 50 to 120 kB to 1 to 13 kB.</desc>
+<text class="lb" x="0" y="16">carried, Mbit/s</text><text class="ax" x="0" y="53">CUBIC</text><rect class="bar cu" x="66" y="32" width="14" height="30" rx="3"/><text class="ax" x="88" y="53">0.3</text><text class="ax" x="0" y="97">BBR</text><rect class="bar bb" x="66" y="76" width="142" height="30" rx="3"/><text class="ax" x="216" y="97">2 to 4</text><text class="lb" x="0" y="176">waiting unsent, kB</text><text class="ax" x="0" y="213">CUBIC</text><rect class="bar cu" x="66" y="192" width="135" height="30" rx="3"/><text class="ax" x="209" y="213">50 to 120</text><text class="ax" x="0" y="257">BBR</text><rect class="bar bb" x="66" y="236" width="11" height="30" rx="3"/><text class="ax" x="85" y="257">1 to 13</text></svg><figcaption>One distant link with about 4&nbsp;% packet loss, the connection inside WireGuard, <code>ss -ti</code> before and after switching CUBIC to BBR. One afternoon.</figcaption></figure>
+<figure><h3>H.264 for screens</h3><svg viewBox="0 0 352 330" role="img" aria-labelledby="c3t c3d"><title id="c3t">H.264 screen-content mode against camera mode</title><desc id="c3d">For a full-screen 720p30 test pattern the screen-content mode needed 6.4 Mbit/s and 43 % of a core; the camera mode needed 12.7 Mbit/s and 15 % of a core.</desc>
+<text class="lb" x="0" y="16">bandwidth, Mbit/s</text><text class="ax" x="0" y="53">screen</text><rect class="bar bb" x="66" y="32" width="94" height="30" rx="3"/><text class="ax" x="168" y="53">6.4</text><text class="ax" x="0" y="97">camera</text><rect class="bar cu" x="66" y="76" width="186" height="30" rx="3"/><text class="ax" x="260" y="97">12.7</text><text class="lb" x="0" y="176">CPU, % of one core</text><text class="ax" x="0" y="213">screen</text><rect class="bar bb" x="66" y="192" width="163" height="30" rx="3"/><text class="ax" x="237" y="213">43</text><text class="ax" x="0" y="257">camera</text><rect class="bar cu" x="66" y="236" width="57" height="30" rx="3"/><text class="ax" x="131" y="257">15</text></svg><figcaption>A full-screen 720p30 test pattern, software OpenH264 on 2 vCPUs. Screen mode costs a near-constant share of a core, so a mostly still desktop costs more CPU in screen mode than in camera mode.</figcaption></figure>
+</div>
 <p class="method">Not measured: CPU under active work (a build, a recalculation), typing and scrolling latency, frame rate on x86 with moving screens.</p>
-
 </div>
 </div>
 </section>
@@ -306,50 +301,14 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <section class="sect" id="security">
 <h2>Security</h2>
 <div class="win">
-<div class="bar"><span class="t">access</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body"><h3>Reaching it</h3>
-<p class="small">Keep the RDP port off the open internet: the login is the account's password inside TLS, with no second factor. It listens on this machine only until you choose otherwise, and the daemon closes every source address that is not allowed before TLS and before any login.</p>
-<div class="dg">
-<svg viewBox="0 0 520 250" role="img" aria-labelledby="adt ads">
-<title id="adt">How a client reaches the RDP port</title>
-<desc id="ads">The RDP client reaches the waydesk daemon in one of three ways: through an SSH tunnel (the default, the port listens on this machine only), over the local network (only the allowed addresses), or over a WireGuard VPN (recommended). On the server the daemon checks the source address against the allowed list, then the TLS certificate, then the account's password, and only then starts a session.</desc>
-<defs><marker id="ah2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ee9a45"/></marker></defs>
-<rect class="zone" x="330" y="8" width="182" height="234" rx="8"/>
-<text class="zl" x="344" y="28">this server</text>
-<rect class="box" x="8" y="97" width="104" height="56" rx="6"/>
-<text class="nm" x="60" y="122" text-anchor="middle">RDP client</text>
-<text class="dm" x="60" y="140" text-anchor="middle">any client</text>
-<rect class="box" x="170" y="26" width="136" height="52" rx="6"/>
-<text class="nm" x="238" y="49" text-anchor="middle">SSH tunnel</text>
-<text class="dm" x="238" y="66" text-anchor="middle">the default</text>
-<rect class="box" x="170" y="99" width="136" height="52" rx="6"/>
-<text class="nm" x="238" y="122" text-anchor="middle">local network</text>
-<text class="dm" x="238" y="139" text-anchor="middle">allowlist</text>
-<rect class="box" x="170" y="172" width="136" height="52" rx="6"/>
-<text class="nm" x="238" y="195" text-anchor="middle">WireGuard VPN</text>
-<text class="dm" x="238" y="212" text-anchor="middle">recommended</text>
-<rect class="box root" x="346" y="46" width="152" height="182" rx="6"/>
-<text class="nm" x="422" y="70" text-anchor="middle">waydesk daemon</text>
-<text class="dm" x="422" y="108" text-anchor="middle">1 source address</text>
-<text class="dm" x="422" y="132" text-anchor="middle">2 TLS certificate</text>
-<text class="dm" x="422" y="156" text-anchor="middle">3 account password</text>
-<text class="rn" x="422" y="196" text-anchor="middle">then a session</text>
-<path class="arrow" d="M112 118 L170 52" marker-end="url(#ah2)"/>
-<path class="arrow" d="M112 125 L170 125" marker-end="url(#ah2)"/>
-<path class="arrow" d="M112 132 L170 198" marker-end="url(#ah2)"/>
-<path class="arrow" d="M306 52 L346 100" marker-end="url(#ah2)"/>
-<path class="arrow" d="M306 125 L346 125" marker-end="url(#ah2)"/>
-<path class="arrow" d="M306 198 L346 150" marker-end="url(#ah2)"/>
-</svg>
-</div>
-<p class="small">The guide, <a href="https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md"><code>docs/ACCESS.md</code></a>, covers:</p>
+<div class="bar"><span class="t">threat model</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p class="small">The login is the account's password inside TLS, with no second factor: keep the port off the open internet. The daemon has no privileges, a small root helper starts the sessions, and each account is isolated from the others. This is not an audited product: four internal review passes are written down, with what is still open.</p>
 <ul class="plain small">
-<li>where the port listens and who may connect: this machine, a local network, a VPN, or a list of ranges you choose;</li>
-<li>a certificate that clients can verify: a local authority made in one command, or one from Let's Encrypt;</li>
-<li>a WireGuard VPN in two commands, with a client per device and a QR code;</li>
-<li>what to do if you open the port to the internet anyway.</li>
+<li><a href="https://github.com/zhoorta/waydesk/blob/main/docs/THREAT-MODEL.md"><code>docs/THREAT-MODEL.md</code></a>: who is assumed hostile, and the open items</li>
+<li><a href="https://github.com/zhoorta/waydesk/blob/main/docs/SECURITY-REVIEW.md"><code>docs/SECURITY-REVIEW.md</code></a>: the internal reviews</li>
+<li><a href="https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md"><code>docs/ACCESS.md</code></a>: who can reach the port, certificates, the VPN</li>
 </ul>
-<p class="small">The threat model and the open items are on GitHub: <a href="https://github.com/zhoorta/waydesk/blob/main/docs/THREAT-MODEL.md"><code>docs/THREAT-MODEL.md</code></a>, with the internal reviews in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/SECURITY-REVIEW.md"><code>docs/SECURITY-REVIEW.md</code></a>.</p>
 </div>
 </div>
 </section>
@@ -374,44 +333,18 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <div class="win">
 <div class="bar"><span class="t">commands and files</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
 <div class="body">
-<p class="grp">Packages</p>
-<div class="ent"><code class="k">waydesk</code><p>metapackage: server and desktop</p></div>
-<div class="ent"><code class="k">waydesk-server</code><p>daemon, root helper, waydesk-admin, waydesk-setup-admin, PAM services, units, zram and sysctl drop-ins, minimal sway config</p></div>
-<div class="ent"><code class="k">waydesk-desktop</code><p>sway config, setup wizard (waydesk-setup), per-account shell setup, administrator panels</p></div>
-<div class="ent"><code class="k">waydesk-shell, waydesk-quickshell</code><p>DankMaterialShell 2.0.0 built by us with our patches; quickshell 0.3.0, built per distribution</p></div>
-<div class="ent"><code class="k">waydesk-sway</code><p>sway 1.11 with wlroots 0.19.3 linked statically and the title-bar button patch, under /usr/lib/waydesk/bin; built per distribution (+deb13, +ubuntu26.04)</p></div>
-<div class="ent"><code class="k">pcmanfm-qt</code><p>file manager with our patches, built per distribution</p></div>
-<div class="ent"><code class="k">waydesk-repo</code><p>the key, the apt source template and the pin</p></div>
-<p class="grp">Commands: administration</p>
-<div class="ent"><code class="k">waydesk-admin status [--json]</code><p>memory, swap, load, running sessions and what each account uses</p></div>
-<div class="ent"><code class="k">waydesk-admin users list [--json]</code><p>accounts that may log in</p></div>
-<div class="ent"><code class="k">waydesk-admin users add NAME [--admin] [--sudo] [--no-rdp]</code><p>create an account; prints a generated password</p></div>
-<div class="ent"><code class="k">waydesk-admin users passwd NAME [--stdin]</code><p>set a password (read from stdin, never from an argument)</p></div>
-<div class="ent"><code class="k">waydesk-admin users remove NAME [--delete-home]</code><p>remove an account</p></div>
-<div class="ent"><code class="k">waydesk-admin users enable NAME | disable NAME [--keep-session]</code><p>allow or stop RDP logins for an account</p></div>
-<div class="ent"><code class="k">waydesk-admin users admin NAME on|off</code><p>Flatpak installs without a password</p></div>
-<div class="ent"><code class="k">waydesk-admin users sudo NAME on|off</code><p>membership of the sudo group</p></div>
-<div class="ent"><code class="k">waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]</code><p>per-account ceilings</p></div>
-<div class="ent"><code class="k">waydesk-admin sessions list [--json] | end NAME</code><p>running sessions; ending one closes that account's desktop</p></div>
-<p class="grp">Commands: setup</p>
-<div class="ent"><code class="k">waydesk-setup [--list | --check]</code><p>choose and install shell, browsers, office, developer and creative apps</p></div>
-<div class="ent"><code class="k">waydesk-setup-admin [--name NAME [--password-stdin]] [--existing NAME]</code><p>the first administrator: RDP access, panels, Flatpak installs without a password</p></div>
-<p class="grp">Units and ports</p>
-<div class="ent"><code class="k">waydesk.service</code><p>the daemon: TLS, RDP, framing (user waydesk)</p></div>
-<div class="ent"><code class="k">waydesk-helper.service</code><p>the root helper: password check, session start, memory admission</p></div>
-<div class="ent"><code class="k">waydesk-session@UID.service</code><p>one per account: its sway, capture, encoder and shell</p></div>
-<div class="ent"><code class="k">127.0.0.1:3389</code><p>RDP over TLS; reach it through a tunnel or a VPN</p></div>
-<p class="grp">Files</p>
-<div class="ent"><code class="k">/etc/default/waydesk</code><p>daemon and session options</p></div>
-<div class="ent"><code class="k">/etc/pam.d/waydesk-server</code><p>PAM service for the login check</p></div>
-<div class="ent"><code class="k">/etc/pam.d/waydesk-session</code><p>PAM service that gives the session a logind session</p></div>
-<div class="ent"><code class="k">/etc/xdg/waydesk/sway.conf</code><p>the session's sway config (fallback: /usr/share/waydesk/sway-minimal.conf)</p></div>
-<div class="ent"><code class="k">/usr/lib/waydesk/bin</code><p>private sway, swaymsg and swaybar; first in the session's PATH</p></div>
-<div class="ent"><code class="k">/run/waydesk/</code><p>helper and session sockets</p></div>
-<div class="ent"><code class="k">/etc/apt/sources.list.d/waydesk.sources</code><p>the repository, written for your release</p></div>
-<div class="ent"><code class="k">/etc/apt/preferences.d/waydesk</code><p>the pin: these packages win over third-party builds of the same names</p></div>
-<div class="ent"><code class="k">/usr/lib/systemd/zram-generator.conf.d/50-waydesk.conf</code><p>zram as large as the RAM, at most 16 GiB</p></div>
-<p class="grp">Source code and licences</p>
+<div class="tw"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>waydesk-admin status</code></td><td>memory, swap, load, running sessions and what each account uses</td></tr>
+<tr><td><code>waydesk-admin users ...</code></td><td>accounts, passwords, per-account limits; <code>sessions list | end NAME</code></td></tr>
+<tr><td><code>waydesk-admin access | cert | vpn</code></td><td>who can reach the port, the certificate clients check, a WireGuard VPN</td></tr>
+<tr><td><code>waydesk-setup-admin</code></td><td>the first administrator, and how clients connect</td></tr>
+<tr><td><code>waydesk-setup</code></td><td>choose the shell, browsers, office, developer and creative apps</td></tr>
+<tr><td><code>/etc/default/waydesk</code></td><td>the daemon's and the sessions' options</td></tr>
+<tr><td><code>/etc/xdg/waydesk/sway.conf</code></td><td>the session's sway configuration</td></tr>
+</table></div>
+<p class="small">Every package, command, unit and file is listed in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/REFERENCE.md"><code>docs/REFERENCE.md</code></a>.</p>
+<h3>Source code and licences</h3>
 <p>Waydesk is MIT or Apache-2.0 (<a href="https://github.com/zhoorta/waydesk">source on GitHub</a>); so are the other programs we build: sway, wlroots, DankMaterialShell, danksearch and dgop. Three copyleft programs are in the repository as binaries, and their source is offered here, from the same place as the packages, at no charge:</p>
 <ul class="plain">
 <li><b>matugen 4.2.0</b> (GPL-2.0-or-later), built unmodified from the upstream tag, with its Rust crates</li>
@@ -423,6 +356,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 
 <p class="grp">Key</p>
 <p>Packages and indexes are signed with one ed25519 key, fingerprint <code>C64672B25ECD4773196C39589D8E8874E67617F4</code>, expires 2029-10-21. The public key is <code>/apt/waydesk-archive-keyring.gpg</code>.</p>
+
 
 </div>
 </div>

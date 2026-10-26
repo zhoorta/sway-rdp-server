@@ -235,3 +235,35 @@ footer a.gh { display: inline-flex; align-items: center; gap: var(--s2); }
   nav { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* measurements: tiles and charts of the same size */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--s3); margin: var(--s3) 0 var(--s4); }
+.tile { border: 1px solid var(--line); border-radius: 8px; padding: var(--s3); background: rgba(255, 255, 255, .03); }
+.tile .big { font-size: var(--fs-l); font-weight: 700; color: var(--copper); line-height: 1.2; }
+.tile .cap2 { margin-top: var(--s1); font-size: var(--fs-xs); color: var(--dim); }
+.charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4); margin: var(--s4) 0; align-items: stretch; }
+figure { margin: 0; display: flex; flex-direction: column; }
+figure h3 { margin: 0 0 var(--s2); }
+figure svg { display: block; width: 100%; height: auto; }
+figcaption { margin-top: var(--s2); font-size: var(--fs-xs); color: var(--dim); }
+.gl { stroke: #2a323c; stroke-width: 1; }
+.th { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.ln { fill: none; stroke-width: 2.6; }
+.ln.deb, .dt.deb { stroke: var(--copper); }
+.dt.deb { fill: var(--copper); }
+.ln.ubu, .dt.ubu { stroke: #5cc8c0; }
+.dt.ubu { fill: #5cc8c0; }
+figure svg text { font-family: var(--mono); font-size: 14px; fill: var(--fg); }
+figure svg text.ax { fill: var(--dim); }
+figure svg text.lb { font-weight: 700; }
+figure svg text.lb.deb { fill: var(--copper); }
+figure svg text.lb.ubu { fill: #5cc8c0; }
+figure svg text.warn2 { fill: var(--warn); font-weight: 400; }
+.bar.cu { fill: #6b7480; }
+.bar.bb { fill: var(--copper); }
+@media (max-width: 1100px) { .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .charts { grid-template-columns: 1fr; } }
+
+/* the labels "does" / "never" of the architecture cards */
+.k2 { color: var(--copper); margin-right: var(--s1); }
+.grid + .note { margin-top: var(--s4); }
