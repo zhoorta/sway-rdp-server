@@ -361,3 +361,30 @@ One link, one afternoon, so read it as "what happens on a lossy long link", not 
   press, so that key repeat started (`c` repeated nine times, `o` once). The stalls were about a second, which fits a retransmission timeout (344 ms) doubling after a loss (that is an inference: the cause of each stall was not traced). With BBR the typing was reported as "much much better"; it was **not** captured with `xev` again.
 - **What the server now does**: the daemon asks for BBR on each RDP connection (`WAYDESK_TCP_CONGESTION`, empty for the system's default); the package loads `tcp_bbr` and adds `bbr` to `net.ipv4.tcp_allowed_congestion_control`, which is what lets a process that is not root use it. The system's default stays CUBIC.
 - **Not measured**: a link without loss (then BBR and CUBIC should be close), the effect on a LAN, other kernels.
+
+## Heavy users on a 12-vCPU / 23 GB server: Hetzner CPX52, Debian 13 x86 (2026-10-26)
+Debian 13 amd64 from the published repository (version 0.3.1, key checked), `waydesk-setup` for the shell, Chromium, LibreOffice and VS Code (Flathub). The server cost 123.60 euros a month at the time (hourly billing up to that). Two accounts of the administrator
+were open and in use (one playing a video with sound) while the test ran. The test (`docs/measure-data/capacity.sh`, results in `docs/measure-data/capacity-cpx52.tsv`) adds one account at a time. Each logs in over RDP from a short-lived `xfreerdp3` on the
+server (never through a tunnel) and opens Chromium with three pages (Wikipedia, BBC News, debian.org), LibreOffice Calc with a CSV of 300,000 rows by 10 columns (23 MB) and VS Code (Flatpak) on a copy of the Python 3 library (28 MB); 75 s after the last application
+started the numbers were taken. The applications are left idle: an upper bound. The test stops at the first refusal.
+
+| Heavy accounts | Available memory | Swap in use | Load (12 cores) | CPU idle | Memory of the new account |
+|---|---|---|---|---|---|
+| 0 (two administrator sessions) | 15.8 GB | 1.1 GB | 2.5 | | |
+| 1 | 14.8 GB | 1.0 GB | 1.2 | 94 % | 2.1 GB |
+| 2 | 13.4 GB | 1.0 GB | 0.7 | 96 % | 1.6 GB |
+| 4 | 14.5 GB | 0.6 GB | 1.6 | 93 % | 1.6 GB |
+| 6 | 11.1 GB | 0.5 GB | 2.0 | 78 % | 1.5 GB |
+| 8 | 7.7 GB | 0.5 GB | 2.0 | 86 % | 1.6 GB |
+| 10 | 5.5 GB | 0.5 GB | 5.5 | 71 % | 1.6 GB |
+| 12 | 3.4 GB | 1.1 GB | 2.5 | 87 % | 1.7 GB |
+| 13 | refused: 3466 MB available, 3519 MB needed (`ERRINFO_OUT_OF_MEMORY` on the client) | | | | |
+
+- **12 heavy accounts fit, the 13th was refused**, with the two administrator sessions still open (14 sessions at the end). The refusal is the daemon's rule that a new session needs 15 % of the RAM available (3.4 GB here).
+- **Memory is the limit, not the CPU**: CPU idle stayed between 71 % and 96 % (the lowest values come while an account's applications were starting), the load peaked at 5.8 on 12 cores, and the CPU pressure average (`avg300`) was 2.8 %.
+- **No out-of-memory kill** in the kernel log, memory pressure `some` and `full` 0.07 % (`avg300`) at the end, 1.1 GB of swap in use. The zram held 1 GB of data in 217 MB (about 4.8 to 1).
+- **One heavy account costs about 1.6 GB** (1.3 to 2.1 GB in its cgroup; the first one more, with the shared files not yet in the cache). On 8 GB the earlier test measured about 1.85 GB per account and eight accounts.
+- **The administrator's session stayed smooth** (video with sound in Chromium, pointer and windows) through all twelve additions: nothing was held back (send queue 0 bytes on every connection, encoder bitrate 23 to 35 Mbit/s).
+- **Cost**: 123.60 euros a month for 12 heavy accounts is about 10.30 euros per account and month; with the browser-and-shell use of an ordinary account (about 1 GB) roughly twice as many fit.
+- **Not measured**: applications that are busy (the numbers are for idle ones), a second round of the same accounts, and a server with a GPU.
+

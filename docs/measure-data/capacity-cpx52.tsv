@@ -1,0 +1,16 @@
+n	account	available_MB	swap_used_MB	load1	cpu_idle_pct	user_MB	note
+0	(baseline)	15845	1146	2.52	-	-	before the test
+1	cap1	14774	1022	1.16	93.5	2.1GB	ok
+2	cap2	13388	1019	0.68	95.5	1.6GB	ok
+3	cap3	15920	563	0.88	95.5	1.6GB	ok
+4	cap4	14455	562	1.61	92.5	1.6GB	ok
+5	cap5	12678	558	1.67	83.3	1.6GB	ok
+6	cap6	11111	509	1.95	78.0	1.5GB	ok
+7	cap7	9539	509	1.97	84.3	1.6GB	ok
+8	cap8	7683	509	2.00	86.0	1.6GB	ok
+9	cap9	7341	509	2.61	84.7	1.5GB	ok
+10	cap10	5514	450	5.54	70.5	1.6GB	ok
+11	cap11	4107	433	2.44	89.5	1.6GB	ok
+12	cap12	3400	1114	2.49	87.4	1.7GB	ok
+13	cap13	3393	1114	5.81	-	-	REFUSED or failed: ERRINFO_OUT_OF_MEMORY
+done 17:27:14

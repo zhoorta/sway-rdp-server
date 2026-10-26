@@ -327,7 +327,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <ul class="plain">
 <li>Early software. Tested with FreeRDP and the Windows App on macOS; Microsoft Remote Desktop (Windows) and mstsc were not tested.</li>
 <li>No GPU: applications that insist on one do not start. Zed fails with "Failed to create surface"; VS Code and LibreOffice work.</li>
-<li>Sizing: on an 8 GB, 4-core server count 7 to 8 users with Chromium, Calc and VS Code open if most are idle. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down.</li>
+<li>Sizing: on an 8 GB, 4-core server count 7 to 8 users with Chromium, Calc and VS Code open if most are idle. A 12-vCPU, 23 GB server (Hetzner CPX52, 123.60 euros a month) held 12 of them before it refused the 13th; memory is the limit, about 1.6 GB per such user. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down.</li>
 </ul>
 
 </div>
