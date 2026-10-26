@@ -382,7 +382,7 @@ started the numbers were taken. The applications are left idle: an upper bound. 
 
 - **12 heavy accounts fit, the 13th was refused**, with the two administrator sessions still open (14 sessions at the end). The refusal is the daemon's rule that a new session needs 15 % of the RAM available (3.4 GB here).
 - **Memory is the limit, not the CPU**: CPU idle stayed between 71 % and 96 % (the lowest values come while an account's applications were starting), the load peaked at 5.8 on 12 cores, and the CPU pressure average (`avg300`) was 2.8 %.
-- **No out-of-memory kill** in the kernel log, memory pressure `some` and `full` 0.07 % (`avg300`) at the end, 1.1 GB of swap in use. The zram held 1 GB of data in 217 MB (about 4.8 to 1).
+- **No out-of-memory kill** in the kernel log, memory pressure `some` and `full` 0.07 % (`avg300`) at the end, 1.1 GB of swap in use. The zram held 1 GB of data in 217 MB (about 4.7 to 1).
 - **One heavy account costs about 1.6 GB** (1.3 to 2.1 GB in its cgroup; the first one more, with the shared files not yet in the cache). On 8 GB the earlier test measured about 1.85 GB per account and eight accounts.
 - **The administrator's session stayed smooth** (video with sound in Chromium, pointer and windows) through all twelve additions: nothing was held back (send queue 0 bytes on every connection, encoder bitrate 23 to 35 Mbit/s).
 - **Cost**: 123.60 euros a month for 12 heavy accounts is about 10.30 euros per account and month; with the browser-and-shell use of an ordinary account (about 1 GB) roughly twice as many fit.
