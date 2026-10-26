@@ -18,4 +18,13 @@ fi
 if [ "$1" = configure ] && command -v flatpak >/dev/null 2>&1; then
     flatpak override --system --filesystem=xdg-config/gtk-3.0:ro --filesystem=xdg-config/gtk-4.0:ro || true
 fi
+# Flathub, so that the Software app has apps to show and Flatpak apps install as the site says ("Flathub works as it is"). Without a remote the
+# Explore page of Software is empty. Needs the network: when there is none, say how to do it later and carry on (the install must not fail).
+if [ "$1" = configure ] && command -v flatpak >/dev/null 2>&1 && ! flatpak remotes --system 2>/dev/null | grep -q '^flathub'; then
+    if timeout 60 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo >/dev/null 2>&1; then
+        timeout 120 flatpak update --appstream --system >/dev/null 2>&1 || true
+    else
+        echo "waydesk-desktop: could not add Flathub (no network?). Later: sudo flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo" >&2
+    fi
+fi
 exit 0

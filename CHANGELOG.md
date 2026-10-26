@@ -2,6 +2,10 @@
 
 What changed, newest first. The numbered releases are the ones in the apt repository.
 
+## 0.3.1 (in preparation)
+
+`waydesk-desktop` adds the Flathub remote when it is installed (it needs the network; without it the install goes on and says how to add it later). Before, the Explore page of the Software app was empty on a fresh install, because there was no remote to read apps from, and Flatpak apps only worked after `waydesk-setup` had added Flathub.
+
 ## 2026-10-27 · 0.3.0
 
 **Keyboard.** A keyboard whose keys reach the server at other places than the layout of its locale expects gets a layout of its own: the new **Keyboard** window in the launcher (or `~/.config/waydesk/keyboard`, one xkb layout name) picks it, and the session follows within a second, with no reconnect. `waydeskmac` is for the built-in keyboard of a Portuguese MacBook through the Windows App; a layout of your own goes in `/etc/xkb/symbols`.
