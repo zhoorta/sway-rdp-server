@@ -12,5 +12,5 @@ Description: RDP server giving each account its own sway desktop
  passwords (PAM) and starts the sessions; the network-facing daemon runs as
  an unprivileged account.
  .
- Early software, one author. Plain TLS login: `waydesk-admin access`, `cert` and `vpn` set who can
+ Early software. Plain TLS login: `waydesk-admin access`, `cert` and `vpn` set who can
  reach it (this machine, a local network, a WireGuard VPN), what certificate clients check, and who may connect.
