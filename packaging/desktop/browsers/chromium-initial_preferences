@@ -3,7 +3,6 @@
     "import_bookmarks": false,
     "import_bookmarks_from_file": "/usr/share/chromium/initial_bookmarks.html",
     "make_chrome_default_for_user": false,
-    "create_all_shortcuts": true,
     "verbose_logging": true
   },
   "browser": {

@@ -2,6 +2,10 @@
 
 What changed, newest first. The numbered releases are the ones in the apt repository.
 
+## 2026-10-27 · 0.2.2
+
+The file manager (`pcmanfm-qt` `+waydesk2`) no longer recommends `lxqt-qtplugin` and `lxqt-policykit`: they pulled in `lxqt-session` and with it about a hundred xscreensaver screensavers in the launcher (no icon, none of them can run in a session), `lxqt-config`, `qps`, `qlipper` and the Hibernate, Leave and Logout entries, about 60 MB. On a server that has them, `sudo apt autoremove` removes them after the update. The dock starts with a browser, the file manager and the terminal pinned (each once, when it is installed), and the Chromium icon is no longer put on the desktop, which keeps Home and Trash. A shortcut added with `waydesk-add-to-desktop` is marked trusted with the right key (`metadata::trusted`), so the file manager shows no "!" on it.
+
 ## 2026-10-26 · 0.2.1
 
 `waydesk-desktop` depends on `waydesk-shell`: `apt install waydesk` gives the desktop with its shell, bar and dock at the first login (it was a bare sway until `waydesk-setup` had installed the shell). `waydesk-setup` is for the apps only. Everything else is as in 0.2.0.
