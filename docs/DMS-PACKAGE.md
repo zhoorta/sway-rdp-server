@@ -152,3 +152,5 @@ applied to the source tree before the build: a build with fewer than five patche
 - Where to host the repository and who holds the signing key.
 - How far to trim: every cut makes a later DMS update harder to merge.
 - amd64: the script is arm64 only until the Go checksum for amd64 is filled in.
+
+Since 0.2.1 `waydesk-desktop` depends on `waydesk-shell`: `apt install waydesk` gives a session with its shell at the first login, and `waydesk-setup` is only for apps.

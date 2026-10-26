@@ -78,8 +78,8 @@ Debian-based ones included, have not been tried (Fedora: not yet), and the packa
 `waydesk-desktop` (second package, same build) makes those sessions a Windows-like desktop: a system sway config
 (`/etc/xdg/waydesk/sway.conf`: floating windows with title bars, Alt+Tab, Alt+F4, `Super+d` launcher, screenshots;
 an account's `~/.config/waydesk/config` replaces it), the glue that starts [DankMaterialShell](https://duxlabs.dev)
-through the account's systemd user session when it is installed (`waydesk-shell`, our own build from source; it is not in Debian), and `waydesk-setup`, a
-whiptail wizard for DMS and developer, creative and AI apps. Design, threat model and what is not done yet:
+through the account's systemd user session (`waydesk-shell`, our own build from source, which `waydesk-desktop` depends on; it is not in Debian), and `waydesk-setup`, a
+whiptail wizard for browsers, office, developer, creative and AI apps. Design, threat model and what is not done yet:
 [docs/MULTIUSER-DESIGN.md](docs/MULTIUSER-DESIGN.md). The sections below describe the single-account form, which still
 exists (run the binary inside your own sway).
 

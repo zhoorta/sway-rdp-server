@@ -9,16 +9,14 @@ What is planned or open, in no particular order inside a group. Nothing here is 
   --cpu-quota 100%` (a `CPUQuota=` on the account's slice, next to the existing `--memory`, `--swap` and `--cpu-weight`) and a field in the **Limits…**
   dialog of the Users & Access panel. Weights stay the default; the quota is the exception.
 
-- **Flow control that follows the link (written, being tested).** The server measures what the link delivers while it is full, keeps no more than a few tenths of a
-  second of it in flight, and lowers the encoder's bitrate to fit (floor 300 kbit/s, ceiling the configured one). Before, a slow link built a queue of seconds.
-
 - **H.264 CPU on a lightly changing desktop.** Screen mode costs about 8 ms per frame at 720p whatever changed. Convert only the changed rectangles to YUV and take a
   cheaper path for tiny damage; compare real text legibility of screen and camera mode (PSNR says 12 dB lower at rest). Numbers in `docs/MEASUREMENTS.md`.
 
 ## In progress
 
-- **Mouse pointer pictures.** The pointer follows the shape an application asks for (text cursor, resize arrows, hand, ...), done for
-  applications that name a shape. Applications that draw their own cursor picture (GTK 3, XWayland) send the picture itself: written, being tested.
+- **A full login on arm64 hardware with 0.3.0.** The arm64 packages install cleanly from the repository (checked in containers), and a full login was last checked on real arm64 servers with 0.1.0.
+
+- **More keyboard layouts.** `waydeskmac` was measured on the built-in keyboard of a Portuguese MacBook through the Windows App only; its shifted and Option characters were checked by one person. Other Mac layouts and external keyboards need the same measurement (press each key, compare what arrives with the keycap): a layout is one short file in `/etc/xkb/symbols`.
 
 ## Maybe, if it turns out to be needed
 

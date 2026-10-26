@@ -7,7 +7,7 @@ Packages, commands, units, ports and files of Waydesk. The short version is on [
 
 - `waydesk`: metapackage: server and desktop
 - `waydesk-server`: daemon, root helper, waydesk-admin, waydesk-setup-admin, PAM services, units, zram and sysctl drop-ins, minimal sway config
-- `waydesk-desktop`: sway config, setup wizard (waydesk-setup), per-account shell setup, administrator panels
+- `waydesk-desktop`: sway config, the shell it depends on, setup wizard (waydesk-setup), per-account shell setup, the Keyboard window, administrator panels
 - `waydesk-shell, waydesk-quickshell`: DankMaterialShell 2.0.0 built by us with our patches; quickshell 0.3.0, built per distribution
 - `waydesk-sway`: sway 1.11 with wlroots 0.19.3 linked statically and the title-bar button patch, under /usr/lib/waydesk/bin; built per distribution (+deb13, +ubuntu26.04)
 - `pcmanfm-qt`: file manager with our patches, built per distribution
@@ -28,7 +28,9 @@ Packages, commands, units, ports and files of Waydesk. The short version is on [
 
 ## Commands: setup
 
-- `waydesk-setup [--list | --check]`: choose and install shell, browsers, office, developer and creative apps
+- `waydesk-setup [--list | --check]`: choose and install browsers, office, developer and creative apps (the shell comes with `waydesk-desktop`)
+- `waydesk-keyboard-panel`: the **Keyboard** window in the launcher: the layout of the account's keys, written to `~/.config/waydesk/keyboard` (an xkb layout name; `waydeskmac` is in `/etc/xkb/symbols`); the session follows the file within a second
+- `waydesk-server --version`, `waydesk-admin --version`: the version of the package
 - `waydesk-setup-admin [--name NAME [--password-stdin]] [--existing NAME]`: the first administrator: RDP access, panels, Flatpak installs without a password
 
 ## Units and ports
