@@ -43,6 +43,7 @@
       <div class="bar"><span class="t">install</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
       <div class="body"><pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
 <span class="p">$</span> sudo apt install ./waydesk-repo.deb
+<span class="p">$</span> sudo apt update
 <span class="p">$</span> sudo apt install waydesk
 <span class="p">$</span> sudo waydesk-setup-admin</code></pre></div>
     </div>
@@ -173,7 +174,8 @@
 <p>The first download cannot be verified by the repository itself, so compare the key with this fingerprint (ed25519, expires 2029-10-21). If it differs, stop and tell us.</p>
 <div class="fp">C646 72B2 5ECD 4773 196C&nbsp; 3958 9D8E 8874 E676 17F4</div>
 <h3>2. Install, and make the first administrator</h3>
-<pre><code><span class="p">$</span> sudo apt install waydesk
+<pre><code><span class="p">$</span> sudo apt update
+<span class="p">$</span> sudo apt install waydesk
 <span class="p">$</span> sudo waydesk-setup-admin       <span class="c"># asks how you will connect; there is no default account or password</span>
 <span class="p">$</span> sudo waydesk-setup             <span class="c"># optional: choose browsers, office, developer and creative apps</span></code></pre>
 <h3>3. See what it does</h3>
