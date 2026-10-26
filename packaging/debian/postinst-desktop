@@ -27,4 +27,15 @@ if [ "$1" = configure ] && command -v flatpak >/dev/null 2>&1 && ! flatpak remot
         echo "waydesk-desktop: could not add Flathub (no network?). Later: sudo flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo" >&2
     fi
 fi
+# A browser by default. Debian has a Chromium package (a recommend of this one); Ubuntu has only a stub that installs the snap, which the versioned
+# recommend does not accept. Where the archive has no Chromium, the one from Flathub is installed here (about 190 MB to download): it is the one the shell
+# pins in the dock and seeds for each account. Needs the network; without it the install goes on and says how to do it later.
+if [ "$1" = configure ] && command -v flatpak >/dev/null 2>&1 && flatpak remotes --system 2>/dev/null | grep -q '^flathub' \
+    && ! dpkg-query -W -f='${Status}' chromium 2>/dev/null | grep -q 'ok installed' \
+    && [ -z "$(apt-cache policy chromium 2>/dev/null | awk '/Candidate:/ && $2 != "(none)"')" ] \
+    && ! flatpak info --system org.chromium.Chromium >/dev/null 2>&1; then
+    echo "waydesk-desktop: installing Chromium from Flathub (about 190 MB) ..." >&2
+    timeout 900 flatpak install --system -y --noninteractive flathub org.chromium.Chromium >/dev/null 2>&1 \
+        || echo "waydesk-desktop: could not install Chromium (no network?). Later: sudo flatpak install --system flathub org.chromium.Chromium" >&2
+fi
 exit 0

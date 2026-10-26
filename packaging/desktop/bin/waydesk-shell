@@ -275,7 +275,8 @@ for kind, ids in wanted:
     app = next((i for i in ids if have(i)), None)
     if app and not os.path.exists(marker):
         if app not in pins:
-            pins.append(app)
+            # the browser first, whenever it comes (it may be installed after the first login)
+            pins.insert(0, app) if kind == "browser" else pins.append(app)
             changed = True
         os.makedirs(marks, exist_ok=True)
         open(marker, "w").close()

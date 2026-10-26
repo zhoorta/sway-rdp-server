@@ -4,7 +4,11 @@ What changed, newest first. The numbered releases are the ones in the apt reposi
 
 ## 0.3.1 (in preparation)
 
-`waydesk-desktop` adds the Flathub remote when it is installed (it needs the network; without it the install goes on and says how to add it later). Before, the Explore page of the Software app was empty on a fresh install, because there was no remote to read apps from, and Flatpak apps only worked after `waydesk-setup` had added Flathub.
+A browser by default: `waydesk-desktop` installs Chromium from Flathub (about 190 MB) where the archive has no Chromium package, which is Ubuntu: its recommend of `chromium` is now versioned, so that Ubuntu's stub (it installs the snap, which the shell neither tunes nor pins) is not taken for it. Debian keeps the Chromium deb. The browser is pinned first in the dock.
+
+`waydesk-desktop` also adds the Flathub remote when it is installed (it needs the network; without it the install goes on and says how to add it later). Before, the Explore page of the Software app was empty on a fresh install, because there was no remote to read apps from.
+
+`waydesk-setup` runs as the account that typed it, also under `sudo waydesk-setup`, and refuses to run as plain root: Claude Code, OpenCode, mise, uv and the other tools of the wizard install into the home of whoever runs it, and as root they ended up in `/root`. Run it as the administrator account, without sudo.
 
 ## 2026-10-27 · 0.3.0
 

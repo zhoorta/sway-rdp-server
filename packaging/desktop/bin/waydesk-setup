@@ -1,6 +1,16 @@
 #!/bin/sh
 # Chooses and installs desktop shell, developer, creative and AI apps (whiptail wizard). Run it as an ordinary account
 # that may use sudo; --list shows what can be installed.
+# Claude Code, OpenCode, mise, uv and the other tools of the wizard install into the home of whoever runs it, and ask for sudo themselves where a
+# package needs it: run as root they would land in /root, out of reach of the account that uses the desktop. `sudo waydesk-setup` therefore
+# runs as the account that typed it.
+if [ "$(id -u)" -eq 0 ] && [ "${1:-}" != --list ] && [ "${1:-}" != --check ]; then
+    if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+        exec sudo -u "$SUDO_USER" -H "$0" "$@"
+    fi
+    echo "waydesk-setup: run it as the administrator account that uses the desktop (it asks for sudo itself), not as root" >&2
+    exit 1
+fi
 case "${1:-}" in
     --list) exec /usr/share/waydesk/setup/install.sh --list ;;
     --check) exec /usr/share/waydesk/setup/install.sh --check ;;
