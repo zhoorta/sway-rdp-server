@@ -22,6 +22,16 @@ pub fn surface_size(width: usize, height: usize) -> (usize, usize) {
     (((width + 15) & !15) + 16, ((height + 15) & !15) + 16)
 }
 
+/// A tuning switch of the encoder from the environment: `0` or `1` (anything else, or nothing: the default). For measuring (see
+/// `waydesk-encbench`); the defaults are what was measured to be best.
+fn env_flag(name: &str, default: bool) -> bool {
+    match std::env::var(name).as_deref() {
+        Ok("1") => true,
+        Ok("0") => false,
+        _ => default,
+    }
+}
+
 pub struct H264 {
     encoder: Encoder,
     sw: usize,
@@ -44,9 +54,18 @@ impl H264 {
                 Ok("camera") => UsageType::CameraVideoRealTime,
                 _ => UsageType::ScreenContentRealTime,
             })
-            .complexity(Complexity::Medium)
-            .scene_change_detect(true)
-            .num_threads(4)
+            .complexity(match std::env::var("WAYDESK_H264_COMPLEXITY").as_deref() {
+                Ok("low") => Complexity::Low,
+                Ok("high") => Complexity::High,
+                Ok("medium") => Complexity::Medium,
+                // Low saves 15-36 % CPU under heavy motion at the same bits and PSNR (docs/MEASUREMENTS.md, encoder benchmark).
+                _ => Complexity::Low,
+            })
+            .scene_change_detect(env_flag("WAYDESK_H264_SCENE_CHANGE", true))
+            .background_detection(env_flag("WAYDESK_H264_BACKGROUND", true))
+            .adaptive_quantization(env_flag("WAYDESK_H264_ADAPTIVE_QUANT", true))
+            .long_term_reference(env_flag("WAYDESK_H264_LTR", false))
+            .num_threads(std::env::var("WAYDESK_H264_THREADS").ok().and_then(|v| v.parse::<u16>().ok()).filter(|n| (1..=16).contains(n)).unwrap_or(4))
             .rate_control_mode(RateControlMode::Bitrate)
             .qp(QpRange::new(0, t.max_qp.clamp(1, 51)))
             // Skipping a frame would lose its changed area (only the changed rectangle is sent each time).
@@ -174,7 +193,7 @@ fn extract_sps_pps(data: &[u8]) -> Option<Vec<u8>> {
 /// resolves to is a 2.6 release; anything else is refused instead of risking an ABI mismatch.
 /// `WAYDESK_OPENH264` names a library to use instead (for example a copy downloaded from Cisco); that one keeps the
 /// crate's hash check.
-fn load_openh264() -> anyhow::Result<OpenH264API> {
+pub fn load_openh264() -> anyhow::Result<OpenH264API> {
     if let Ok(p) = std::env::var("WAYDESK_OPENH264") {
         return OpenH264API::from_blob_path(&p).map_err(|e| anyhow::anyhow!("WAYDESK_OPENH264={p}: {e}"));
     }
