@@ -28,7 +28,7 @@ set -eu
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq && apt-get install -y -qq --no-install-recommends git curl ca-certificates make tar gzip python3 >/dev/null
 cd /tmp
-curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 300 -o go.tgz https://go.dev/dl/go$GO_VERSION.linux-$ARCH.tar.gz
+curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 20 --max-time 1800 -C - -o go.tgz https://go.dev/dl/go$GO_VERSION.linux-$ARCH.tar.gz
 echo "$GO_SHA256  go.tgz" | sha256sum -c -
 tar -C /usr/local -xzf go.tgz
 export PATH=/usr/local/go/bin:\$PATH

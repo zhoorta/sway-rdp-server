@@ -1,0 +1,19 @@
+// Portuguese Mac keycaps as the Windows App on a built-in MacBook keyboard sends them (measured 2026-10-26).
+default partial alphanumeric_keys
+xkb_symbols "pt" {
+    include "pt(basic)"
+    name[Group1] = "Portuguese (Mac keycaps)";
+    key <AD11> { [ ordmasculine, ordfeminine ] };
+    key <AD12> { [ dead_acute, dead_grave ] };
+    key <AE11> { [ apostrophe, question ] };
+    key <AE12> { [ plus, asterisk ] };
+    key <TLDE> { [ section, plusminus ] };
+    key <AC11> { [ dead_tilde, dead_circumflex ] };
+    key <BKSL> { [ backslash, bar ] };
+    include "level3(lalt_switch)"
+};
+
+partial alphanumeric_keys
+xkb_symbols "mac" {
+    include "waydeskmac(pt)"
+};

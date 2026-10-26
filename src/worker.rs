@@ -260,7 +260,8 @@ async fn serve_client(
     // First client: make the session. Later clients: it exists; give it the new client's size.
     let session = match session {
         None => {
-            let layout = if klid == 0 { cfg.opts.default_layout.clone() } else { session::xkb_layout_for_klid(klid).to_owned() };
+            let layout = account_keyboard()
+                .unwrap_or_else(|| if klid == 0 { cfg.opts.default_layout.clone() } else { session::xkb_layout_for_klid(klid).to_owned() });
             info!(width, height, klid = format!("{klid:#06x}"), %layout, "creating session");
             let opts = cfg.opts.clone();
             match tokio::task::spawn_blocking(move || Session::create((width, height), &layout, &opts)).await {
@@ -607,6 +608,21 @@ pub const PRIVATE_QML: &str = "/usr/lib/waydesk/qml";
 const SWAY_OWN_CONFIGS: [&str; 2] = ["/etc/sway/config", "/usr/lib/waydesk/etc/sway/config"];
 /// Used when nothing else exists, so that a server without the desktop package still gets a session (sway refuses to start without a config).
 const MINIMAL_CONFIG: &str = "/usr/share/waydesk/sway-minimal.conf";
+
+/// The keyboard layout this account asked for: the name of an xkb layout in `~/.config/waydesk/keyboard` (first line that is not a comment),
+/// for a keyboard whose keys the client reports at other places than the layout of its Windows locale, such as a Mac's (`waydeskmac`).
+/// It replaces the layout that follows from the client's locale.
+fn account_keyboard() -> Option<String> {
+    let home = std::env::var_os("HOME")?;
+    let text = std::fs::read_to_string(std::path::Path::new(&home).join(".config/waydesk/keyboard")).ok()?;
+    let name = text.lines().map(str::trim).find(|l| !l.is_empty() && !l.starts_with('#'))?;
+    let valid = name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    if !valid {
+        warn!("~/.config/waydesk/keyboard names no usable layout: {name:?}");
+        return None;
+    }
+    Some(name.to_owned())
+}
 
 /// The config to start sway with (`-c`), or None to let sway look. The account's own config for these sessions wins, then the system's;
 /// then sway's usual lookup, and if that would find nothing, the minimal one.

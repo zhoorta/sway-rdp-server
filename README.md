@@ -142,6 +142,10 @@ source addresses may connect (this machine, the local network, a VPN), `waydesk-
 non-loopback address accepts only private networks. Use a long random password, and prefer loopback plus an SSH tunnel or a VPN over the open internet. A new connection
 replaces the open one; that is on by default only for loopback, because the old client is dropped before the new one has authenticated (so anyone who can reach the port could kick the user).
 
+## Keyboard
+
+The layout of a session follows the keyboard layout that the client reports (Portuguese, English, German and so on) and stays the same until the session ends. A keyboard whose keys are not where that layout expects them gets its own layout: put the name of an xkb layout in `~/.config/waydesk/keyboard` of the account (a line of its own, `#` for comments), end the session and log in again. `waydeskmac` is for the built-in keyboard of a Portuguese MacBook through the Windows App (measured: its `º ´ ' + § ~ \` keys arrive at the places of other keys, and the left Option key is AltGr); the file is `/etc/xkb/symbols/waydeskmac`, and you can add layouts of your own next to it.
+
 ## Session hook
 
 `--session-hook PROGRAM` starts a program when a session begins and sends SIGTERM to its process group when the session ends
