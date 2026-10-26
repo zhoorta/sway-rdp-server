@@ -23,8 +23,8 @@ curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
 sudo apt install ./waydesk-repo.deb
 gpg --show-keys --with-fingerprint /usr/share/keyrings/waydesk-archive-keyring.gpg   # must be C646 72B2 5ECD 4773 196C 3958 9D8E 8874 E676 17F4
 sudo apt update && sudo apt install waydesk
-sudo waydesk-setup            # the shell, browser, office and developer apps
 sudo waydesk-setup-admin      # the first administrator
+sudo waydesk-setup            # optional: browsers, office, developer and creative apps
 ```
 
 The first download cannot be verified by the repository itself, so compare the fingerprint above with the one printed. The RDP port listens on `127.0.0.1:3389`:

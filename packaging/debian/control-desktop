@@ -4,14 +4,10 @@ Architecture: all
 Maintainer: José Mendonça <jmendonca@gmail.com>
 Section: x11
 Priority: optional
-Depends: waydesk-server (>= @VERSION@), foot, qt6-wayland, qt6ct, pcmanfm-qt, qterminal, xdg-desktop-portal, xdg-desktop-portal-gtk, gnome-software, gnome-software-plugin-flatpak, gvfs, gvfs-daemons, fonts-inter, fonts-jetbrains-mono, fonts-noto, grim, slurp, wl-clipboard, dbus-user-session, dbus-bin, xdg-utils, python3, papirus-icon-theme, librsvg2-common, libglib2.0-bin, dconf-gsettings-backend, gtk-update-icon-cache, pkexec, wmenu, whiptail
+Depends: waydesk-server (>= @VERSION@), foot, qt6-wayland, qt6ct, pcmanfm-qt, qterminal, xdg-desktop-portal, xdg-desktop-portal-gtk, gnome-software, gnome-software-plugin-flatpak, gvfs, gvfs-daemons, fonts-inter, fonts-jetbrains-mono, fonts-noto, grim, slurp, wl-clipboard, dbus-user-session, dbus-bin, xdg-utils, python3, papirus-icon-theme, librsvg2-common, libglib2.0-bin, dconf-gsettings-backend, gtk-update-icon-cache, pkexec, wmenu, whiptail, waydesk-shell
 Recommends: chromium
-Suggests: dms
 Description: Windows-like desktop for waydesk sessions
  Default sway configuration for the sessions of waydesk (floating windows,
- Alt+Tab, a launcher, screenshots), the glue that starts DankMaterialShell
- when it is installed, and waydesk-setup, a wizard that installs the shell
- and developer, creative and AI apps.
- .
- DankMaterialShell is not in Debian: waydesk-setup adds its third-party
- repositories after asking.
+ Alt+Tab, a launcher, screenshots), the shell (DankMaterialShell, built by
+ Waydesk as the package waydesk-shell) that it starts, and waydesk-setup,
+ a wizard that installs browsers, office, developer and creative apps.

@@ -171,7 +171,7 @@
 <h3>2. Install, and make the first administrator</h3>
 <pre><code><span class="p">$</span> sudo apt install waydesk
 <span class="p">$</span> sudo waydesk-setup-admin       <span class="c"># asks how you will connect; there is no default account or password</span>
-<span class="p">$</span> sudo waydesk-setup             <span class="c"># optional: choose the shell, browsers, office and developer apps</span></code></pre>
+<span class="p">$</span> sudo waydesk-setup             <span class="c"># optional: choose browsers, office, developer and creative apps</span></code></pre>
 <h3>3. See what it does</h3>
 <pre><code><span class="p">$</span> sudo waydesk-admin status
 <span class="c">Memory    7.6 GB in all, 504 MB available
@@ -339,7 +339,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <tr><td><code>waydesk-admin users ...</code></td><td>accounts, passwords, per-account limits; <code>sessions list | end NAME</code></td></tr>
 <tr><td><code>waydesk-admin access | cert | vpn</code></td><td>who can reach the port, the certificate clients check, a WireGuard VPN</td></tr>
 <tr><td><code>waydesk-setup-admin</code></td><td>the first administrator, and how clients connect</td></tr>
-<tr><td><code>waydesk-setup</code></td><td>choose the shell, browsers, office, developer and creative apps</td></tr>
+<tr><td><code>waydesk-setup</code></td><td>choose browsers, office, developer and creative apps (the shell comes with <code>waydesk</code>)</td></tr>
 <tr><td><code>/etc/default/waydesk</code></td><td>the daemon's and the sessions' options</td></tr>
 <tr><td><code>/etc/xdg/waydesk/sway.conf</code></td><td>the session's sway configuration</td></tr>
 </table></div>
