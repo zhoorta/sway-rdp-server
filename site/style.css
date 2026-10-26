@@ -153,7 +153,7 @@ pre code { background: none; border: 0; padding: 0; font-size: inherit; }
 .cap i:nth-child(3):hover { background: #f2b8b5; color: #400; }
 
 /* the top of the page */
-.hero { display: grid; grid-template-columns: 1fr 1.3fr; gap: var(--s5); align-items: center; margin: var(--s6) 0 var(--s4); }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: var(--s5); align-items: center; margin: var(--s6) 0 var(--s4); }
 .small { font-size: var(--fs-s); color: #cfd3d8; }
 .note { color: #c5cad0; font-size: var(--fs-xs); margin: var(--s2) 0 0; }
 .shot img { display: block; width: 100%; height: auto; border-radius: var(--r-win); box-shadow: 16px 24px 50px rgba(0, 0, 0, .7), 4px 6px 14px rgba(0, 0, 0, .5); }
@@ -223,13 +223,14 @@ footer a.gh { display: inline-flex; align-items: center; gap: var(--s2); }
 }
 
 @media (max-width: 1000px) {
-  .hero { grid-template-columns: 1fr; }
+  .hero { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 860px) {
   h1 { font-size: 26px; }
 }
 @media (max-width: 560px) {
   .win > .body { padding: var(--s3); }
+  .hero pre { white-space: pre-wrap; overflow-wrap: anywhere; }
   dl.refold { grid-template-columns: 1fr; }
   dl.refold dd { margin-bottom: var(--s2); }
   nav { margin-left: 0; }
