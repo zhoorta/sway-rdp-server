@@ -12,6 +12,7 @@ mod cursors;
 mod egfx;
 mod encode;
 mod fdpass;
+mod gpu;
 mod helper;
 mod helperclient;
 mod input;

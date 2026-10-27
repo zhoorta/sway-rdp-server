@@ -1,4 +1,12 @@
-# Waydesk sessions run on a headless sway with no GPU, so Chromium's GPU process only does software rendering. Switching it off saves
-# about 38 MB of memory per browsing account (396 MB against 357 MB for three pages, PSS) and costs no CPU that could be measured on
-# an animated page; the page rendering is the same. Delete this file on a host where Chromium also runs on a real GPU.
-export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --disable-gpu"
+# Waydesk sessions without a GPU: Chromium's GPU process only does software rendering. Switching it off saves about 38 MB of memory per
+# browsing account (396 MB against 357 MB for three pages, PSS) and costs no CPU that could be measured on an animated page; the page
+# rendering is the same. With a GPU (a render node the account can open, see WAYDESK_GPU in /etc/default/waydesk) it stays on: WebGL,
+# canvas and video then use it.
+waydesk_gpu=0
+if [ "${WAYDESK_GPU:-auto}" != off ]; then
+    for node in /dev/dri/renderD*; do
+        [ -w "$node" ] && waydesk_gpu=1
+    done
+fi
+[ "$waydesk_gpu" = 1 ] || export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --disable-gpu"
+unset waydesk_gpu node

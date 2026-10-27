@@ -135,7 +135,7 @@ pub async fn run(cfg: Config) -> Result<()> {
         None => Source::Single(Some(unsafe { std::os::unix::net::UnixStream::from_raw_fd(3) })),
     };
     // Declared before the session so that it is dropped after it: the session's cleanup still needs the sway.
-    let mut sway = if cfg.own_sway { Some(OwnSway::start().await?) } else { None };
+    let mut sway = if cfg.own_sway { Some(OwnSway::start_preferring_gpu().await?) } else { None };
 
     let mut session: Option<Session> = None;
     let mut pending: Option<std::os::unix::net::UnixStream> = None;
@@ -490,7 +490,18 @@ impl OwnSway {
         !matches!(self.child.try_wait(), Ok(None))
     }
 
-    async fn start() -> Result<Self> {
+    /// With a GPU node from the daemon, sway renders on it; if that does not work, once more in software.
+    async fn start_preferring_gpu() -> Result<Self> {
+        if let Some(node) = crate::gpu::usable_node() {
+            match Self::start(Some(&node)).await {
+                Ok(sway) => return Ok(sway),
+                Err(e) => warn!(node = %node.display(), "sway did not start on the GPU ({e:#}): software rendering"),
+            }
+        }
+        Self::start(None).await
+    }
+
+    async fn start(gpu: Option<&std::path::Path>) -> Result<Self> {
         use std::os::unix::process::CommandExt;
         let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);
         let uid = unsafe { libc::getuid() };
@@ -517,12 +528,20 @@ impl OwnSway {
                 cmd.env("XCURSOR_THEME", "waydesk-blank").env("XCURSOR_SIZE", "24");
             }
         }
+        match gpu {
+            Some(node) => {
+                cmd.env("WLR_RENDERER", "gles2").env("WLR_RENDER_DRM_DEVICE", node);
+                info!(node = %node.display(), "sway renders on the GPU");
+            }
+            None => {
+                cmd.env("WLR_RENDERER", "pixman");
+            }
+        }
         let child = cmd
             .env("WLR_BACKENDS", "headless")
             .env("WLR_LIBINPUT_NO_DEVICES", "1")
             // No default output: the session creates its own, at the client's size.
             .env("WLR_HEADLESS_OUTPUTS", "0")
-            .env("WLR_RENDERER", "pixman")
             .env("NO_AT_BRIDGE", "1")
             .env_remove("WAYLAND_DISPLAY")
             .env_remove("SWAYSOCK")

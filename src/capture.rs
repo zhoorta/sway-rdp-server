@@ -248,9 +248,12 @@ impl Capturer {
             self.queue.blocking_dispatch(&mut self.state)?;
         }
         let info = self.state.buffer.clone().context("no buffer info")?;
-        if !matches!(info.format, wl_shm::Format::Xrgb8888 | wl_shm::Format::Argb8888) {
-            bail!("unsupported shm format {:?}", info.format);
-        }
+        // The pixman renderer gives Xrgb8888 (bytes B G R X in memory, what the encoder takes); a GPU renderer gives Xbgr8888 (R G B X).
+        let swap_rb = match info.format {
+            wl_shm::Format::Xrgb8888 | wl_shm::Format::Argb8888 => false,
+            wl_shm::Format::Xbgr8888 | wl_shm::Format::Abgr8888 => true,
+            other => bail!("unsupported shm format {other:?}"),
+        };
         let size = info.stride as usize * info.height as usize;
         self.ensure_pool(size)?;
         let buffer = self.pool.as_ref().unwrap().pool.create_buffer(
@@ -282,6 +285,9 @@ impl Capturer {
             data.extend_from_slice(&map[src_row * stride..src_row * stride + w * 4]);
         }
         for px in data.chunks_exact_mut(4) {
+            if swap_rb {
+                px.swap(0, 2);
+            }
             px[3] = 255;
         }
         let full = Rect { x: 0, y: 0, w: w as u32, h: h as u32 };

@@ -26,6 +26,9 @@ if [ "$1" = configure ]; then
     if [ -x /usr/lib/systemd/system-generators/zram-generator ] && ! grep -q zram /proc/swaps 2>/dev/null; then
         systemctl start systemd-zram-setup@zram0.service >/dev/null 2>&1 || true
     fi
+    # A GPU, if there is one: the rule gives waydesk-users the render node (sessions use it by default, WAYDESK_GPU=off to stop that).
+    udevadm control --reload >/dev/null 2>&1 || true
+    udevadm trigger --subsystem-match=drm --action=change >/dev/null 2>&1 || true
     systemctl enable waydesk-helper.service waydesk.service >/dev/null 2>&1 || true
     systemctl restart waydesk-helper.service waydesk.service >/dev/null 2>&1 || true
     # On a first install nobody may log in over RDP until an account is in waydesk-users (the account that ran the installation was added

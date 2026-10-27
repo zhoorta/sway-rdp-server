@@ -309,12 +309,17 @@ PY
     fi
 fi
 # Chromium from Flathub (what the installer gives where the distribution has no Chromium package, as on Ubuntu) keeps its settings per account under
-# ~/.var/app, out of reach of /etc/chromium: the same ones are written there once: no GPU process (see /etc/chromium.d/waydesk) and the window manager's title bar.
+# ~/.var/app, out of reach of /etc/chromium: the same ones are written there once: no GPU process unless the machine has a GPU (see /etc/chromium.d/waydesk) and the window manager's title bar.
 flatpak_chromium="$HOME/.var/app/org.chromium.Chromium"
 if [ ! -e "$dms_dir/.flatpak-chromium" ] && { [ -d /var/lib/flatpak/app/org.chromium.Chromium ] || [ -d "$HOME/.local/share/flatpak/app/org.chromium.Chromium" ]; }; then
     mkdir -p "$flatpak_chromium/config/chromium/Default"
     flags="$flatpak_chromium/config/chromium-flags.conf"
-    grep -qs -- '--disable-gpu' "$flags" || printf '%s\n' '--disable-gpu' >> "$flags"
+    # With a GPU (a render node this account can open, unless WAYDESK_GPU=off) Chromium keeps it.
+    waydesk_gpu=0
+    if [ "${WAYDESK_GPU:-auto}" != off ]; then
+        for node in /dev/dri/renderD*; do [ -w "$node" ] && waydesk_gpu=1; done
+    fi
+    [ "$waydesk_gpu" = 1 ] || grep -qs -- '--disable-gpu' "$flags" || printf '%s\n' '--disable-gpu' >> "$flags"
     # First run of the Flathub build: its "Additional Terms of Service" window has a placeholder text ("This Space Intentionally Blank") and the
     # browser does not open until it is accepted; these two files are what the accept button writes. And no keyring: nothing unlocks one in a
     # Waydesk session (the password is checked by the helper, not by the session's PAM stack), so libsecret would ask for a new password at the first

@@ -1,0 +1,3 @@
+# Waydesk: the accounts of the sessions (group waydesk-users) may use the GPU through its render node (OpenGL, Vulkan, video encode).
+# Only a render node is opened, never the display node (card*), and only by an ACL: the owner and the group `render` stay as they are.
+ACTION=="add|change", SUBSYSTEM=="drm", KERNEL=="renderD*", RUN+="/usr/bin/setfacl -m g:waydesk-users:rw $env{DEVNAME}"

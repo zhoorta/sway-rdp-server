@@ -25,6 +25,7 @@ install -m 644 packaging/systemd/sysctl/50-waydesk.conf $P/usr/lib/sysctl.d/50-w
 mkdir -p $P/usr/lib/waydesk/admin && install -m 755 packaging/admin/access packaging/admin/cert packaging/admin/vpn $P/usr/lib/waydesk/admin/ && install -m 644 packaging/admin/common.sh $P/usr/lib/waydesk/admin/   # waydesk-admin access, cert, vpn
 install -m 644 packaging/systemd/waydesk-cert-renew.service packaging/systemd/waydesk-cert-renew.timer $P/lib/systemd/system/
 mkdir -p $P/etc/xkb/symbols && install -m 644 packaging/xkb/waydeskmac $P/etc/xkb/symbols/waydeskmac   # the Mac keyboard layout (~/.config/waydesk/keyboard)
+mkdir -p $P/usr/lib/udev/rules.d && install -m 644 packaging/udev/70-waydesk-gpu.rules $P/usr/lib/udev/rules.d/   # the GPU render node for waydesk-users
 mkdir -p $P/usr/lib/modules-load.d && install -m 644 packaging/systemd/modules-load/waydesk.conf $P/usr/lib/modules-load.d/waydesk.conf   # tcp_bbr
 install -m 644 packaging/default-waydesk $P/etc/default/waydesk
 mkdir -p $P/usr/share/waydesk && install -m 644 packaging/sway-minimal.conf $P/usr/share/waydesk/sway-minimal.conf   # a server without waydesk-desktop still gets a session
