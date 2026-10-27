@@ -1,6 +1,6 @@
 # GPU support: plan
 
-Status: stage 1 built and measured (uncommitted), stages 2 and 3 open. 2026-10-27.
+Status: stages 1 and 2 built and measured, stage 3 (zero copy) open. 2026-10-27.
 
 ## Today
 
@@ -66,3 +66,28 @@ What it needed beyond the renderer switch:
 
 With a full-screen 60 fps animation the account's CPU is dominated by our own encoder, not by rendering: the session worker (capture, BGRA to YUV, OpenH264)
 used 107 % of a core, Chromium 8 %, its GPU process 6 %, sway 4 %. Stage 2 (hardware encode) is where the rest of the saving is.
+
+## Results of stage 2 (2026-10-27)
+
+The VAAPI encoder (`src/encode_va.rs`, `src/encoder.rs`) uses `cros-codecs` 0.0.6 (BSD-3) on top of `cros-libva`. The colour conversion (BGRA to NV12) is on the CPU,
+straight into the VA surface; the picture is still copied out of the compositor's shm buffer. Same i7-7700, full-screen WebGL shader at 61 fps: the session
+worker takes 21 % of a core (OpenH264: 107 %). The fixed-function encoder (`EncSliceLP`) needs the GuC firmware on Skylake to Coffee Lake and fails without it,
+so the code tries it first and falls back to `EncSlice`, which works.
+
+What did not work, and why the encoder looks the way it does:
+- **Hardware CBR.** Intel pads every frame to the target: a static grey picture costs 29.8 KB a frame at 8 Mbit/s (VBR: 0.08 KB). A window being dragged
+  cost 5.1 Mbit/s against 1.0 for OpenH264. The chip also expects a steady frame rate, and ours come when something changes.
+- **VBR** is not in the crate (it offers CBR and constant quantiser); a patch means vendoring 5 MB.
+- **Changing the quantiser per frame** through `tune()`: the crate starts a new sequence on every change, which is a keyframe, so every frame became a
+  600 KB keyframe. `BackendRequest` has private fields, so its lower layer (per-frame `slice_qp_delta`) cannot be driven from outside.
+- So: constant quantiser, two steps below `--quality` (18 by default), and a controller (`QpControl`) that moves it up in tiers to 40 only after a second of
+  overload and back after five of calm, never twice in two seconds. Dragging a window: 1.0 to 1.3 Mbit/s (OpenH264: 1.0). A random-noise shader cannot reach
+  8 Mbit/s at any sensible quantiser, with either encoder.
+
+Testing on a real link showed what the slowness of the first runs was: an SSH tunnel to Germany that delivered 0.7 Mbit/s (the daemon's log line
+`the encoder's bitrate follows what the link delivers` said so). On a link with 50 Mbit/s down the same session, with the browser, the text page, a dragged
+window and the WebGL page, was smooth, "even the OpenGL".
+
+Still open: stage 3 (dmabuf capture and the colour conversion on the GPU, which would take the CPU copy and `bgra_to_yuv_nv12` away); text sharpness of the
+hardware encoder against OpenH264's screen-content mode (looked the same by eye, no PSNR yet); AMD (`mesa-va-drivers`) and NVIDIA (NVENC, not VAAPI) are untested;
+many users at once on one GPU; the arm64 build with `vaapi` (compiles in the build container, no GPU to run it on).

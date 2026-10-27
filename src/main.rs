@@ -11,6 +11,9 @@ mod clipboard;
 mod cursors;
 mod egfx;
 mod encode;
+#[cfg(feature = "vaapi")]
+mod encode_va;
+mod encoder;
 mod fdpass;
 mod gpu;
 mod helper;

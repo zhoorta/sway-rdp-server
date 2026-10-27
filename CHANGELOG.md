@@ -2,6 +2,10 @@
 
 What changed, newest first. The numbered releases are the ones in the apt repository.
 
+## Unreleased
+
+**A GPU, when there is one.** A session draws its desktop on the machine's GPU (a render node in `/dev/dri`) and encodes the H.264 picture with the chip's encoder through VAAPI; without a GPU, or when anything about it fails, it is software as before. On an Intel HD 630 (i7-7700, Debian 13): the OpenGL benchmark goes from 167 to 2840 points, the session's CPU for a full-screen animation from 107 % of a core to 21 %, and Chromium gets WebGL (it ran with `--disable-gpu` before, which also meant no WebGL at all). `WAYDESK_GPU=off` and `WAYDESK_ENCODER=software` in `/etc/default/waydesk` switch it off; the accounts get the render node through a udev rule for `waydesk-users` (`acl` is a new dependency, as are `libva2` and `libva-drm2`). The VAAPI encoder is `cros-codecs` (BSD-3, ChromiumOS). Notes and numbers in `docs/GPU-PLAN.md`.
+
 ## 2026-10-26 · 0.3.1
 
 **Through an SSH tunnel.** The flow control looks at the socket's send queue: while more than about 190 kB is queued the next frame waits, and while the queue is deep the capacity is how fast the peer acknowledges (the kernel's delivery rate is the first hop then, the loopback to `sshd`, which says nothing about the real link). Before, an SSH tunnel in front of a slow link let 3 MB build up, which is seconds between a click and its picture, while the encoder aimed for 10 to 40 Mbit/s. The log shows the queue next to the bitrate.

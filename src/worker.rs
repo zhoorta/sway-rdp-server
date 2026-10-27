@@ -11,7 +11,8 @@ use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
 use crate::capture::Rect;
-use crate::encode::{Tuning, H264};
+use crate::encode::Tuning;
+use crate::encoder::Encode;
 use crate::input;
 use crate::proto::{self, Down, FrameKind, Up};
 use crate::sessionaudio::Audio;
@@ -101,7 +102,7 @@ enum Outcome {
 
 struct Worker {
     session: Option<Session>,
-    enc: Option<H264>,
+    enc: Option<Box<dyn Encode>>,
     tuning: Option<Tuning>,
     /// Frames the daemon has room for.
     credits: u32,
@@ -451,7 +452,7 @@ impl Worker {
         if self.enc.is_none() {
             let tuning = self.tuning.context("no encoder settings")?;
             let tuning = Tuning { bitrate: self.bitrate.unwrap_or(tuning.bitrate), ..tuning };
-            self.enc = Some(H264::new(shared.width, shared.height, tuning)?);
+            self.enc = Some(crate::encoder::open(shared.width, shared.height, tuning)?);
         }
         match self.enc.as_mut().expect("encoder").encode(frame, w, h)? {
             Some(data) => {

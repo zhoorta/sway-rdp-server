@@ -5,6 +5,10 @@ edition = "2021"
 description = "RDP server for sway: one headless output per connection, H.264 over the graphics pipeline, keyboard, pointer and audio"
 license = "MIT OR Apache-2.0"
 
+[features]
+default = ["vaapi"]
+vaapi = ["dep:cros-codecs"]
+
 [dependencies]
 ironrdp-server = { version = "0.13", features = ["helper", "egfx"] }
 ironrdp-displaycontrol = "0.8"
@@ -20,6 +24,8 @@ openh264 = { version = "0.9", default-features = false, features = ["libloading"
 # The raw interface of the encoder, to change its bitrate while it runs (the link to the client may get slower or faster).
 openh264-sys2 = { version = "0.9", default-features = false, features = ["libloading"] }
 yuv = "0.8"
+# H.264 on the GPU (VAAPI), for sessions that render on one: the encoder of the ChromiumOS project (BSD-3), linked to libva at run time by the loader.
+cros-codecs = { version = "0.0.6", optional = true, default-features = false, features = ["vaapi"] }
 anyhow = "1"
 serde_json = "1"
 libc = "0.2"
