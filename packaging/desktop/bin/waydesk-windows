@@ -5,8 +5,9 @@
   waydesk-windows minimize   send the focused window to the scratchpad
   waydesk-windows restore [ID]  bring a minimized window back (the last one without an ID)
   waydesk-windows list       the minimized windows as JSON: [{"id", "title", "app"}]
-  waydesk-windows fit        pull every window of this workspace back into the usable area
-  waydesk-windows watch      run `fit` twice a second (started by the session's sway config)
+  waydesk-windows fit        bring every window of this workspace entirely back into the usable area (the bottom may still go behind the dock)
+  waydesk-windows watch      twice a second, keep every window reachable (started by the session's sway config): the title bar on the screen, the rest
+                             may hang over the left and right edges (EDGE_VISIBLE of it stays) and down behind the dock
   waydesk-windows workspaces            the workspaces and their windows (minimized ones too) as JSON (the bar's workspace button uses it)
   waydesk-windows workspace-new         a new workspace at the next free number, and go to it
   waydesk-windows workspace-go NAME     go to a workspace
@@ -133,18 +134,22 @@ def place(con_id, x, y, w=None, h=None, deco=0):
 
 # The dock floats over the bottom of the screen (it reserves no space): keep the title bar of a window above it.
 DOCK_CLEARANCE = 60
+# A window may hang over the left and right edges as it may over the bottom, so long as this much of it stays on the screen to be grabbed by.
+EDGE_VISIBLE = 120
 
 
-def fit_node(ws, n):
-    """Keep a floating window reachable: inside the usable area of its workspace, except that the bottom may go down behind the dock
-    (the title bar stays above it, so the window can always be dragged back)."""
+def fit_node(ws, n, whole=False):
+    """Keep a floating window reachable: its title bar inside the usable area of its workspace. The rest may go beyond the left and right
+    edges (EDGE_VISIBLE of it stays) and down behind the dock (the title bar stays above it), so the window can always be dragged back.
+    With `whole` the window is brought entirely inside the area (only the bottom may still go behind the dock): what the user asks for with `fit`."""
     area = usable(ws["name"])
     if not area or n.get("fullscreen_mode"):
         return
     ax, ay, aw, ah = area
     x, y, w, h, deco = geometry(n)
     nw, nh = min(w, aw), min(h, ah - deco)
-    nx = min(max(x, ax), ax + aw - nw)
+    visible = nw if whole else min(EDGE_VISIBLE, nw)
+    nx = min(max(x, ax - nw + visible), ax + aw - visible)
     ny = min(max(y, ay), ay + ah - deco - DOCK_CLEARANCE)
     if (nx, ny, nw, nh) != (x, y, w, h):
         place(n["id"], nx, ny, nw, nh, deco)
@@ -207,11 +212,11 @@ def minimized():
     return out
 
 
-def fit_all():
+def fit_all(whole=False):
     focused_ws = next((w["name"] for w in workspaces() if w["focused"]), None)
     for ws, n in floating_windows():
         if ws["name"] == focused_ws:
-            fit_node(ws, n)
+            fit_node(ws, n, whole)
 
 
 FIRST_WORKSPACE = "Remote"
@@ -312,7 +317,7 @@ def main():
     elif cmd == "list":
         print(json.dumps(minimized()))
     elif cmd == "fit":
-        fit_all()
+        fit_all(whole=True)
     elif cmd == "watch":
         watch()
     elif cmd == "workspaces":
