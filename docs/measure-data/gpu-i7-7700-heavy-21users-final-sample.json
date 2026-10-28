@@ -1,0 +1,5 @@
+{"cpu_busy_pct": 45.3, "cpu_CLIENTS": 0.0, "cpu_chromium": 6.9, "cpu_foot": 0.8, "cpu_harness": 1.6, "cpu_other": 12.2, "cpu_shell": 0.7, "cpu_sshd": 0.0, "cpu_sway": 3.2, "cpu_waydesk": 4.4, "gpu_Render": 15.4, "gpu_Video": 24.8, "gpu_VideoEnhance": 0.0, "gpu_Blitter": 0.0, "gpu_MHz": 692, "pkg_W": 17.9}
+Mem:           64093       55517         632       21997       30645        8576
+Swap:          24575        1854       22721
+10.14 9.10 9.56
+finished

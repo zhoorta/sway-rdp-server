@@ -128,3 +128,24 @@ header: no new encoder, no IDR. One IDR in a whole run of the harness, slice del
 Also in that patch: with constant quality the coded buffer was a fixed 1.5 MB, and a keyframe of full-screen noise at QP 18 (1.8 MB) overflowed it ("allocated
 memory size is not enough"), which ended the session's connection, again at every reconnect while the noise was on screen. The buffer is now as large as a raw
 NV12 picture. Not yet tried: zero-copy with the fix in Windows App, and the same in sdl-freerdp.
+
+## NVIDIA, a first look (2026-10-28)
+
+Server: Hetzner auction, i5-13500 (Intel UHD 770) and an RTX 4000 SFF Ada, 62 GB, Debian 13, kernel 6.12, installed with `installimage` and kernel mode
+setting on. Two render nodes: `renderD128` the Intel iGPU, `renderD129` the NVIDIA card.
+
+- **Debian's driver (550.163) does not work for a headless sway.** On `renderD129` the GLES2 renderer starts, but the output buffers cannot be allocated
+  (`gbm_bo_create failed: Permission denied`, `DRM_IOCTL_MODE_CREATE_DUMB failed`); the Vulkan renderer starts and fails to allocate too. Opening the card node
+  to the group changes nothing, and wlroots refuses a card node for `WLR_RENDER_DRM_DEVICE`.
+- **NVIDIA's own 615.71.10 does** (`nvidia-open` from `developer.download.nvidia.com/compute/cuda/repos/debian13`): both renderers allocate with no errors.
+- **A session then runs on the NVIDIA GPU.** Sway renders on `renderD129`; a full-screen WebGL page in Chromium shows 52 fps with the card 41 % busy. Things it needed:
+  the GPU rule of `packaging/udev/70-waydesk-gpu.rules` (the render node opened to `waydesk-users`), the GPU-aware `/etc/chromium.d/waydesk` of this repository
+  (the one of 0.3.1 adds `--disable-gpu` unconditionally), and the capture to take 24-bit pixels: NVIDIA's GLES reads back `Bgr888`, which ended the session
+  until 6dfb97c.
+- **The picture still goes through the CPU.** The GBM buffer of the zero-copy capture (linear XRGB) is refused by NVIDIA's allocator (`EINVAL`), so the capture falls back to
+  shared memory, and VAAPI has no encoder on NVIDIA: `VAAPI encoder not available`, OpenH264 on the CPU (about 13 % of a core for one full-screen WebGL page at 52 fps).
+- **NVENC works.** `ffmpeg h264_nvenc` encodes a 1680x1050 test pattern at 527 fps; the Intel iGPU of the same box through VAAPI: 446 fps; x264 ultrafast: 1012 fps on
+  20 threads (speed is not what matters, the CPU it takes is).
+- **A machine with both GPUs already works**: sway on the Intel node (`WAYDESK_GPU=/dev/dri/renderD128`), GLES2 and Vulkan, no errors.
+
+Not done: an NVENC encoder (BGRA in, so no converter), zero-copy from NVIDIA, GL and Vulkan apps measured on it, several users on one card.
