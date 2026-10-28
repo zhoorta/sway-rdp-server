@@ -455,8 +455,20 @@ Started in a session, 35 seconds each, as the account (Zed 1.25 from Flathub; Bl
 | `glxgears` (OpenGL) | opens, the card 17 % busy | opens, on the CPU (0 % on the card) |
 | `vkcube` (Vulkan) | opens, the card 21 % busy | **fails**: `demo_init_vk_swapchain: Assertion '!err' failed` |
 
-The software compositor takes no GPU buffers, so a Vulkan application cannot present its window; everything that uses OpenGL falls back to the CPU. **The failure the site used to list for Zed ("Failed to create surface")
-did not reproduce** with Zed 1.25 in either mode; whether it still fails on a server with no render node at all (a cloud server) has not been tried again. These applications were opened, not used: how fast they are with and
+With a render node present and the GPU switched off, the software compositor takes no GPU buffers and a Vulkan application cannot present its window; everything that uses OpenGL falls back to the CPU. **The failure the site used to list for Zed ("Failed to create surface") did not reproduce** with Zed 1.25 in either mode.
+
+### A server with no render node at all (2026-10-28)
+A cloud server with no `/dev/dri` (Debian 13, 4 vCPU, 8 GB), one session, a local `sdl-freerdp3` client, Mesa's software drivers (`llvmpipe`, and lavapipe for Vulkan):
+
+| | result |
+|---|---|
+| `glxgears` (OpenGL) | opens |
+| `vkcube --wsi wayland` (Vulkan) | **opens** (the `vkcube` failure above only happened with a render node present and the GPU switched off) |
+| Zed 1.25 | opens (its window appears); no error |
+| Chromium, WebGL page, as Waydesk starts it | does not animate (the page's title never shows a frame rate): `/etc/chromium.d/waydesk` adds `--disable-gpu` |
+| Chromium with `--use-angle=swiftshader --enable-unsafe-swiftshader` | 8 fps, the browser using about 310 % CPU of 400 % |
+
+"Opens" is a window and a running process, looked at through sway, not at the picture. Blender, Kdenlive, darktable, VS Code and LibreOffice were tried only on the machine with the Intel device, with the GPU on and off, not here. These applications were opened, not used: how fast they are with and
 without the GPU was not measured.
 
 ### When the GPU cannot encode

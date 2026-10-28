@@ -355,7 +355,7 @@ macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoder
 <div class="body">
 <ul class="plain">
 <li>Early software. Tested with FreeRDP, the Windows App on macOS and mstsc on Windows 11 (ARM, in a VM, with the GPU encoders); older Windows clients were not tested.</li>
-<li>No GPU: everything runs on the CPU. OpenGL applications start and are slow, a WebGL page in the browser does not animate, and a Vulkan application cannot show its window (it needs a session on a GPU). Zed, Blender, Kdenlive, darktable, VS Code and LibreOffice opened with and without one.</li>
+<li>No GPU: everything runs on the CPU. OpenGL and Vulkan applications open and are slow (<code>glxgears</code>, <code>vkcube</code> and Zed opened on a server with no render node), and a WebGL page in the browser does not animate, because the browser is started without its GPU process (about 8 fps with SwiftShader, using three cores). With a render node but the GPU switched off, <code>vkcube</code> failed to show its window.</li>
 <li>With a GPU: tried on an Intel HD 630 and an NVIDIA RTX 4000 SFF Ada (NVIDIA needs driver 615 or newer; Debian's 550 cannot draw the desktop); AMD should work through VAAPI and was not tried. The GPU is shared by every session: ten users on full-screen WebGL get about 13 fps each. An integrated GPU takes some system memory for each session.</li>
 <li>Sizing: on an 8 GB, 4-core server count 7 to 8 users with Chromium, Calc and VS Code open if most are idle. A 12-vCPU, 23 GB server (Hetzner CPX52, 123.60 euros a month) held 12 of them before it refused the 13th; memory is the limit, about 1.6 GB per such user. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down.</li>
 </ul>

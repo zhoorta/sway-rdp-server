@@ -5,9 +5,9 @@ description: What Waydesk does with a GPU (Intel, AMD, NVIDIA), how to set it up
 No GPU is needed. When the machine has one, every session draws its desktop on it and encodes the H.264 picture with the chip's own encoder, which leaves the CPU to the programs, and Chromium gets WebGL. If anything about the GPU fails, the session carries on in software.
 
 ## What it changes {bar: notes}
-- **The desktop** (sway, the shell, the applications' windows) is drawn on the GPU through a render node in `/dev/dri`. OpenGL and WebGL applications run on it; without a GPU they run on the CPU, and a WebGL page in the browser does not animate.
+- **The desktop** (sway, the shell, the applications' windows) is drawn on the GPU through a render node in `/dev/dri`. OpenGL and WebGL applications run on it; without a GPU they run on the CPU, and a WebGL page in the browser does not animate (see below).
 - **The picture** is converted and encoded on the chip (VAAPI on Intel and AMD, NVENC on NVIDIA). On Intel the capture is also zero-copy: the compositor draws into GPU buffers and the GPU's video processor converts them, so the picture never passes through the CPU.
-- **Vulkan applications** need a session on a GPU: with the software compositor they cannot show their window.
+- **Without a GPU** OpenGL and Vulkan applications still open, drawn by Mesa's software drivers on the CPU (`glxgears`, `vkcube` and Zed opened on a server with no render node). The browser is the exception: Waydesk starts Chromium with `--disable-gpu` there, which saves memory but leaves WebGL out, so a WebGL page does not animate. `--use-angle=swiftshader --enable-unsafe-swiftshader` brings it back at about 8 fps for a full-screen page, using three of four cores. A server that has a render node while `WAYDESK_GPU=off` is a different case: `vkcube` failed there.
 - **Nothing to configure** in the usual case: the package gives the accounts of `waydesk-users` the render node with a udev rule, and `WAYDESK_GPU=auto` picks the first one.
 
 ## Which GPUs {bar: table}
