@@ -1,5 +1,6 @@
 title: How it compares
 nav: How it compares
+seo_title: Waydesk compared with xrdp, GNOME Remote Desktop, X2Go, NoMachine, VNC
 description: Waydesk next to xrdp, the GNOME remote desktop, X2Go, NoMachine and VNC: what each is for, and when to choose Waydesk.
 ---
 A short, honest map. We have measured only Waydesk: nothing here claims that it is faster than the others, only what each tool is built around.

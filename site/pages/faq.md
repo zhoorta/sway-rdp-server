@@ -1,5 +1,6 @@
 title: Questions and answers
 nav: FAQ
+seo_title: Waydesk FAQ: GPU, Sway, sessions, apps, capacity, security
 description: Short answers: whether a GPU is needed, why Sway, what happens when you disconnect, which apps run, how many users fit, and who makes Waydesk.
 ---
 Short answers, with a link to the page that has the rest.

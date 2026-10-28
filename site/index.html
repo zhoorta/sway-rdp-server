@@ -3,17 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Waydesk · A Linux desktop over RDP, out of the box</title>
+<title>Waydesk: multi-user Linux desktop over RDP for Debian and Ubuntu</title>
 <meta name="description" content="Waydesk gives every account on a Debian 13 or Ubuntu 26.04 server its own desktop over RDP, out of the box: one apt install, no GPU needed (it uses one when there is one), tuned for slow links. Signed apt repository, measurements with methods, threat model.">
 <link rel="canonical" href="https://waydesk.dev/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#06121c">
-<meta property="og:title" content="Waydesk">
+<meta property="og:title" content="Waydesk: multi-user Linux desktop over RDP for Debian and Ubuntu">
 <meta property="og:description" content="A Linux desktop over RDP, out of the box. One apt install on Debian or Ubuntu, no GPU needed (it uses one when there is one), tuned for slow links. Measured, documented, free software.">
 <meta property="og:url" content="https://waydesk.dev/">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="Waydesk">
+<meta property="og:image" content="https://waydesk.dev/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Waydesk: multi-user Linux desktop over RDP for Debian and Ubuntu">
+<meta name="twitter:description" content="A Linux desktop over RDP, out of the box. One apt install on Debian or Ubuntu, no GPU needed (it uses one when there is one), tuned for slow links. Measured, documented, free software.">
+<meta name="twitter:image" content="https://waydesk.dev/og.jpg">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Waydesk", "description": "A Linux desktop over RDP, out of the box: every account on a Debian or Ubuntu server gets its own desktop session.", "url": "https://waydesk.dev/", "applicationCategory": "DeveloperApplication", "operatingSystem": "Debian 13, Ubuntu 26.04", "softwareVersion": "0.4.0", "license": "https://spdx.org/licenses/MIT.html", "downloadUrl": "https://waydesk.dev/docs/install/", "softwareHelp": "https://waydesk.dev/docs/", "codeRepository": "https://github.com/zhoorta/waydesk", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "author": {"@type": "Organization", "name": "StackCare", "url": "https://stackcare.pt"}}</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body class="sans">
@@ -46,7 +55,7 @@
     </div>
     <p class="note">Free software, early. Tested with FreeRDP and the Windows App on macOS.</p>
   </div>
-  <div class="shot"><img src="desktop.png" width="1680" height="1050" alt="A Waydesk desktop seen from the Windows App: the shell bar and dock, a browser showing this site, Text Editor and a terminal"></div>
+  <div class="shot"><picture><source srcset="desktop.webp" type="image/webp"><img src="desktop.png" width="1680" height="1050" alt="A Waydesk desktop seen from the Windows App: the shell bar and dock, a browser showing this site, Text Editor and a terminal"></picture></div>
 </div>
 
 <section class="band" id="who">

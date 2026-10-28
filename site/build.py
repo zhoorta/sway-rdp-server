@@ -7,7 +7,9 @@ pages. The generated files are committed (the site is a folder that is copied as
 `rsync -a --exclude=.DS_Store --exclude=build.py --exclude=pages -e "ssh -i ~/.ssh/id_ed25519_metproof -o IdentitiesOnly=yes" site/ waydesk@2.28.140.203:app/` (no --delete: the apt repository lives in app/apt).
 """
 import html
+import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -163,23 +165,33 @@ FOOT = f"""<footer>
 </footer>"""
 
 
-def shell(title, desc, url, body, kind="article"):
+def shell(title, desc, url, body, kind="article", ld="", full_title=None):
+    page_title = full_title or f"{title} \u00b7 Waydesk"
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{html.escape(title)} \u00b7 Waydesk</title>
+<title>{html.escape(page_title)}</title>
 <meta name="description" content="{html.escape(desc, quote=True)}">
 <link rel="canonical" href="{BASE}{url}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#06121c">
-<meta property="og:title" content="{html.escape(title)} \u00b7 Waydesk">
+<meta property="og:title" content="{html.escape(page_title)}">
 <meta property="og:description" content="{html.escape(desc, quote=True)}">
 <meta property="og:url" content="{BASE}{url}">
 <meta property="og:type" content="{kind}">
+<meta property="og:site_name" content="Waydesk">
+<meta property="og:image" content="{BASE}/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{html.escape(page_title)}">
+<meta name="twitter:description" content="{html.escape(desc, quote=True)}">
+<meta name="twitter:image" content="{BASE}/og.jpg">
+{ld}
 <link rel="stylesheet" href="/style.css">
 </head>
 <body class="sans">
@@ -243,7 +255,11 @@ def page_html(meta, intro, sections, pages, source_name):
 <p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/{source_name}">a file in the repository</a>: corrections are welcome.</p>
 </main>
 </div>"""
-    return shell(meta["title"], meta["description"], f"/docs/{slug}/", body)
+    crumbs = json.dumps({"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "Waydesk", "item": f"{BASE}/"},
+        {"@type": "ListItem", "position": 2, "name": "Documentation", "item": f"{BASE}/docs/"},
+        {"@type": "ListItem", "position": 3, "name": meta["title"], "item": f"{BASE}/docs/{slug}/"}]})
+    return shell(meta["title"], meta["description"], f"/docs/{slug}/", body, ld=f'<script type="application/ld+json">{crumbs}</script>', full_title=meta.get("seo_title"))
 
 
 def index_html(pages):
@@ -277,8 +293,15 @@ def main():
         out.write_text(page_html(meta, intro, sections, metas, name))
         print("wrote", out.relative_to(SITE))
     (SITE / "docs" / "index.html").write_text(index_html(metas))
-    urls = [f"{BASE}/", f"{BASE}/docs/"] + [f"{BASE}/docs/{s}/" for s in ORDER]
-    (SITE / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(f"<url><loc>{u}</loc></url>" for u in urls) + "</urlset>\n")
+    def lastmod(*files):
+        """The date of the last commit that touched one of the files (none when git does not know them)."""
+        out = subprocess.run(["git", "log", "-1", "--format=%cs", "--", *map(str, files)], capture_output=True, text=True, cwd=SITE).stdout.strip()
+        return f"<lastmod>{out}</lastmod>" if out else ""
+
+    entries = [(f"{BASE}/", lastmod(SITE / "index.html")), (f"{BASE}/docs/", lastmod(*PAGES.glob("*")))]
+    entries += [(f"{BASE}/docs/{s}/", lastmod(PAGES / pages[s][3])) for s in ORDER]
+    urls = [u for u, _ in entries]
+    (SITE / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(f"<url><loc>{u}</loc>{m}</url>" for u, m in entries) + "</urlset>\n")
     print("wrote docs/index.html and sitemap.xml:", len(urls), "urls")
     unknown = set(metas) - set(ORDER)
     if unknown:

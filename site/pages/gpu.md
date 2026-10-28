@@ -1,5 +1,6 @@
 title: Using a GPU
 nav: GPU
+seo_title: GPU acceleration for a remote Linux desktop: Intel, NVIDIA, AMD · Waydesk
 description: What Waydesk does with a GPU (Intel, AMD, NVIDIA), how to set it up, how to see what each session runs, what happens when it fails, and what was measured.
 ---
 No GPU is needed. When the machine has one, every session draws its desktop on it and encodes the H.264 picture with the chip's own encoder, which leaves the CPU to the programs, and Chromium gets WebGL. If anything about the GPU fails, the session carries on in software.

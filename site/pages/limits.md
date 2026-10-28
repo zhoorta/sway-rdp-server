@@ -1,5 +1,6 @@
 title: Limits and status
 nav: Limits and status
+seo_title: Waydesk limits and status: tested systems, clients and capacity
 description: What Waydesk is not yet: early software, the clients and GPUs it was tried with, what happens without a GPU, and how many users a server holds.
 ---
 Waydesk is early, free software, written and tested by one person on real servers. This page says what was tried, what was not, and what to expect. Nothing here is hidden in a footnote elsewhere.

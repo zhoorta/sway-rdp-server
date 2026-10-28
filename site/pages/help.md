@@ -1,5 +1,6 @@
 title: When something is wrong
 nav: Troubleshooting
+seo_title: Troubleshooting Waydesk: connection, session, slow picture, GPU
 description: What to check when a client cannot connect, a session is refused, the picture is slow or wrong, or the GPU is not used. Where the logs are.
 ---
 Most problems show in one of three places: `waydesk-admin status`, `waydesk-admin access show`, and the journal. Start there.

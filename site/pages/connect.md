@@ -1,5 +1,6 @@
 title: Connect
 nav: Connect
+seo_title: How to connect to your Linux RDP desktop: SSH tunnel, LAN, VPN · Waydesk
 description: The ways an RDP client can reach a Waydesk server: an SSH tunnel, the local network, a WireGuard VPN, and certificates a client can verify.
 ---
 The RDP login is a TLS login with the account's password, and there is no second factor. So the port is **closed to the network until you open it**. Four things are set, each with one command: where it listens, which addresses may connect, what certificate clients check, and, if you want one, a VPN.

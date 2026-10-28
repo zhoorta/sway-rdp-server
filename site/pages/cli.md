@@ -1,5 +1,6 @@
 title: The command line
 nav: Command line
+seo_title: waydesk-admin command line: users, sessions, status, access · Waydesk
 description: Every waydesk-admin command with its real output: accounts, sessions, limits, status and --watch, access, certificates and the VPN.
 ---
 `waydesk-admin` is how an administrator looks after a server. Listing and `status` are open to every local account (an ordinary account sees its own row and the totals; administrators see every account); everything else needs root (`sudo`). Each command below was run on a real server, and the output is shown as it came, with only passwords and keys removed.
