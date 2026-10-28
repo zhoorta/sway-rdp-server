@@ -138,7 +138,7 @@ pre code { background: none; border: 0; padding: 0; font-size: inherit; }
   color: var(--dim);
   font-size: var(--fs-xs);
 }
-.win > .bar .t, .win > .bar h2 { flex: 1; margin: 0; font-size: var(--fs-xs); font-weight: 400; color: var(--dim); }
+.win > .bar .t, .win > .bar h2 { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-xs); font-weight: 400; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .win > .body { padding: var(--s4); }
 /* a line of text is at most about 78 characters long; tables and code use the whole window */
 .win > .body > p, .win > .body > ul, .win > .body > dl.log, .win > .body > .method { max-width: 78ch; }
@@ -203,6 +203,9 @@ dl.refold dd { margin: 0; color: var(--dim); }
 
 /* architecture diagram, centred */
 .dg { max-width: 480px; margin: var(--s4) auto; }
+/* a diagram in its own window, centred and not wider than it needs */
+.win.diagram { max-width: 640px; margin: var(--s4) auto var(--s5); }
+.win.diagram .dg { margin: 0 auto; }
 .dg svg { display: block; width: 100%; height: auto; }
 .dg .zone { fill: none; stroke: var(--dim); stroke-width: 1; stroke-dasharray: 5 4; }
 .dg .box { fill: rgba(255, 255, 255, .04); stroke: var(--line); stroke-width: 1.2; }

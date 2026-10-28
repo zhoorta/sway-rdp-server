@@ -110,6 +110,9 @@
 <h2>Connect your way</h2>
 <p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect; <code>waydesk-admin access</code> changes it later (<a href="https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md">docs/ACCESS.md</a>).</p>
 </section>
+<div class="win diagram">
+<div class="bar"><span class="t">how a client reaches the port</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
 <div class="dg">
 <svg viewBox="0 0 520 250" role="img" aria-labelledby="adt ads">
 <title id="adt">How a client reaches the RDP port</title>
@@ -143,9 +146,11 @@
 <path class="arrow" d="M306 198 L346 150" marker-end="url(#ah2)"/>
 </svg>
 </div>
+</div>
+</div>
 <div class="grid">
   <div class="win card">
-    <div class="bar"><span class="t">this machine or an SSH tunnel</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="bar"><span class="t">ssh tunnel</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
     <div class="body"><h3>The default <span class="tag def">default</span></h3><p>Listens on <code>127.0.0.1</code> only. One <code>ssh -L</code> and the client connects to localhost.</p></div>
   </div>
   <div class="win card">
@@ -198,7 +203,8 @@ lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 
 <tr><td>Ubuntu 26.04 LTS</td><td class="ok">tested</td><td class="ok">tested</td><td>Chromium and Firefox come from Flathub (no Chromium deb)</td></tr>
 <tr><td>Ubuntu 24.04, Fedora, Arch</td><td colspan="2" class="dim">not yet</td><td>different Qt and wlroots; no rpm yet</td></tr>
 </table></div>
-<p class="method">Tested means a clean server, SSH hardened first, these steps, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on macOS was also used; Microsoft's Windows clients were not tested.</p>
+<p class="method">Tested means a clean server, SSH hardened first, these steps, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on
+macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoders; older Windows clients were not tested.</p>
 </div>
 </div>
 </section>
@@ -207,6 +213,9 @@ lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 
 <h2>Architecture</h2>
 <p>Three parts with different rights: the network-facing daemon has none, a small root helper checks passwords and starts sessions, and each session runs as the account itself.</p>
 </section>
+<div class="win diagram">
+<div class="bar"><span class="t">how a login reaches a session</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
 <div class="dg">
 <svg viewBox="0 0 520 556" role="img" aria-labelledby="dgt dgd">
 <title id="dgt">How a login reaches a session</title>
@@ -258,17 +267,19 @@ lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 
 <text x="484" y="451" text-anchor="end">audio, clipboard</text>
 </svg>
 </div>
+</div>
+</div>
 <div class="grid">
   <div class="win card">
-    <div class="bar"><span class="t">runs as waydesk, no privileges</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="bar"><span class="t">no privileges</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
     <div class="body"><h3><code>waydesk</code></h3><p><span class="k2">does</span> TLS, the RDP protocol, channel framing, rate limits per address.</p><p><span class="k2">never</span> touches user files, calls PAM, keeps a password after the check.</p></div>
   </div>
   <div class="win card">
-    <div class="bar"><span class="t">runs as root, no network</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="bar"><span class="t">root, no network</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
     <div class="body"><h3><code>waydesk-helper</code></h3><p><span class="k2">does</span> checks the password through PAM, starts and finds sessions, admits or refuses by memory.</p><p><span class="k2">never</span> parses RDP or TLS, listens on the network.</p></div>
   </div>
   <div class="win card">
-    <div class="bar"><span class="t">runs as the account</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="bar"><span class="t">the account</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
     <div class="body"><h3><code>waydesk-session@UID</code></h3><p><span class="k2">does</span> its sway, capture, encoder, input, audio, clipboard, hooks.</p><p><span class="k2">never</span> anything as another user.</p></div>
   </div>
 </div>
