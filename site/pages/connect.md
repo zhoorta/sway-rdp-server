@@ -1,5 +1,5 @@
 title: Connect
-nav: connect
+nav: Connect
 description: The ways an RDP client can reach a Waydesk server: an SSH tunnel, the local network, a WireGuard VPN, and certificates a client can verify.
 ---
 The RDP login is a TLS login with the account's password, and there is no second factor. So the port is **closed to the network until you open it**. Four things are set, each with one command: where it listens, which addresses may connect, what certificate clients check, and, if you want one, a VPN.
@@ -86,7 +86,7 @@ $ sudo waydesk-admin access lan
 opens the port to this server's network only (other addresses are closed before TLS). `--allow` narrows or widens it. Do not use `--allow any` without a firewall you trust.
 
 ## A VPN {bar: notes}
-The recommendation for several people or devices, and for anything over the internet: a key per device, nothing exposed but one UDP port. [The VPN page](/vpn/) walks through it.
+The recommendation for several people or devices, and for anything over the internet: a key per device, nothing exposed but one UDP port. [The VPN page](/docs/vpn/) walks through it.
 
 ## A certificate you can verify {bar: terminal}
 At install the server makes a self-signed certificate, and the client has to compare its fingerprint on the first connection (`waydesk-admin cert status` prints it). A local certificate authority removes the comparison:

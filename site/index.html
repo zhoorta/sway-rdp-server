@@ -26,7 +26,6 @@
     <a href="#connect">connect</a>
     <a href="#install">install</a>
     <a href="#measurements">numbers</a>
-    <a href="#limits">limits</a>
     <a href="/docs/">docs</a>
     <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
   </nav>
@@ -52,7 +51,7 @@
 
 <section class="band" id="fast">
 <h2>Built to stay light and fast</h2>
-<p>Most of the work is in not wasting what a server has: memory, CPU and a slow link. Every figure has its method on the <a href="/measurements/">measurements</a> page.</p>
+<p>Most of the work is in not wasting what a server has: memory, CPU and a slow link. Every figure has its method on the <a href="/docs/measurements/">measurements</a> page.</p>
 </section>
 <div class="grid">
   <div class="win card">
@@ -106,26 +105,8 @@
 
 <section class="band" id="connect">
 <h2>Connect your way</h2>
-<p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect; <code>waydesk-admin access</code> changes it later (<a href="https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md">docs/ACCESS.md</a>). Step by step: <a href="/connect/">connect</a> and <a href="/vpn/">the VPN</a>.</p>
+<p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect: through an SSH tunnel (the default), from the local network, or over a WireGuard VPN that Waydesk sets up for you. Clients that were tried: the Windows App on macOS, mstsc on Windows 11 and FreeRDP. <a href="/docs/connect/">How to connect</a> &middot; <a href="/docs/vpn/">VPN and security</a>.</p>
 </section>
-<div class="grid">
-  <div class="win card">
-    <div class="bar"><span class="t">ssh tunnel</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>The default <span class="tag def">default</span></h3><p>Listens on <code>127.0.0.1</code> only. One <code>ssh -L</code> and the client connects to localhost.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">a local network</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Directly, on a LAN</h3><p><code>waydesk-admin access lan</code> opens the port to this network only; other addresses are closed before TLS.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">a VPN</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>WireGuard <span class="tag rec">recommended</span></h3><p><code>vpn init</code>, then <code>vpn add NAME</code>: a client with a QR code. <code>vpn remove</code> cuts one off.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">a certificate</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>One you can verify</h3><p><code>cert local-ca</code> makes an authority of your own; clients import it once and check every connection.</p></div>
-  </div>
-</div>
 
 <section class="sect" id="install">
 <h2>Install</h2>
@@ -175,56 +156,22 @@ macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoder
 <div class="bar"><span class="t">the numbers</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
 <div class="body">
 <div class="tiles"><div class="tile"><div class="big">430 to 600 MB</div><div class="cap2">an idle session with the shell</div></div><div class="tile"><div class="big">7 to 8</div><div class="cap2">heavy users on an 8 GB server</div></div><div class="tile"><div class="big">4.5 : 1</div><div class="cap2">compressed swap, zstd</div></div><div class="tile"><div class="big">60 s</div><div class="cap2">a frozen client is cut off</div></div><div class="tile"><div class="big">4.8 % vs 15 %</div><div class="cap2">CPU of the capture and encoding with 20 active heavy users, GPU or CPU</div></div></div>
-<p class="small">Our own servers and scripts; each chart says how it was measured. Charts, tables and method: <a href="/measurements/">measurements</a>; what a GPU changes: <a href="/gpu/">the GPU page</a>.</p>
+<p class="small">Our own servers and scripts; each chart says how it was measured. Charts, tables and method: <a href="/docs/measurements/">measurements</a>; what a GPU changes: <a href="/docs/gpu/">the GPU page</a>.</p>
 </div>
 </div>
 </section>
 
-<section class="band" id="deeper">
-<h2>Go deeper</h2>
-<div class="grid">
-  <div class="win card">
-    <div class="bar"><span class="t">/architecture/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/architecture/">Architecture</a></h3><p>Three parts with different rights, how a login reaches a session, and how the picture is captured and encoded.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/security/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/security/">Security</a></h3><p>What the daemon, the helper and the sessions may do, and what was reviewed.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/reference/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/reference/">Reference</a></h3><p>Tested systems and clients, files, ports and settings.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/cli/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/cli/">The command line</a></h3><p>Every <code>waydesk-admin</code> command, run on a real server.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/start/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/start/">Getting started</a></h3><p>From a fresh server to a first connection.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/help/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/help/">When something is wrong</a></h3><p>Symptoms, causes and what to do.</p></div>
-  </div>
+<section class="band" id="docs">
+<h2>Documentation</h2>
+<p>Install in about ten minutes, then read what you need. <a href="/docs/">The whole index</a>, or:</p>
+<div class="linkcols">
+<div><h3>Get started</h3><ul><li><a href="/docs/install/">Install and first login</a></li><li><a href="/docs/connect/">Connect</a></li><li><a href="/docs/vpn/">VPN and securing access</a></li></ul></div>
+<div><h3>Run it</h3><ul><li><a href="/docs/cli/">The command line</a></li><li><a href="/docs/gpu/">Using a GPU</a></li><li><a href="/docs/reference/">Files and settings</a></li></ul></div>
+<div><h3>Understand it</h3><ul><li><a href="/docs/architecture/">Architecture</a></li><li><a href="/docs/measurements/">Measurements</a></li><li><a href="/docs/compare/">How it compares</a></li><li><a href="/docs/limits/">Limits and status</a></li></ul></div>
+<div><h3>Help</h3><ul><li><a href="/docs/help/">When something is wrong</a></li><li><a href="/docs/faq/">Questions and answers</a></li></ul></div>
 </div>
 </section>
 
-<section class="sect" id="limits">
-<h2>Limits</h2>
-<div class="win">
-<div class="bar"><span class="t">known limits</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
-<ul class="plain">
-<li>Early software. Tested with FreeRDP, the Windows App on macOS and mstsc on Windows 11 (ARM, in a VM, with the GPU encoders); older Windows clients were not tested.</li>
-<li>No GPU: everything runs on the CPU. OpenGL and Vulkan applications open and are slow (<code>glxgears</code>, <code>vkcube</code> and Zed opened on a server with no render node), and a WebGL page in the browser does not animate, because the browser is started without its GPU process (about 8 fps with SwiftShader, using three cores). With a render node but the GPU switched off, <code>vkcube</code> failed to show its window.</li>
-<li>With a GPU: tried on an Intel HD 630 and an NVIDIA RTX 4000 SFF Ada (NVIDIA needs driver 615 or newer; Debian's 550 cannot draw the desktop); AMD should work through VAAPI and was not tried. The GPU is shared by every session: ten users on full-screen WebGL get about 13 fps each. An integrated GPU takes some system memory for each session.</li>
-<li>Sizing: on an 8 GB, 4-core server count 7 to 8 users with Chromium, Calc and VS Code open if most are idle. A 12-vCPU, 23 GB server (Hetzner CPX52, 123.60 euros a month) held 12 of them before it refused the 13th; memory is the limit, about 1.6 GB per such user. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down.</li>
-</ul>
-
-</div>
-</div>
-</section>
 
 </main>
 

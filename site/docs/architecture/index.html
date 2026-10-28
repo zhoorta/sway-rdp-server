@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Architecture · Waydesk</title>
 <meta name="description" content="How a login reaches a session, what each of the three parts may do, and how the capture and the encoder work.">
-<link rel="canonical" href="https://waydesk.dev/architecture/">
+<link rel="canonical" href="https://waydesk.dev/docs/architecture/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0a1c2a">
 <meta property="og:title" content="Architecture · Waydesk">
 <meta property="og:description" content="How a login reaches a session, what each of the three parts may do, and how the capture and the encoder work.">
-<meta property="og:url" content="https://waydesk.dev/architecture/">
+<meta property="og:url" content="https://waydesk.dev/docs/architecture/">
 <meta property="og:type" content="article">
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -20,27 +20,47 @@
 <div class="col">
 <header>
   <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
-  <nav aria-label="Pages">
+  <nav aria-label="Site">
     <a href="/">home</a>
-    <a href="/start/">start</a>
-    <a href="/connect/">connect</a>
-    <a href="/vpn/">vpn</a>
-    <a href="/cli/">cli</a>
-    <a href="/gpu/">gpu</a>
-    <a href="/architecture/" aria-current="page">architecture</a>
-    <a href="/measurements/">measurements</a>
-    <a href="/security/">security</a>
-    <a href="/reference/">reference</a>
-    <a href="/help/">help</a>
-    <a href="/docs/">all pages</a>
+    <a href="/docs/" aria-current="page">documentation</a>
     <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
   </nav>
 </header>
-<main>
-<section class="pagehead">
+<div class="docs">
+<details class="side" open>
+<summary>Documentation</summary>
+<nav aria-label="Documentation">
+<h2>Get started</h2>
+<ul>
+<li><a href="/docs/install/">Install</a></li>
+<li><a href="/docs/connect/">Connect</a></li>
+<li><a href="/docs/vpn/">VPN and security</a></li>
+</ul>
+<h2>Run it</h2>
+<ul>
+<li><a href="/docs/cli/">Command line</a></li>
+<li><a href="/docs/gpu/">GPU</a></li>
+<li><a href="/docs/reference/">Files and settings</a></li>
+</ul>
+<h2>Understand it</h2>
+<ul>
+<li><a href="/docs/architecture/" aria-current="page">Architecture</a></li>
+<li><a href="/docs/measurements/">Measurements</a></li>
+<li><a href="/docs/compare/">How it compares</a></li>
+<li><a href="/docs/limits/">Limits and status</a></li>
+</ul>
+<h2>Help</h2>
+<ul>
+<li><a href="/docs/help/">Troubleshooting</a></li>
+<li><a href="/docs/faq/">FAQ</a></li>
+</ul>
+</nav>
+</details>
+<main class="doc">
+<div class="pagehead">
 <h1>Architecture</h1>
 <p class="lede">Three parts with different rights: the network-facing daemon has none, a small root helper checks passwords and starts sessions, and each session runs as the account itself.</p>
-</section>
+</div>
 <div class="win diagram">
 <div class="bar"><span class="t">how a login reaches a session</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
 <div class="body">
@@ -114,8 +134,11 @@
 <p class="note">A session is a systemd unit of the account: it survives a disconnect, sits in <code>user-UID.slice</code> (limits there apply) and is killed with its control group. A second login from the same account takes the running session over. Design notes: <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MULTIUSER-DESIGN.md"><code>docs/MULTIUSER-DESIGN.md</code></a>.</p>
 
 
+<nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/reference/"><span>previous</span>Files and settings</a><a class="next" href="/docs/measurements/"><span>next</span>Measurements</a></nav>
 <p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/architecture.html">a file in the repository</a>: corrections are welcome.</p>
 </main>
+</div>
+<script>if (matchMedia('(max-width: 860px)').matches) document.querySelector('.side').open = false;</script>
 <footer>
   <span>© 2026 StackCare</span>
   <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>

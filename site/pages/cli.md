@@ -1,5 +1,5 @@
 title: The command line
-nav: cli
+nav: Command line
 description: Every waydesk-admin command with its real output: accounts, sessions, limits, status and --watch, access, certificates and the VPN.
 ---
 `waydesk-admin` is how an administrator looks after a server. Listing and `status` are open to every local account (an ordinary account sees its own row and the totals; administrators see every account); everything else needs root (`sudo`). Each command below was run on a real server, and the output is shown as it came, with only passwords and keys removed.
@@ -12,7 +12,7 @@ description: Every waydesk-admin command with its real output: accounts, session
 | `status [--json] [--watch [SECONDS]]` | memory, swap, load, the GPUs, and what each account uses and runs |
 | `access [show \| local \| lan \| vpn \| custom]` | where the RDP port listens and who may connect |
 | `cert [status \| local-ca \| reissue \| export-ca \| install \| self-signed]` | the certificate clients check |
-| `vpn [status \| init \| add \| show \| list \| remove]` | a WireGuard VPN for the port (see [the VPN page](/vpn/)) |
+| `vpn [status \| init \| add \| show \| list \| remove]` | a WireGuard VPN for the port (see [the VPN page](/docs/vpn/)) |
 | `waydesk-setup-admin` | the first administrator, and how clients connect |
 | `waydesk-setup` | as your own account: choose browsers, office, developer and creative applications |
 
@@ -87,7 +87,7 @@ ACCOUNT            SESSION     MEMORY    SWAP    CPU    LIMIT RENDER ENCODER    
 lt1                running     570 MB       -     3%   3.8 GB cpu    openh264 0fps      qs 481 MB, sway 73 MB, waydesk-server 70 MB
 ```
 
-`RENDER` says whether the session's desktop is drawn on a GPU or on the CPU, and `ENCODER` which video encoder it runs (`vaapi`, `nvenc` or `openh264`), with the quantiser and the frame rate once frames flow: `vaapi q18 12fps`, `nvenc q25 17fps`. A GPU encoder that cannot start falls back to OpenH264 on the CPU, and this is where you see it. The [GPU page](/gpu/) has a status from a machine with a card.
+`RENDER` says whether the session's desktop is drawn on a GPU or on the CPU, and `ENCODER` which video encoder it runs (`vaapi`, `nvenc` or `openh264`), with the quantiser and the frame rate once frames flow: `vaapi q18 12fps`, `nvenc q25 17fps`. A GPU encoder that cannot start falls back to OpenH264 on the CPU, and this is where you see it. The [GPU page](/docs/gpu/) has a status from a machine with a card.
 
 Two more forms, for watching a machine under load and for scripts:
 
@@ -114,7 +114,7 @@ Names
 Fingerprint      6F:E1:32:12:8C:64:71:A3:C0:51:C6:BB:80:37:64:B9:C4:E4:C7:1E:C7:C2:B8:93:E3:48:42:A5:C9:A4:FD:10
 ```
 
-`access local | lan | vpn | custom` change where the port listens; `cert local-ca`, `cert install`, `cert reissue` and `cert export-ca` manage what clients check. The [Connect page](/connect/) explains each.
+`access local | lan | vpn | custom` change where the port listens; `cert local-ca`, `cert install`, `cert reissue` and `cert export-ca` manage what clients check. The [Connect page](/docs/connect/) explains each.
 
 ## Everything is scriptable {bar: notes}
 `users list`, `users add`, `users passwd`, `sessions list` and `status` take `--json`. `waydesk-setup-admin --name NAME --password-stdin --access local` makes the first administrator without questions. `waydesk-admin --version` prints the version.

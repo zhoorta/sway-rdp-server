@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Builds the subpages of waydesk.dev from site/pages/*.md (standard library only): `python3 site/build.py`.
+"""Builds the documentation of waydesk.dev (site/docs/) from site/pages/*.md and *.html (standard library only): `python3 site/build.py`.
 
-Each page is `key: value` lines, a line `---`, then Markdown of a small kind: `##` starts a section (shown in one of the site's windows, `## Title {bar: label}`
-names the title bar), `###` a sub-heading, paragraphs, `-` and `1.` lists, pipe tables, `>` notes, fenced code (```console puts the prompt and comments in
+Each page is `key: value` lines, a line `---`, then Markdown of a small kind: `##` starts a section (`## Title {bar: label}` is accepted and the label ignored), `###` a sub-heading, paragraphs, `-` and `1.` lists, pipe tables, `>` notes, fenced code (```console puts the prompt and comments in
 colour; ```html is passed through). A page that is a file `name.html` has the same front matter (and a `lede:` line) and a body of HTML sections written by hand: the charts and diagrams of the architecture, measurements, security and reference pages. The output goes to site/<slug>/index.html, with the header, footer and stylesheet of the home page, and sitemap.xml lists the home page and the
 pages. The generated files are committed (the site is a folder that is copied as it is), so run this after editing a page and commit both. Deploy with
 `rsync -a --exclude=.DS_Store --exclude=build.py --exclude=pages -e "ssh -i ~/.ssh/id_ed25519_metproof -o IdentitiesOnly=yes" site/ waydesk@2.28.140.203:app/` (no --delete: the apt repository lives in app/apt).
@@ -18,22 +17,27 @@ BASE = "https://waydesk.dev"
 CAP = '<span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span>'
 GH_ICON = (SITE / "index.html").read_text().split('<a class="gh" href="https://github.com/zhoorta/waydesk">')[1].split("</a>")[0]
 
-# The order of the pages in the navigation and in the index.
-NAV = ["start", "connect", "vpn", "cli", "gpu", "architecture", "measurements", "security", "reference", "help"]
+# The documentation, in groups: the order of the sidebar, of the index and of "next page".
+GROUPS = [
+    ("Get started", ["install", "connect", "vpn"]),
+    ("Run it", ["cli", "gpu", "reference"]),
+    ("Understand it", ["architecture", "measurements", "compare", "limits"]),
+    ("Help", ["help", "faq"]),
+]
+ORDER = [s for _, ss in GROUPS for s in ss]
 
 
 def inline(text):
-    """Escapes and marks up one line of text: `code`, **bold**, [link](url)."""
-    parts = re.split(r"(`[^`]+`)", text)
+    """Escapes and marks up one line of text: `code`, **bold**, [link](url) (the text of a link may hold `code`)."""
     out = []
-    for p in parts:
-        if p.startswith("`") and p.endswith("`") and len(p) > 1:
+    for p in re.split(r"(\[(?:[^\]`]|`[^`]*`)+\]\([^)\s]+\)|`[^`]+`)", text):
+        m = re.fullmatch(r"\[((?:[^\]`]|`[^`]*`)+)\]\(([^)\s]+)\)", p)
+        if m:
+            out.append(f'<a href="{m.group(2)}">{inline(m.group(1))}</a>')
+        elif p.startswith("`") and p.endswith("`") and len(p) > 1:
             out.append("<code>" + html.escape(p[1:-1], quote=False) + "</code>")
-            continue
-        p = html.escape(p, quote=False)
-        p = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", p)
-        p = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>', p)
-        out.append(p)
+        else:
+            out.append(re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html.escape(p, quote=False)))
     return "".join(out)
 
 
@@ -148,82 +152,118 @@ def slugify(t):
     return re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-")
 
 
-def page_html(meta, intro, sections, pages, source_name):
-    def link(s):
-        current = ' aria-current="page"' if s == meta["slug"] else ""
-        return f'<a href="/{s}/"{current}>{pages[s][0]["nav"]}</a>'
+GH = f'<a class="gh" href="https://github.com/zhoorta/waydesk">{GH_ICON}</a>'
+FOOT = f"""<footer>
+  <span>\u00a9 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  {GH}
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>"""
 
-    nav = "\n    ".join(link(s) for s in NAV if s in pages)
-    secs = sections if isinstance(sections, str) else []
-    for s in [] if isinstance(sections, str) else sections:
-        secs.append(
-            f'<section class="sect" id="{slugify(s["title"])}">\n<h2>{inline(s["title"])}</h2>\n<div class="win">\n'
-            f'<div class="bar"><span class="t">{html.escape(s["bar"])}</span>{CAP}</div>\n<div class="body">\n{blocks(chr(10).join(s["lines"]))}\n</div>\n</div>\n</section>'
-        )
-    title, desc = meta["title"], meta["description"]
+
+def shell(title, desc, url, body, kind="article"):
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{html.escape(title)} · Waydesk</title>
+<title>{html.escape(title)} \u00b7 Waydesk</title>
 <meta name="description" content="{html.escape(desc, quote=True)}">
-<link rel="canonical" href="{BASE}/{meta['slug']}/">
+<link rel="canonical" href="{BASE}{url}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0a1c2a">
-<meta property="og:title" content="{html.escape(title)} · Waydesk">
+<meta property="og:title" content="{html.escape(title)} \u00b7 Waydesk">
 <meta property="og:description" content="{html.escape(desc, quote=True)}">
-<meta property="og:url" content="{BASE}/{meta['slug']}/">
-<meta property="og:type" content="article">
+<meta property="og:url" content="{BASE}{url}">
+<meta property="og:type" content="{kind}">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <div class="col">
 <header>
   <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
-  <nav aria-label="Pages">
+  <nav aria-label="Site">
     <a href="/">home</a>
-    {nav}
-    <a href="/docs/">all pages</a>
-    <a class="gh" href="https://github.com/zhoorta/waydesk">{GH_ICON}</a>
+    <a href="/docs/"{' aria-current="page"' if url.startswith("/docs/") else ""}>documentation</a>
+    {GH}
   </nav>
 </header>
-<main>
-<section class="pagehead">
-<h1>{inline(title)}</h1>
-<p class="lede">{inline(intro.strip())}</p>
-</section>
-{secs if isinstance(secs, str) else chr(10).join(secs)}
-<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/{source_name}">a file in the repository</a>: corrections are welcome.</p>
-</main>
-<footer>
-  <span>© 2026 StackCare</span>
-  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
-  <a class="gh" href="https://github.com/zhoorta/waydesk">{GH_ICON}</a>
-  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
-  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
-  <span>MIT or Apache-2.0</span>
-</footer>
+{body}
+{FOOT}
 </div>
 </body>
 </html>
 """
 
 
+def sidebar(pages, current, sections):
+    out = ['<details class="side" open>\n<summary>Documentation</summary>\n<nav aria-label="Documentation">']
+    for name, slugs in GROUPS:
+        out.append(f"<h2>{name}</h2>\n<ul>")
+        for s in slugs:
+            if s not in pages:
+                continue
+            cur = ' aria-current="page"' if s == current else ""
+            li = f'<li><a href="/docs/{s}/"{cur}>{html.escape(pages[s]["nav"])}</a>'
+            if s == current and sections:
+                li += "<ul>" + "".join(f'<li><a href="#{slugify(x["title"])}">{inline(x["title"])}</a></li>' for x in sections) + "</ul>"
+            out.append(li + "</li>")
+        out.append("</ul>")
+    out.append("</nav>\n</details>")
+    return "\n".join(out)
+
+
+SIDE_JS = "<script>if (matchMedia('(max-width: 860px)').matches) document.querySelector('.side').open = false;</script>"
+
+
+def page_html(meta, intro, sections, pages, source_name):
+    slug = meta["slug"]
+    if isinstance(sections, str):
+        secs, anchors = sections, []
+        anchors = [{"title": t} for t in re.findall(r'<section[^>]*id="[^"]*"[^>]*>\s*<h2>(.*?)</h2>', sections)]
+    else:
+        secs = "\n".join(
+            f'<section id="{slugify(s["title"])}">\n<h2>{inline(s["title"])}</h2>\n{blocks(chr(10).join(s["lines"]))}\n</section>' for s in sections
+        )
+        anchors = sections
+    i = ORDER.index(slug)
+    prev = f'<a class="prev" href="/docs/{ORDER[i-1]}/"><span>previous</span>{html.escape(pages[ORDER[i-1]]["title"])}</a>' if i > 0 else "<span></span>"
+    nxt = f'<a class="next" href="/docs/{ORDER[i+1]}/"><span>next</span>{html.escape(pages[ORDER[i+1]]["title"])}</a>' if i + 1 < len(ORDER) else "<span></span>"
+    body = f"""<div class="docs">
+{sidebar(pages, slug, anchors)}
+<main class="doc">
+<div class="pagehead">
+<h1>{inline(meta["title"])}</h1>
+<p class="lede">{inline(intro.strip())}</p>
+</div>
+{secs}
+<nav class="prevnext" aria-label="Previous and next page">{prev}{nxt}</nav>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/{source_name}">a file in the repository</a>: corrections are welcome.</p>
+</main>
+</div>
+{SIDE_JS}"""
+    return shell(meta["title"], meta["description"], f"/docs/{slug}/", body)
+
+
 def index_html(pages):
-    cards = "\n".join(
-        f'  <div class="win card">\n    <div class="bar"><span class="t">/{s}/</span>{CAP}</div>\n'
-        f'    <div class="body"><h3><a href="/{s}/">{html.escape(pages[s][0]["title"])}</a></h3><p>{html.escape(pages[s][0]["description"])}</p></div>\n  </div>'
-        for s in NAV if s in pages
-    )
-    meta = {"slug": "docs", "title": "All pages", "description": "Every page of waydesk.dev: getting started, connecting, the VPN, the command line, the GPU, and what to do when something is wrong."}
-    nav = "\n    ".join(f'<a href="/{s}/">{pages[s][0]["nav"]}</a>' for s in NAV if s in pages)
-    page = page_html(meta, "The home page is the overview; these pages go deeper. Each is a file in the repository, written from what was run on real servers.", [], pages, "")
-    # the index has cards, not sections
-    page = page.replace('<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/">a file in the repository</a>: corrections are welcome.</p>\n', f'<div class="grid">\n{cards}\n</div>\n')
-    return page
+    cols = []
+    for name, slugs in GROUPS:
+        rows = "\n".join(
+            f'<li><a href="/docs/{s}/">{html.escape(pages[s]["title"])}</a><span>{html.escape(pages[s]["description"])}</span></li>' for s in slugs if s in pages
+        )
+        cols.append(f"<section>\n<h2>{name}</h2>\n<ul class=\"toc\">\n{rows}\n</ul>\n</section>")
+    body = f"""<main class="doc docindex">
+<div class="pagehead">
+<h1>Documentation</h1>
+<p class="lede">Read it in order, or jump to what you need. New to Waydesk: start with <a href="/docs/install/">Install and first login</a>, it takes about ten minutes from a fresh server. Every page is a file in the repository, written from what was run on real servers.</p>
+</div>
+{chr(10).join(cols)}
+</main>"""
+    return shell("Documentation", "Waydesk documentation: install, connect, the VPN, the command line, the GPU, how it works, what was measured, limits and troubleshooting.", "/docs/", body)
 
 
 def main():
@@ -232,16 +272,20 @@ def main():
         meta, intro, sections = parse(path)
         meta["slug"] = meta.get("slug", path.stem)
         pages[meta["slug"]] = (meta, intro, sections, path.name)
-    for slug, (meta, intro, sections, name) in pages.items():
-        out = SITE / slug / "index.html"
-        out.parent.mkdir(exist_ok=True)
-        out.write_text(page_html(meta, intro, sections, {k: (v[0],) for k, v in pages.items()}, name))
+    metas = {k: v[0] for k, v in pages.items()}
+    for slug in ORDER:
+        meta, intro, sections, name = pages[slug]
+        out = SITE / "docs" / slug / "index.html"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(page_html(meta, intro, sections, metas, name))
         print("wrote", out.relative_to(SITE))
-    (SITE / "docs").mkdir(exist_ok=True)
-    (SITE / "docs" / "index.html").write_text(index_html({k: (v[0],) for k, v in pages.items()}))
-    urls = [f"{BASE}/"] + [f"{BASE}/docs/"] + [f"{BASE}/{s}/" for s in NAV if s in pages]
+    (SITE / "docs" / "index.html").write_text(index_html(metas))
+    urls = [f"{BASE}/", f"{BASE}/docs/"] + [f"{BASE}/docs/{s}/" for s in ORDER]
     (SITE / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(f"<url><loc>{u}</loc></url>" for u in urls) + "</urlset>\n")
     print("wrote docs/index.html and sitemap.xml:", len(urls), "urls")
+    unknown = set(metas) - set(ORDER)
+    if unknown:
+        sys.exit(f"pages that are in no group: {sorted(unknown)}")
 
 
 if __name__ == "__main__":

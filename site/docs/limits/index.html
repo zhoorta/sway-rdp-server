@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limits and status · Waydesk</title>
+<meta name="description" content="What Waydesk is not yet: early software, the clients and GPUs it was tried with, what happens without a GPU, and how many users a server holds.">
+<link rel="canonical" href="https://waydesk.dev/docs/limits/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0a1c2a">
+<meta property="og:title" content="Limits and status · Waydesk">
+<meta property="og:description" content="What Waydesk is not yet: early software, the clients and GPUs it was tried with, what happens without a GPU, and how many users a server holds.">
+<meta property="og:url" content="https://waydesk.dev/docs/limits/">
+<meta property="og:type" content="article">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Site">
+    <a href="/">home</a>
+    <a href="/docs/" aria-current="page">documentation</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<div class="docs">
+<details class="side" open>
+<summary>Documentation</summary>
+<nav aria-label="Documentation">
+<h2>Get started</h2>
+<ul>
+<li><a href="/docs/install/">Install</a></li>
+<li><a href="/docs/connect/">Connect</a></li>
+<li><a href="/docs/vpn/">VPN and security</a></li>
+</ul>
+<h2>Run it</h2>
+<ul>
+<li><a href="/docs/cli/">Command line</a></li>
+<li><a href="/docs/gpu/">GPU</a></li>
+<li><a href="/docs/reference/">Files and settings</a></li>
+</ul>
+<h2>Understand it</h2>
+<ul>
+<li><a href="/docs/architecture/">Architecture</a></li>
+<li><a href="/docs/measurements/">Measurements</a></li>
+<li><a href="/docs/compare/">How it compares</a></li>
+<li><a href="/docs/limits/" aria-current="page">Limits and status</a><ul><li><a href="#status">Status</a></li><li><a href="#clients">Clients</a></li><li><a href="#without-a-gpu">Without a GPU</a></li><li><a href="#with-a-gpu">With a GPU</a></li><li><a href="#how-many-users">How many users</a></li></ul></li>
+</ul>
+<h2>Help</h2>
+<ul>
+<li><a href="/docs/help/">Troubleshooting</a></li>
+<li><a href="/docs/faq/">FAQ</a></li>
+</ul>
+</nav>
+</details>
+<main class="doc">
+<div class="pagehead">
+<h1>Limits and status</h1>
+<p class="lede">Waydesk is early, free software, written and tested by one person on real servers. This page says what was tried, what was not, and what to expect. Nothing here is hidden in a footnote elsewhere.</p>
+</div>
+<section id="status">
+<h2>Status</h2>
+<ul class="plain"><li><strong>Early software.</strong> Version 0.4.0. Expect rough edges; <a href="https://github.com/zhoorta/waydesk/issues">open an issue</a> when you find one.</li><li><strong>Systems:</strong> Debian 13 and Ubuntu 26.04 on amd64 (arm64 packages are built; they have not been installed on a machine yet).</li><li><strong>No second factor.</strong> The login is the account's password inside TLS: keep the port behind an SSH tunnel or a <a href="/docs/vpn/#security">VPN</a>.</li><li><strong>Not an audited product.</strong> Four internal review passes are written down, with what is still open.</li></ul>
+</section>
+<section id="clients">
+<h2>Clients</h2>
+<div class="tw"><table><tr><th>Client</th><th>Result</th></tr><tr><td>Windows App on macOS</td><td>tried, works</td></tr><tr><td>mstsc on Windows 11 (ARM, in a VM, with the GPU encoders)</td><td>tried, works</td></tr><tr><td>FreeRDP (Debian 13's <code>sdl-freerdp</code> 3.15)</td><td>tried, works</td></tr><tr><td>Ubuntu's own <code>xfreerdp3</code> 3.32</td><td>cannot decode the H.264 stream: use Remmina or Debian's client</td></tr><tr><td>Older Windows clients, Linux and mobile clients other than the above</td><td>not tested</td></tr></table></div>
+</section>
+<section id="without-a-gpu">
+<h2>Without a GPU</h2>
+<p>Everything runs on the CPU. OpenGL and Vulkan applications open and are slow: <code>glxgears</code>, <code>vkcube</code> and Zed opened on a server with no render node. A <strong>WebGL page in the browser does not animate</strong>, because Waydesk starts Chromium without its GPU process there (it saves memory); with SwiftShader it runs at about 8 fps for a full-screen page, using three of four cores. With a render node but the GPU switched off, <code>vkcube</code> failed to show its window. Blender, Kdenlive, darktable, VS Code and LibreOffice were tried with the GPU on and off on a machine that had one, not on a machine without a render node.</p>
+</section>
+<section id="with-a-gpu">
+<h2>With a GPU</h2>
+<p>Tried on an Intel HD 630 and an NVIDIA RTX 4000 SFF Ada. NVIDIA needs the vendor's driver, 615 or newer (Debian's 550 cannot draw the desktop). AMD should work through VAAPI and was not tried. The GPU is shared by every session: ten users on full-screen WebGL get about 13 fps each on the HD 630, and an integrated GPU takes some system memory for each session. Not measured: several users on one NVIDIA card (GeForce cards limit simultaneous NVENC sessions; the encoder then falls back to OpenH264) and a card with its own memory under many users. More on the <a href="/docs/gpu/">GPU page</a>.</p>
+</section>
+<section id="how-many-users">
+<h2>How many users</h2>
+<p>On an 8 GB, 4-core server count <strong>7 to 8 users</strong> with Chromium, Calc and VS Code open if most are idle. A 12-vCPU, 23 GB server (Hetzner CPX52, 123.60 euros a month) held 12 of them before it refused the 13th: memory is the limit, about 1.6 GB per such user. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down. The figures and their method are on the <a href="/docs/measurements/">measurements</a> page.</p>
+</section>
+<nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/compare/"><span>previous</span>How it compares</a><a class="next" href="/docs/help/"><span>next</span>When something is wrong</a></nav>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/limits.md">a file in the repository</a>: corrections are welcome.</p>
+</main>
+</div>
+<script>if (matchMedia('(max-width: 860px)').matches) document.querySelector('.side').open = false;</script>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>

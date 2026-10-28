@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Getting started · Waydesk</title>
+<title>Install and first login · Waydesk</title>
 <meta name="description" content="Install Waydesk on Debian 13 or Ubuntu 26.04, make the first administrator, connect, and add more people. About ten minutes from a fresh server.">
-<link rel="canonical" href="https://waydesk.dev/start/">
+<link rel="canonical" href="https://waydesk.dev/docs/install/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0a1c2a">
-<meta property="og:title" content="Getting started · Waydesk">
+<meta property="og:title" content="Install and first login · Waydesk">
 <meta property="og:description" content="Install Waydesk on Debian 13 or Ubuntu 26.04, make the first administrator, connect, and add more people. About ten minutes from a fresh server.">
-<meta property="og:url" content="https://waydesk.dev/start/">
+<meta property="og:url" content="https://waydesk.dev/docs/install/">
 <meta property="og:type" content="article">
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -20,32 +20,49 @@
 <div class="col">
 <header>
   <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
-  <nav aria-label="Pages">
+  <nav aria-label="Site">
     <a href="/">home</a>
-    <a href="/start/" aria-current="page">start</a>
-    <a href="/connect/">connect</a>
-    <a href="/vpn/">vpn</a>
-    <a href="/cli/">cli</a>
-    <a href="/gpu/">gpu</a>
-    <a href="/architecture/">architecture</a>
-    <a href="/measurements/">measurements</a>
-    <a href="/security/">security</a>
-    <a href="/reference/">reference</a>
-    <a href="/help/">help</a>
-    <a href="/docs/">all pages</a>
+    <a href="/docs/" aria-current="page">documentation</a>
     <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
   </nav>
 </header>
-<main>
-<section class="pagehead">
-<h1>Getting started</h1>
+<div class="docs">
+<details class="side" open>
+<summary>Documentation</summary>
+<nav aria-label="Documentation">
+<h2>Get started</h2>
+<ul>
+<li><a href="/docs/install/" aria-current="page">Install</a><ul><li><a href="#install">Install</a></li><li><a href="#the-first-administrator">The first administrator</a></li><li><a href="#connect">Connect</a></li><li><a href="#what-you-get">What you get</a></li><li><a href="#add-more-people">Add more people</a></li></ul></li>
+<li><a href="/docs/connect/">Connect</a></li>
+<li><a href="/docs/vpn/">VPN and security</a></li>
+</ul>
+<h2>Run it</h2>
+<ul>
+<li><a href="/docs/cli/">Command line</a></li>
+<li><a href="/docs/gpu/">GPU</a></li>
+<li><a href="/docs/reference/">Files and settings</a></li>
+</ul>
+<h2>Understand it</h2>
+<ul>
+<li><a href="/docs/architecture/">Architecture</a></li>
+<li><a href="/docs/measurements/">Measurements</a></li>
+<li><a href="/docs/compare/">How it compares</a></li>
+<li><a href="/docs/limits/">Limits and status</a></li>
+</ul>
+<h2>Help</h2>
+<ul>
+<li><a href="/docs/help/">Troubleshooting</a></li>
+<li><a href="/docs/faq/">FAQ</a></li>
+</ul>
+</nav>
+</details>
+<main class="doc">
+<div class="pagehead">
+<h1>Install and first login</h1>
 <p class="lede">From a fresh server to a desktop in about ten minutes: one package, one command to make the first administrator, and an RDP client. Everything below was run on a clean Debian 13 server.</p>
-</section>
-<section class="sect" id="install">
+</div>
+<section id="install">
 <h2>Install</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <p>Packages come from a signed apt repository. The first download cannot be verified by the repository itself, so compare its key with the fingerprint printed on the <a href="/#install">home page</a> before you trust it.</p>
 <pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
 <span class="p">$</span> sudo apt install ./waydesk-repo.deb
@@ -53,48 +70,28 @@
 <span class="p">$</span> sudo apt update
 <span class="p">$</span> sudo apt install waydesk</code></pre>
 <p><code>waydesk</code> is the server and the desktop (the shell, the dock, a file manager and a terminal). On a server that should only run the RDP part, <code>waydesk-server</code> alone is enough. The RDP port is <strong>closed to the network</strong> until you open it.</p>
-</div>
-</div>
 </section>
-<section class="sect" id="the-first-administrator">
+<section id="the-first-administrator">
 <h2>The first administrator</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <p>There is no default account or password. <code>waydesk-setup-admin</code> makes the first administrator, the account that connects over RDP and manages the others:</p>
 <pre><code><span class="p">$</span> sudo waydesk-setup-admin</code></pre>
 <p>It asks for an account name (lower case letters, digits, <code>-</code> and <code>_</code>), a password of at least ten characters (this is the RDP password), and then how you will connect:</p>
 <ol class="plain"><li>From this machine, or through an SSH tunnel (the default: the port stays closed to the network).</li><li>From computers on this server's local network (the port opens to that network only).</li><li>Over a WireGuard VPN, made now (the port opens to the VPN only).</li></ol>
 <p>It also prints the <strong>fingerprint of the server's RDP certificate</strong>. Write it down: your client shows it on the first connection, and a client that does not compare can be fooled by a man in the middle. For scripts, <code>--name NAME --password-stdin --access local|lan|vpn</code> does the same without questions.</p>
-</div>
-</div>
 </section>
-<section class="sect" id="connect">
+<section id="connect">
 <h2>Connect</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <p>The default needs one command on your own computer. It forwards a local port to the server's closed one:</p>
 <pre><code><span class="p">$</span> ssh -N -L 3389:127.0.0.1:3389 you@your-server  <span class="c"># keep this running</span></code></pre>
-<p>Then point the RDP client at <code>localhost</code> and log in as the account you made. If your computer already uses port 3389, forward <code>13389</code> instead and connect to <code>localhost:13389</code>. The <a href="/connect/">Connect</a> page has the other ways (a local network, a VPN, certificates you can verify).</p>
+<p>Then point the RDP client at <code>localhost</code> and log in as the account you made. If your computer already uses port 3389, forward <code>13389</code> instead and connect to <code>localhost:13389</code>. The <a href="/docs/connect/">Connect</a> page has the other ways (a local network, a VPN, certificates you can verify).</p>
 <p>Clients that were tried: the <strong>Windows App on macOS</strong>, <strong>mstsc on Windows 11</strong> (ARM, in a VM) and <strong>FreeRDP</strong> (Debian 13's <code>sdl-freerdp</code>, version 3.15). Ubuntu's own <code>xfreerdp3</code> 3.32 cannot decode the H.264 stream; use Remmina or Debian's client there.</p>
-</div>
-</div>
 </section>
-<section class="sect" id="what-you-get">
+<section id="what-you-get">
 <h2>What you get</h2>
-<div class="win">
-<div class="bar"><span class="t">desktop</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <ul class="plain"><li><strong>A desktop of your own for every account</strong>, with a shell, a dock, a file manager and your applications. Reconnect and the windows are where you left them: closing the RDP window does not end the session.</li><li><strong>The size follows the client.</strong> A Retina Mac or a laptop at 200 % scaling gets a sharp picture, and the window resizes live.</li><li><strong>Chromium</strong> is installed with the desktop (from Flathub on Ubuntu). <code>waydesk-setup</code>, run as your own account, offers browsers, office, developer and creative applications.</li><li><strong>Windows</strong> are floating: drag a title bar, use the three dots for minimise, maximise and close. Super+Up maximises, Super+Down minimises, Super+Shift+Up brings every window entirely back on the screen.</li></ul>
-</div>
-</div>
 </section>
-<section class="sect" id="add-more-people">
+<section id="add-more-people">
 <h2>Add more people</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <p>Administrators make the other accounts:</p>
 <pre><code><span class="p">$</span> sudo waydesk-admin users add alice
 made alice (uid 1000), groups: waydesk-users
@@ -102,12 +99,13 @@ temporary password (shown once): ************
 The account should change it at once: Change password, in the desktop's power menu.
 <span class="p">$</span> sudo waydesk-admin users limit alice --memory 4G
 <span class="p">$</span> waydesk-admin status</code></pre>
-<p>A new session is refused when the machine would run out of memory, so one account cannot take everyone else down. The <a href="/cli/">command line</a> page shows every command with its real output, and the <a href="/gpu/">GPU</a> page what changes on a machine with a graphics card.</p>
-</div>
-</div>
+<p>A new session is refused when the machine would run out of memory, so one account cannot take everyone else down. The <a href="/docs/cli/">command line</a> page shows every command with its real output, and the <a href="/docs/gpu/">GPU</a> page what changes on a machine with a graphics card.</p>
 </section>
-<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/start.md">a file in the repository</a>: corrections are welcome.</p>
+<nav class="prevnext" aria-label="Previous and next page"><span></span><a class="next" href="/docs/connect/"><span>next</span>Connect</a></nav>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/install.md">a file in the repository</a>: corrections are welcome.</p>
 </main>
+</div>
+<script>if (matchMedia('(max-width: 860px)').matches) document.querySelector('.side').open = false;</script>
 <footer>
   <span>© 2026 StackCare</span>
   <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>

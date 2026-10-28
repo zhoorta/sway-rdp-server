@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it compares · Waydesk</title>
+<meta name="description" content="Waydesk next to xrdp, the GNOME remote desktop, X2Go, NoMachine and VNC: what each is for, and when to choose Waydesk.">
+<link rel="canonical" href="https://waydesk.dev/docs/compare/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0a1c2a">
+<meta property="og:title" content="How it compares · Waydesk">
+<meta property="og:description" content="Waydesk next to xrdp, the GNOME remote desktop, X2Go, NoMachine and VNC: what each is for, and when to choose Waydesk.">
+<meta property="og:url" content="https://waydesk.dev/docs/compare/">
+<meta property="og:type" content="article">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Site">
+    <a href="/">home</a>
+    <a href="/docs/" aria-current="page">documentation</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<div class="docs">
+<details class="side" open>
+<summary>Documentation</summary>
+<nav aria-label="Documentation">
+<h2>Get started</h2>
+<ul>
+<li><a href="/docs/install/">Install</a></li>
+<li><a href="/docs/connect/">Connect</a></li>
+<li><a href="/docs/vpn/">VPN and security</a></li>
+</ul>
+<h2>Run it</h2>
+<ul>
+<li><a href="/docs/cli/">Command line</a></li>
+<li><a href="/docs/gpu/">GPU</a></li>
+<li><a href="/docs/reference/">Files and settings</a></li>
+</ul>
+<h2>Understand it</h2>
+<ul>
+<li><a href="/docs/architecture/">Architecture</a></li>
+<li><a href="/docs/measurements/">Measurements</a></li>
+<li><a href="/docs/compare/" aria-current="page">How it compares</a><ul><li><a href="#the-tools">The tools</a></li><li><a href="#when-to-choose-waydesk">When to choose Waydesk</a></li><li><a href="#when-not-to">When not to</a></li></ul></li>
+<li><a href="/docs/limits/">Limits and status</a></li>
+</ul>
+<h2>Help</h2>
+<ul>
+<li><a href="/docs/help/">Troubleshooting</a></li>
+<li><a href="/docs/faq/">FAQ</a></li>
+</ul>
+</nav>
+</details>
+<main class="doc">
+<div class="pagehead">
+<h1>How it compares</h1>
+<p class="lede">A short, honest map. We have measured only Waydesk: nothing here claims that it is faster than the others, only what each tool is built around.</p>
+</div>
+<section id="the-tools">
+<h2>The tools</h2>
+<div class="tw"><table><tr><th>Tool</th><th>Built around</th><th>A good fit when</th></tr><tr><td><strong>Waydesk</strong></td><td>one Wayland (sway) desktop per account over standard RDP, H.264 tuned for screens</td><td>you want several people on one Debian or Ubuntu server, with their own session and any RDP client, and a package to install</td></tr><tr><td><strong>xrdp</strong></td><td>RDP in front of an X11 session (Xorg or Xvnc)</td><td>you want the long-established option, with many desktop environments and distributions</td></tr><tr><td><strong>GNOME Remote Desktop</strong></td><td>the GNOME desktop's own RDP server</td><td>you already run GNOME and want to share or reach that desktop</td></tr><tr><td><strong>X2Go</strong></td><td>NX-style remote X11 sessions over SSH</td><td>you want everything inside SSH and use X11 applications</td></tr><tr><td><strong>NoMachine</strong></td><td>its own protocol and clients</td><td>you want its clients and features, and accept a product with commercial editions</td></tr><tr><td><strong>VNC</strong></td><td>sharing a framebuffer</td><td>you want the simplest thing, and bandwidth and per-user sessions matter less</td></tr></table></div>
+</section>
+<section id="when-to-choose-waydesk">
+<h2>When to choose Waydesk</h2>
+<ul class="plain"><li>You want <strong>standard RDP</strong> (the Windows App, mstsc, FreeRDP) and no client to install.</li><li>You want <strong>one isolated session per account</strong> with memory limits and a refusal when the server is full, not a shared screen.</li><li>You want it **in one <code>apt install</code>**, with a desktop, a shell and a dock already set up.</li><li>You care about <strong>slow links</strong>: the encoder follows what the link delivers and the pointer is drawn by the client.</li></ul>
+</section>
+<section id="when-not-to">
+<h2>When not to</h2>
+<ul class="plain"><li>You need an <strong>X11 desktop environment</strong> such as XFCE or KDE as it is: Waydesk gives every account its own sway desktop instead.</li><li>You need <strong>Windows-style features</strong> beyond what was tested (see <a href="/docs/limits/">Limits and status</a>).</li><li>You need something <strong>mature and widely deployed today</strong>: xrdp has years of use behind it, and Waydesk is early.</li></ul>
+</section>
+<nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/measurements/"><span>previous</span>Measurements</a><a class="next" href="/docs/limits/"><span>next</span>Limits and status</a></nav>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/compare.md">a file in the repository</a>: corrections are welcome.</p>
+</main>
+</div>
+<script>if (matchMedia('(max-width: 860px)').matches) document.querySelector('.side').open = false;</script>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Questions and answers · Waydesk</title>
+<meta name="description" content="Short answers: whether a GPU is needed, why Sway, what happens when you disconnect, which apps run, how many users fit, and who makes Waydesk.">
+<link rel="canonical" href="https://waydesk.dev/docs/faq/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0a1c2a">
+<meta property="og:title" content="Questions and answers · Waydesk">
+<meta property="og:description" content="Short answers: whether a GPU is needed, why Sway, what happens when you disconnect, which apps run, how many users fit, and who makes Waydesk.">
+<meta property="og:url" content="https://waydesk.dev/docs/faq/">
+<meta property="og:type" content="article">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Site">
+    <a href="/">home</a>
+    <a href="/docs/" aria-current="page">documentation</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<div class="docs">
+<details class="side" open>
+<summary>Documentation</summary>
+<nav aria-label="Documentation">
+<h2>Get started</h2>
+<ul>
+<li><a href="/docs/install/">Install</a></li>
+<li><a href="/docs/connect/">Connect</a></li>
+<li><a href="/docs/vpn/">VPN and security</a></li>
+</ul>
+<h2>Run it</h2>
+<ul>
+<li><a href="/docs/cli/">Command line</a></li>
+<li><a href="/docs/gpu/">GPU</a></li>
+<li><a href="/docs/reference/">Files and settings</a></li>
+</ul>
+<h2>Understand it</h2>
+<ul>
+<li><a href="/docs/architecture/">Architecture</a></li>
+<li><a href="/docs/measurements/">Measurements</a></li>
+<li><a href="/docs/compare/">How it compares</a></li>
+<li><a href="/docs/limits/">Limits and status</a></li>
+</ul>
+<h2>Help</h2>
+<ul>
+<li><a href="/docs/help/">Troubleshooting</a></li>
+<li><a href="/docs/faq/" aria-current="page">FAQ</a><ul><li><a href="#do-i-need-a-gpu">Do I need a GPU?</a></li><li><a href="#what-happens-when-i-close-the-rdp-window">What happens when I close the RDP window?</a></li><li><a href="#why-sway">Why Sway?</a></li><li><a href="#which-applications-run">Which applications run?</a></li><li><a href="#how-many-users-fit-on-one-server">How many users fit on one server?</a></li><li><a href="#is-it-safe-to-put-on-the-internet">Is it safe to put on the internet?</a></li><li><a href="#which-rdp-clients-work">Which RDP clients work?</a></li><li><a href="#what-does-it-cost-and-who-makes-it">What does it cost, and who makes it?</a></li><li><a href="#can-i-see-how-it-is-built">Can I see how it is built?</a></li></ul></li>
+</ul>
+</nav>
+</details>
+<main class="doc">
+<div class="pagehead">
+<h1>Questions and answers</h1>
+<p class="lede">Short answers, with a link to the page that has the rest.</p>
+</div>
+<section id="do-i-need-a-gpu">
+<h2>Do I need a GPU?</h2>
+<p>No. Without one, everything is drawn and encoded on the CPU. With one (Intel, NVIDIA, AMD should work) the desktop is drawn on it and the picture is encoded by the chip, which leaves the CPU to your programs. <a href="/docs/gpu/">The GPU page</a> has the numbers.</p>
+</section>
+<section id="what-happens-when-i-close-the-rdp-window">
+<h2>What happens when I close the RDP window?</h2>
+<p>Nothing: the session is a systemd unit of the account and keeps running, so reconnecting gives you the same windows. A second login from the same account takes the running session over.</p>
+</section>
+<section id="why-sway">
+<h2>Why Sway?</h2>
+<p>Each session needs a desktop that can run headless, one per account, and be captured and scripted. Sway is a small Wayland compositor that does that, and it is what the picture sent over RDP is captured from. Windows are floating with title bars, so it feels like a desktop, not a tiling window manager.</p>
+</section>
+<section id="which-applications-run">
+<h2>Which applications run?</h2>
+<p>Wayland and X11 applications, from the distribution or from Flathub. X11 programs run through XWayland, one server per account. Checked: Chromium, VS Code, LibreOffice, Obsidian, Slack, GNOME Text Editor, GIMP, Zed, Blender, Kdenlive, darktable. <code>waydesk-setup</code> offers browsers, office, developer and creative applications.</p>
+</section>
+<section id="how-many-users-fit-on-one-server">
+<h2>How many users fit on one server?</h2>
+<p>About 7 to 8 heavy users on 8 GB; memory is the limit and a new session is refused rather than slowing everyone down. See <a href="/docs/limits/">Limits and status</a>.</p>
+</section>
+<section id="is-it-safe-to-put-on-the-internet">
+<h2>Is it safe to put on the internet?</h2>
+<p>Not with the port published: the login is a password with no second factor. Use an SSH tunnel or a VPN, which are both a few commands. <a href="/docs/vpn/">VPN and securing access</a> says what protects the login.</p>
+</section>
+<section id="which-rdp-clients-work">
+<h2>Which RDP clients work?</h2>
+<p>The Windows App on macOS, mstsc on Windows 11 and FreeRDP were tried. The list, with what did not work, is on <a href="/docs/limits/">Limits and status</a>.</p>
+</section>
+<section id="what-does-it-cost-and-who-makes-it">
+<h2>What does it cost, and who makes it?</h2>
+<p>It is free software, MIT or Apache-2.0, written by José Mendonça. Commercial support and setup are offered by <a href="https://stackcare.pt/en">StackCare</a>.</p>
+</section>
+<section id="can-i-see-how-it-is-built">
+<h2>Can I see how it is built?</h2>
+<p>Yes: <a href="/docs/architecture/">Architecture</a> draws the three parts, <a href="/docs/measurements/">Measurements</a> shows how each figure was taken, and the source is on <a href="https://github.com/zhoorta/waydesk">GitHub</a>.</p>
+</section>
+<nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/help/"><span>previous</span>When something is wrong</a><span></span></nav>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/faq.md">a file in the repository</a>: corrections are welcome.</p>
+</main>
+</div>
+<script>if (matchMedia('(max-width: 860px)').matches) document.querySelector('.side').open = false;</script>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>

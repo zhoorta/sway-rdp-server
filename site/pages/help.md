@@ -1,5 +1,5 @@
 title: When something is wrong
-nav: help
+nav: Troubleshooting
 description: What to check when a client cannot connect, a session is refused, the picture is slow or wrong, or the GPU is not used. Where the logs are.
 ---
 Most problems show in one of three places: `waydesk-admin status`, `waydesk-admin access show`, and the journal. Start there.
@@ -21,11 +21,11 @@ $ journalctl -u waydesk -u waydesk-helper -u waydesk-session@1000 --since "-10 m
 
 ## The login is accepted but there is no desktop {bar: notes}
 - **The session was refused for memory.** `waydesk-admin status` ends its summary with "a new one would be REFUSED: 504 MB available, 1161 MB needed" when the machine is full (a new session needs the larger of 900 MB and 15 % of the memory). End an idle session (`sessions end NAME`), add memory, or lower another account's `users limit`. An account that already has a session just reconnects.
-- **The GPU could not give the desktop its buffers.** On NVIDIA with Debian's driver 550 this used to leave no desktop; since 0.4.0 the session is made again in software. If you see `the session could not be made on the GPU (...): software rendering` in the journal, the GPU path failed and the session runs on the CPU: see [the GPU page](/gpu/).
+- **The GPU could not give the desktop its buffers.** On NVIDIA with Debian's driver 550 this used to leave no desktop; since 0.4.0 the session is made again in software. If you see `the session could not be made on the GPU (...): software rendering` in the journal, the GPU path failed and the session runs on the CPU: see [the GPU page](/docs/gpu/).
 
 ## It is slow, or the picture is poor {bar: notes}
 - **Check the link first.** The encoder follows what the link delivers, from 300 kbit/s to the maximum, and raises the quantiser (a blockier picture) when the link cannot carry the picture. A full-screen noise or video page asks for tens of Mbit/s; a mostly still desktop needs very little. A link of 4 Mbit/s will make a busy screen coarse, and it goes back to full quality within about half a minute of the screen settling.
-- **An SSH tunnel on a long round trip** (about 100 ms, another country) stalls, because TCP runs inside TCP. A [WireGuard VPN](/vpn/) copes with it.
+- **An SSH tunnel on a long round trip** (about 100 ms, another country) stalls, because TCP runs inside TCP. A [WireGuard VPN](/docs/vpn/) copes with it.
 - **`waydesk-admin status --watch`** shows the encoder, its quantiser and frame rate per session while you look at the picture.
 
 ## The GPU is not used {bar: terminal}
@@ -37,7 +37,7 @@ $ waydesk-admin status
 - **No `/dev/dri`:** the machine has no render node. On a dedicated server, the installer may have added `nomodeset` to the kernel line or blacklisted the driver; on a cloud server there is simply no GPU.
 - **`status` says `cpu` or `openh264`:** the session fell back. The journal line before it says why (`sway did not start on the GPU`, `the session could not be made on the GPU`, `VAAPI encoder not available`, `NVENC encoder not available`).
 - **The accounts cannot open the node.** The package grants `waydesk-users` access with a udev rule; `getfacl /dev/dri/renderD128` should list the group.
-- **NVIDIA:** the driver must be NVIDIA's own, 615 or newer; `nvidia-smi` shows the version. See [the GPU page](/gpu/).
+- **NVIDIA:** the driver must be NVIDIA's own, 615 or newer; `nvidia-smi` shows the version. See [the GPU page](/docs/gpu/).
 - **`WAYDESK_GPU=off`** in `/etc/default/waydesk` switches the GPU off on purpose; `status` shows what new sessions will use.
 
 ## A window is out of reach {bar: notes}

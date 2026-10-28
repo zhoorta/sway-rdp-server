@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>All pages · Waydesk</title>
-<meta name="description" content="Every page of waydesk.dev: getting started, connecting, the VPN, the command line, the GPU, and what to do when something is wrong.">
+<title>Documentation · Waydesk</title>
+<meta name="description" content="Waydesk documentation: install, connect, the VPN, the command line, the GPU, how it works, what was measured, limits and troubleshooting.">
 <link rel="canonical" href="https://waydesk.dev/docs/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0a1c2a">
-<meta property="og:title" content="All pages · Waydesk">
-<meta property="og:description" content="Every page of waydesk.dev: getting started, connecting, the VPN, the command line, the GPU, and what to do when something is wrong.">
+<meta property="og:title" content="Documentation · Waydesk">
+<meta property="og:description" content="Waydesk documentation: install, connect, the VPN, the command line, the GPU, how it works, what was measured, limits and troubleshooting.">
 <meta property="og:url" content="https://waydesk.dev/docs/">
 <meta property="og:type" content="article">
 <link rel="stylesheet" href="/style.css">
@@ -20,70 +20,49 @@
 <div class="col">
 <header>
   <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
-  <nav aria-label="Pages">
+  <nav aria-label="Site">
     <a href="/">home</a>
-    <a href="/start/">start</a>
-    <a href="/connect/">connect</a>
-    <a href="/vpn/">vpn</a>
-    <a href="/cli/">cli</a>
-    <a href="/gpu/">gpu</a>
-    <a href="/architecture/">architecture</a>
-    <a href="/measurements/">measurements</a>
-    <a href="/security/">security</a>
-    <a href="/reference/">reference</a>
-    <a href="/help/">help</a>
-    <a href="/docs/">all pages</a>
+    <a href="/docs/" aria-current="page">documentation</a>
     <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
   </nav>
 </header>
-<main>
-<section class="pagehead">
-<h1>All pages</h1>
-<p class="lede">The home page is the overview; these pages go deeper. Each is a file in the repository, written from what was run on real servers.</p>
-</section>
-
-<div class="grid">
-  <div class="win card">
-    <div class="bar"><span class="t">/start/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/start/">Getting started</a></h3><p>Install Waydesk on Debian 13 or Ubuntu 26.04, make the first administrator, connect, and add more people. About ten minutes from a fresh server.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/connect/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/connect/">Connect</a></h3><p>The ways an RDP client can reach a Waydesk server: an SSH tunnel, the local network, a WireGuard VPN, and certificates a client can verify.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/vpn/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/vpn/">A VPN with WireGuard</a></h3><p>Put the RDP port behind a WireGuard VPN with three commands: init, add a client, scan the QR code. A key per device and one UDP port open.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/cli/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/cli/">The command line</a></h3><p>Every waydesk-admin command with its real output: accounts, sessions, limits, status and --watch, access, certificates and the VPN.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/gpu/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/gpu/">Using a GPU</a></h3><p>What Waydesk does with a GPU (Intel, AMD, NVIDIA), how to set it up, how to see what each session runs, what happens when it fails, and what was measured.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/architecture/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/architecture/">Architecture</a></h3><p>How a login reaches a session, what each of the three parts may do, and how the capture and the encoder work.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/measurements/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/measurements/">Measurements</a></h3><p>Memory per user, capacity of an 8 GB server, bandwidth on a bad link and the GPU figures, each with its method.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/security/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/security/">Security</a></h3><p>What the daemon, the helper and the sessions may do, what is checked at login, and what was reviewed.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/reference/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/reference/">Reference</a></h3><p>The tested systems, clients, files, ports and settings of Waydesk, in tables.</p></div>
-  </div>
-  <div class="win card">
-    <div class="bar"><span class="t">/help/</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3><a href="/help/">When something is wrong</a></h3><p>What to check when a client cannot connect, a session is refused, the picture is slow or wrong, or the GPU is not used. Where the logs are.</p></div>
-  </div>
+<main class="doc docindex">
+<div class="pagehead">
+<h1>Documentation</h1>
+<p class="lede">Read it in order, or jump to what you need. New to Waydesk: start with <a href="/docs/install/">Install and first login</a>, it takes about ten minutes from a fresh server. Every page is a file in the repository, written from what was run on real servers.</p>
 </div>
+<section>
+<h2>Get started</h2>
+<ul class="toc">
+<li><a href="/docs/install/">Install and first login</a><span>Install Waydesk on Debian 13 or Ubuntu 26.04, make the first administrator, connect, and add more people. About ten minutes from a fresh server.</span></li>
+<li><a href="/docs/connect/">Connect</a><span>The ways an RDP client can reach a Waydesk server: an SSH tunnel, the local network, a WireGuard VPN, and certificates a client can verify.</span></li>
+<li><a href="/docs/vpn/">VPN and securing access</a><span>What protects the RDP login, and how to put the port behind a WireGuard VPN with three commands: init, add a client, scan the QR code.</span></li>
+</ul>
+</section>
+<section>
+<h2>Run it</h2>
+<ul class="toc">
+<li><a href="/docs/cli/">The command line</a><span>Every waydesk-admin command with its real output: accounts, sessions, limits, status and --watch, access, certificates and the VPN.</span></li>
+<li><a href="/docs/gpu/">Using a GPU</a><span>What Waydesk does with a GPU (Intel, AMD, NVIDIA), how to set it up, how to see what each session runs, what happens when it fails, and what was measured.</span></li>
+<li><a href="/docs/reference/">Files and settings</a><span>The tested systems, clients, files, ports and settings of Waydesk, in tables.</span></li>
+</ul>
+</section>
+<section>
+<h2>Understand it</h2>
+<ul class="toc">
+<li><a href="/docs/architecture/">Architecture</a><span>How a login reaches a session, what each of the three parts may do, and how the capture and the encoder work.</span></li>
+<li><a href="/docs/measurements/">Measurements</a><span>Memory per user, capacity of an 8 GB server, bandwidth on a bad link and the GPU figures, each with its method.</span></li>
+<li><a href="/docs/compare/">How it compares</a><span>Waydesk next to xrdp, the GNOME remote desktop, X2Go, NoMachine and VNC: what each is for, and when to choose Waydesk.</span></li>
+<li><a href="/docs/limits/">Limits and status</a><span>What Waydesk is not yet: early software, the clients and GPUs it was tried with, what happens without a GPU, and how many users a server holds.</span></li>
+</ul>
+</section>
+<section>
+<h2>Help</h2>
+<ul class="toc">
+<li><a href="/docs/help/">When something is wrong</a><span>What to check when a client cannot connect, a session is refused, the picture is slow or wrong, or the GPU is not used. Where the logs are.</span></li>
+<li><a href="/docs/faq/">Questions and answers</a><span>Short answers: whether a GPU is needed, why Sway, what happens when you disconnect, which apps run, how many users fit, and who makes Waydesk.</span></li>
+</ul>
+</section>
 </main>
 <footer>
   <span>© 2026 StackCare</span>

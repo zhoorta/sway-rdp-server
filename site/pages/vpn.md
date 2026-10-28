@@ -1,7 +1,19 @@
-title: A VPN with WireGuard
-nav: vpn
-description: Put the RDP port behind a WireGuard VPN with three commands: init, add a client, scan the QR code. A key per device and one UDP port open.
+title: VPN and securing access
+nav: VPN and security
+description: What protects the RDP login, and how to put the port behind a WireGuard VPN with three commands: init, add a client, scan the QR code.
 ---
+The RDP port is closed until you open it, and there are two good ways to open it to people who are not on the machine: an SSH tunnel and a WireGuard VPN. This page says what protects the login, then makes the VPN.
+
+## Security: what protects the login {bar: notes}
+The login is the account's **password inside TLS**, with no second factor. Everything else is about making sure only the right people get as far as typing it:
+
+- **The port is closed until you open it**, and an address that is not allowed gets nothing, before TLS and before any login. Failed logins are delayed 2 seconds; five in a row refuse every login for a minute. Only members of `waydesk-users` may log in, never root.
+- **Keep the port off the open internet.** Use an SSH tunnel for one person, or the VPN below for several. Long random passwords matter, because there is no second factor.
+- **Each part has only the rights it needs.** The network-facing daemon has none and never sees a user's files; a small root helper checks the password through PAM and starts the session; each session runs as the account itself, in its own systemd slice, with its own limits. The [architecture](/docs/architecture/) page draws it.
+- **A certificate you can verify** (`waydesk-admin cert local-ca`) lets the client check every connection instead of trusting the first one.
+- **This is not an audited product.** Four internal review passes are written down with what is still open: [`docs/SECURITY-REVIEW.md`](https://github.com/zhoorta/waydesk/blob/main/docs/SECURITY-REVIEW.md), who is assumed hostile in [`docs/THREAT-MODEL.md`](https://github.com/zhoorta/waydesk/blob/main/docs/THREAT-MODEL.md), and the access model in [`docs/ACCESS.md`](https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md).
+
+## Why a VPN {bar: notes}
 For several people or devices, or anything over the internet, do not publish the RDP port: put it behind a VPN. `waydesk-admin vpn` makes the WireGuard server side, one client at a time, and a QR code for a phone. The RDP port then listens on the VPN address only, so without a key it does not exist for anyone.
 
 ## Make the VPN {bar: terminal}

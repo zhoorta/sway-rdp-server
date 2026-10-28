@@ -1,5 +1,5 @@
-title: Getting started
-nav: start
+title: Install and first login
+nav: Install
 description: Install Waydesk on Debian 13 or Ubuntu 26.04, make the first administrator, connect, and add more people. About ten minutes from a fresh server.
 ---
 From a fresh server to a desktop in about ten minutes: one package, one command to make the first administrator, and an RDP client. Everything below was run on a clean Debian 13 server.
@@ -39,7 +39,7 @@ The default needs one command on your own computer. It forwards a local port to 
 $ ssh -N -L 3389:127.0.0.1:3389 you@your-server  # keep this running
 ```
 
-Then point the RDP client at `localhost` and log in as the account you made. If your computer already uses port 3389, forward `13389` instead and connect to `localhost:13389`. The [Connect](/connect/) page has the other ways (a local network, a VPN, certificates you can verify).
+Then point the RDP client at `localhost` and log in as the account you made. If your computer already uses port 3389, forward `13389` instead and connect to `localhost:13389`. The [Connect](/docs/connect/) page has the other ways (a local network, a VPN, certificates you can verify).
 
 Clients that were tried: the **Windows App on macOS**, **mstsc on Windows 11** (ARM, in a VM) and **FreeRDP** (Debian 13's `sdl-freerdp`, version 3.15). Ubuntu's own `xfreerdp3` 3.32 cannot decode the H.264 stream; use Remmina or Debian's client there.
 
@@ -61,4 +61,4 @@ $ sudo waydesk-admin users limit alice --memory 4G
 $ waydesk-admin status
 ```
 
-A new session is refused when the machine would run out of memory, so one account cannot take everyone else down. The [command line](/cli/) page shows every command with its real output, and the [GPU](/gpu/) page what changes on a machine with a graphics card.
+A new session is refused when the machine would run out of memory, so one account cannot take everyone else down. The [command line](/docs/cli/) page shows every command with its real output, and the [GPU](/docs/gpu/) page what changes on a machine with a graphics card.

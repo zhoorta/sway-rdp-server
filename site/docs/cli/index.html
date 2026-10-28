@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The command line · Waydesk</title>
 <meta name="description" content="Every waydesk-admin command with its real output: accounts, sessions, limits, status and --watch, access, certificates and the VPN.">
-<link rel="canonical" href="https://waydesk.dev/cli/">
+<link rel="canonical" href="https://waydesk.dev/docs/cli/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0a1c2a">
 <meta property="og:title" content="The command line · Waydesk">
 <meta property="og:description" content="Every waydesk-admin command with its real output: accounts, sessions, limits, status and --watch, access, certificates and the VPN.">
-<meta property="og:url" content="https://waydesk.dev/cli/">
+<meta property="og:url" content="https://waydesk.dev/docs/cli/">
 <meta property="og:type" content="article">
 <link rel="stylesheet" href="/style.css">
 </head>
@@ -20,41 +20,53 @@
 <div class="col">
 <header>
   <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
-  <nav aria-label="Pages">
+  <nav aria-label="Site">
     <a href="/">home</a>
-    <a href="/start/">start</a>
-    <a href="/connect/">connect</a>
-    <a href="/vpn/">vpn</a>
-    <a href="/cli/" aria-current="page">cli</a>
-    <a href="/gpu/">gpu</a>
-    <a href="/architecture/">architecture</a>
-    <a href="/measurements/">measurements</a>
-    <a href="/security/">security</a>
-    <a href="/reference/">reference</a>
-    <a href="/help/">help</a>
-    <a href="/docs/">all pages</a>
+    <a href="/docs/" aria-current="page">documentation</a>
     <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
   </nav>
 </header>
-<main>
-<section class="pagehead">
+<div class="docs">
+<details class="side" open>
+<summary>Documentation</summary>
+<nav aria-label="Documentation">
+<h2>Get started</h2>
+<ul>
+<li><a href="/docs/install/">Install</a></li>
+<li><a href="/docs/connect/">Connect</a></li>
+<li><a href="/docs/vpn/">VPN and security</a></li>
+</ul>
+<h2>Run it</h2>
+<ul>
+<li><a href="/docs/cli/" aria-current="page">Command line</a><ul><li><a href="#at-a-glance">At a glance</a></li><li><a href="#accounts">Accounts</a></li><li><a href="#sessions">Sessions</a></li><li><a href="#limits">Limits</a></li><li><a href="#status">Status</a></li><li><a href="#access-and-certificates">Access and certificates</a></li><li><a href="#everything-is-scriptable">Everything is scriptable</a></li></ul></li>
+<li><a href="/docs/gpu/">GPU</a></li>
+<li><a href="/docs/reference/">Files and settings</a></li>
+</ul>
+<h2>Understand it</h2>
+<ul>
+<li><a href="/docs/architecture/">Architecture</a></li>
+<li><a href="/docs/measurements/">Measurements</a></li>
+<li><a href="/docs/compare/">How it compares</a></li>
+<li><a href="/docs/limits/">Limits and status</a></li>
+</ul>
+<h2>Help</h2>
+<ul>
+<li><a href="/docs/help/">Troubleshooting</a></li>
+<li><a href="/docs/faq/">FAQ</a></li>
+</ul>
+</nav>
+</details>
+<main class="doc">
+<div class="pagehead">
 <h1>The command line</h1>
 <p class="lede"><code>waydesk-admin</code> is how an administrator looks after a server. Listing and <code>status</code> are open to every local account (an ordinary account sees its own row and the totals; administrators see every account); everything else needs root (<code>sudo</code>). Each command below was run on a real server, and the output is shown as it came, with only passwords and keys removed.</p>
-</section>
-<section class="sect" id="at-a-glance">
+</div>
+<section id="at-a-glance">
 <h2>At a glance</h2>
-<div class="win">
-<div class="bar"><span class="t">table</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
-<div class="tw"><table><tr><th>command</th><th>what it does</th></tr><tr><td><code>users list | add | remove | passwd | enable | disable | admin | sudo | limit</code></td><td>accounts, passwords, rights and per-account limits</td></tr><tr><td><code>sessions list | end NAME</code></td><td>who has a running session; end one</td></tr><tr><td><code>status [--json] [--watch [SECONDS]]</code></td><td>memory, swap, load, the GPUs, and what each account uses and runs</td></tr><tr><td><code>access [show | local | lan | vpn | custom]</code></td><td>where the RDP port listens and who may connect</td></tr><tr><td><code>cert [status | local-ca | reissue | export-ca | install | self-signed]</code></td><td>the certificate clients check</td></tr><tr><td><code>vpn [status | init | add | show | list | remove]</code></td><td>a WireGuard VPN for the port (see <a href="/vpn/">the VPN page</a>)</td></tr><tr><td><code>waydesk-setup-admin</code></td><td>the first administrator, and how clients connect</td></tr><tr><td><code>waydesk-setup</code></td><td>as your own account: choose browsers, office, developer and creative applications</td></tr></table></div>
-</div>
-</div>
+<div class="tw"><table><tr><th>command</th><th>what it does</th></tr><tr><td><code>users list | add | remove | passwd | enable | disable | admin | sudo | limit</code></td><td>accounts, passwords, rights and per-account limits</td></tr><tr><td><code>sessions list | end NAME</code></td><td>who has a running session; end one</td></tr><tr><td><code>status [--json] [--watch [SECONDS]]</code></td><td>memory, swap, load, the GPUs, and what each account uses and runs</td></tr><tr><td><code>access [show | local | lan | vpn | custom]</code></td><td>where the RDP port listens and who may connect</td></tr><tr><td><code>cert [status | local-ca | reissue | export-ca | install | self-signed]</code></td><td>the certificate clients check</td></tr><tr><td><code>vpn [status | init | add | show | list | remove]</code></td><td>a WireGuard VPN for the port (see <a href="/docs/vpn/">the VPN page</a>)</td></tr><tr><td><code>waydesk-setup-admin</code></td><td>the first administrator, and how clients connect</td></tr><tr><td><code>waydesk-setup</code></td><td>as your own account: choose browsers, office, developer and creative applications</td></tr></table></div>
 </section>
-<section class="sect" id="accounts">
+<section id="accounts">
 <h2>Accounts</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <pre><code><span class="p">$</span> sudo waydesk-admin users add alice
 made alice (uid 1000), groups: waydesk-users
 temporary password (shown once): ************
@@ -75,27 +87,17 @@ ACCOUNT                UID  RDP  FLATPAK  SUDO  SHELL   SESSION
 alice                 1000  yes  -        -     yes     none
 bob                   1001  -    yes      -     yes     none</code></pre>
 <p><code>users enable NAME</code> gives the right back, <code>users disable NAME --keep-session</code> leaves a running session alone, <code>users passwd NAME</code> sets a new temporary password (<code>--stdin</code> reads it from a pipe, never from an argument), <code>users admin NAME on|off</code> and <code>users sudo NAME on|off</code> change the rights, and <code>users remove NAME [--delete-home]</code> removes the account. Accounts below uid 1000 and root are never touched.</p>
-</div>
-</div>
 </section>
-<section class="sect" id="sessions">
+<section id="sessions">
 <h2>Sessions</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <pre><code><span class="p">$</span> waydesk-admin sessions list
 no sessions running
 <span class="p">$</span> sudo waydesk-admin sessions end alice
 ended the session of alice</code></pre>
 <p>A session outlives the RDP connection: the windows are where you left them when you reconnect. Ending it closes everything the account had open.</p>
-</div>
-</div>
 </section>
-<section class="sect" id="limits">
+<section id="limits">
 <h2>Limits</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <p>Every account lives in its own cgroup slice, with ceilings of 35 % and 50 % of the memory, 50 % of it in swap, and 8192 tasks. To change them for one account:</p>
 <pre><code><span class="p">$</span> sudo waydesk-admin users limit alice show
 limits of alice (user-1000.slice):
@@ -107,14 +109,9 @@ TasksMax=8192
 <span class="p">$</span> sudo waydesk-admin users limit alice --memory 4G --swap 1G
 limits of alice set: MemoryHigh=3865470561 MemoryMax=4294967296 MemorySwapMax=1073741824</code></pre>
 <p><code>--cpu-weight N</code> and <code>--tasks N</code> work the same way, and <code>users limit NAME reset</code> puts the defaults back. A new session is refused when less than the larger of 900 MB and 15 % of the memory is available (or the optional limit of active users is reached); an account that already has a session just reconnects.</p>
-</div>
-</div>
 </section>
-<section class="sect" id="status">
+<section id="status">
 <h2>Status</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <p><code>status</code> shows the machine and every session. On a server without a GPU:</p>
 <pre><code><span class="p">$</span> waydesk-admin status
 Memory    7.6 GB in all, 7.0 GB available
@@ -125,20 +122,15 @@ Sessions  1 running; a new one would be accepted (needs 1.1 GB available)
 
 ACCOUNT            SESSION     MEMORY    SWAP    CPU    LIMIT RENDER ENCODER            PROGRAMS (resident)
 lt1                running     570 MB       -     3%   3.8 GB cpu    openh264 0fps      qs 481 MB, sway 73 MB, waydesk-server 70 MB</code></pre>
-<p><code>RENDER</code> says whether the session's desktop is drawn on a GPU or on the CPU, and <code>ENCODER</code> which video encoder it runs (<code>vaapi</code>, <code>nvenc</code> or <code>openh264</code>), with the quantiser and the frame rate once frames flow: <code>vaapi q18 12fps</code>, <code>nvenc q25 17fps</code>. A GPU encoder that cannot start falls back to OpenH264 on the CPU, and this is where you see it. The <a href="/gpu/">GPU page</a> has a status from a machine with a card.</p>
+<p><code>RENDER</code> says whether the session's desktop is drawn on a GPU or on the CPU, and <code>ENCODER</code> which video encoder it runs (<code>vaapi</code>, <code>nvenc</code> or <code>openh264</code>), with the quantiser and the frame rate once frames flow: <code>vaapi q18 12fps</code>, <code>nvenc q25 17fps</code>. A GPU encoder that cannot start falls back to OpenH264 on the CPU, and this is where you see it. The <a href="/docs/gpu/">GPU page</a> has a status from a machine with a card.</p>
 <p>Two more forms, for watching a machine under load and for scripts:</p>
 <pre><code><span class="p">$</span> waydesk-admin status --watch        <span class="c"># redraws every 2 seconds; --watch 5 for 5 seconds</span>
 <span class="p">$</span> waydesk-admin status --json         <span class="c"># the same as JSON</span>
 <span class="p">$</span> waydesk-admin status --json --watch 1 | jq .machine.load   <span class="c"># one line of JSON per second</span></code></pre>
 <p>A session's renderer, encoder and frame rate are readable by that account and by root, so another administrator's row shows a dash.</p>
-</div>
-</div>
 </section>
-<section class="sect" id="access-and-certificates">
+<section id="access-and-certificates">
 <h2>Access and certificates</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <pre><code><span class="p">$</span> waydesk-admin access show
 Listening on     127.0.0.1:3389  (local)
 Who may connect   this machine only
@@ -150,21 +142,17 @@ Signed by        itself (self-signed): clients have to compare the fingerprint
 Valid until      Oct 25 19:19:21 2036 GMT
 Names            
 Fingerprint      6F:E1:32:12:8C:64:71:A3:C0:51:C6:BB:80:37:64:B9:C4:E4:C7:1E:C7:C2:B8:93:E3:48:42:A5:C9:A4:FD:10</code></pre>
-<p><code>access local | lan | vpn | custom</code> change where the port listens; <code>cert local-ca</code>, <code>cert install</code>, <code>cert reissue</code> and <code>cert export-ca</code> manage what clients check. The <a href="/connect/">Connect page</a> explains each.</p>
-</div>
-</div>
+<p><code>access local | lan | vpn | custom</code> change where the port listens; <code>cert local-ca</code>, <code>cert install</code>, <code>cert reissue</code> and <code>cert export-ca</code> manage what clients check. The <a href="/docs/connect/">Connect page</a> explains each.</p>
 </section>
-<section class="sect" id="everything-is-scriptable">
+<section id="everything-is-scriptable">
 <h2>Everything is scriptable</h2>
-<div class="win">
-<div class="bar"><span class="t">notes</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <p><code>users list</code>, <code>users add</code>, <code>users passwd</code>, <code>sessions list</code> and <code>status</code> take <code>--json</code>. <code>waydesk-setup-admin --name NAME --password-stdin --access local</code> makes the first administrator without questions. <code>waydesk-admin --version</code> prints the version.</p>
-</div>
-</div>
 </section>
+<nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/vpn/"><span>previous</span>VPN and securing access</a><a class="next" href="/docs/gpu/"><span>next</span>Using a GPU</a></nav>
 <p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/cli.md">a file in the repository</a>: corrections are welcome.</p>
 </main>
+</div>
+<script>if (matchMedia('(max-width: 860px)').matches) document.querySelector('.side').open = false;</script>
 <footer>
   <span>© 2026 StackCare</span>
   <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
