@@ -27,6 +27,10 @@
     <a href="/vpn/">vpn</a>
     <a href="/cli/">cli</a>
     <a href="/gpu/">gpu</a>
+    <a href="/architecture/">architecture</a>
+    <a href="/measurements/">measurements</a>
+    <a href="/security/">security</a>
+    <a href="/reference/">reference</a>
     <a href="/help/">help</a>
     <a href="/docs/">all pages</a>
     <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
@@ -36,6 +40,47 @@
 <section class="pagehead">
 <h1>Connect</h1>
 <p class="lede">The RDP login is a TLS login with the account's password, and there is no second factor. So the port is <strong>closed to the network until you open it</strong>. Four things are set, each with one command: where it listens, which addresses may connect, what certificate clients check, and, if you want one, a VPN.</p>
+</section>
+<section class="sect" id="how-a-client-reaches-the-port">
+<h2>How a client reaches the port</h2>
+<div class="win">
+<div class="bar"><span class="t">diagram</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<div class="dg">
+<svg viewBox="0 0 520 250" role="img" aria-labelledby="adt ads">
+<title id="adt">How a client reaches the RDP port</title>
+<desc id="ads">The RDP client reaches the waydesk daemon in one of three ways: through an SSH tunnel (the default, the port listens on this machine only), over the local network (only the allowed addresses), or over a WireGuard VPN (recommended). On the server the daemon checks the source address against the allowed list, then the TLS certificate, then the account's password, and only then starts a session.</desc>
+<defs><marker id="ah2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ee9a45"/></marker></defs>
+<rect class="zone" x="330" y="8" width="182" height="234" rx="8"/>
+<text class="zl" x="344" y="28">this server</text>
+<rect class="box" x="8" y="97" width="104" height="56" rx="6"/>
+<text class="nm" x="60" y="122" text-anchor="middle">RDP client</text>
+<text class="dm" x="60" y="140" text-anchor="middle">any client</text>
+<rect class="box" x="170" y="26" width="136" height="52" rx="6"/>
+<text class="nm" x="238" y="49" text-anchor="middle">SSH tunnel</text>
+<text class="dm" x="238" y="66" text-anchor="middle">the default</text>
+<rect class="box" x="170" y="99" width="136" height="52" rx="6"/>
+<text class="nm" x="238" y="122" text-anchor="middle">local network</text>
+<text class="dm" x="238" y="139" text-anchor="middle">allowlist</text>
+<rect class="box" x="170" y="172" width="136" height="52" rx="6"/>
+<text class="nm" x="238" y="195" text-anchor="middle">WireGuard VPN</text>
+<text class="dm" x="238" y="212" text-anchor="middle">recommended</text>
+<rect class="box root" x="346" y="46" width="152" height="182" rx="6"/>
+<text class="nm" x="422" y="70" text-anchor="middle">waydesk daemon</text>
+<text class="dm" x="422" y="108" text-anchor="middle">1 source address</text>
+<text class="dm" x="422" y="132" text-anchor="middle">2 TLS certificate</text>
+<text class="dm" x="422" y="156" text-anchor="middle">3 account password</text>
+<text class="rn" x="422" y="196" text-anchor="middle">then a session</text>
+<path class="arrow" d="M112 118 L170 52" marker-end="url(#ah2)"/>
+<path class="arrow" d="M112 125 L170 125" marker-end="url(#ah2)"/>
+<path class="arrow" d="M112 132 L170 198" marker-end="url(#ah2)"/>
+<path class="arrow" d="M306 52 L346 100" marker-end="url(#ah2)"/>
+<path class="arrow" d="M306 125 L346 125" marker-end="url(#ah2)"/>
+<path class="arrow" d="M306 198 L346 150" marker-end="url(#ah2)"/>
+</svg>
+</div>
+</div>
+</div>
 </section>
 <section class="sect" id="where-it-listens-and-who-may-connect">
 <h2>Where it listens, and who may connect</h2>

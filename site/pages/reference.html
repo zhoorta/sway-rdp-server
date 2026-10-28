@@ -1,0 +1,38 @@
+title: Reference
+nav: reference
+description: The tested systems, clients, files, ports and settings of Waydesk, in tables.
+lede: Where things are, and what was tested.
+---
+<section class="sect" id="reference">
+<div class="win">
+<div class="bar"><span class="t">commands and files</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<div class="tw"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>waydesk-admin status [--watch]</code></td><td>memory, swap, load, the GPUs and how busy they are, running sessions, what each account uses and runs (GPU or CPU, the video encoder); <code>--watch</code> keeps refreshing, <code>--json --watch</code> writes a line of JSON each time</td></tr>
+<tr><td><code>waydesk-admin users ...</code></td><td>accounts, passwords, per-account limits; <code>sessions list | end NAME</code></td></tr>
+<tr><td><code>waydesk-admin access | cert | vpn</code></td><td>who can reach the port, the certificate clients check, a WireGuard VPN</td></tr>
+<tr><td><code>waydesk-setup-admin</code></td><td>the first administrator, and how clients connect</td></tr>
+<tr><td><code>waydesk-setup</code></td><td>choose browsers, office, developer and creative apps (the shell comes with <code>waydesk</code>)</td></tr>
+<tr><td><code>/etc/default/waydesk</code></td><td>the daemon's and the sessions' options</td></tr>
+<tr><td><code>/etc/xdg/waydesk/sway.conf</code></td><td>the session's sway configuration</td></tr>
+</table></div>
+<p class="method">Every command with its real output: <a href="/cli/">the command line</a>; first steps: <a href="/start/">getting started</a>; when something is wrong: <a href="/help/">troubleshooting</a>.</p>
+<p class="small">Every package, command, unit and file is listed in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/REFERENCE.md"><code>docs/REFERENCE.md</code></a>.</p>
+<h3>Source code and licences</h3>
+<p>Waydesk is MIT or Apache-2.0 (<a href="https://github.com/zhoorta/waydesk">source on GitHub</a>); so are the other programs we build: sway, wlroots, DankMaterialShell, danksearch and dgop. Three copyleft programs are in the repository as binaries, and their source is offered here, from the same place as the packages, at no charge:</p>
+<ul class="plain">
+<li><b>matugen 4.2.0</b> (GPL-2.0-or-later), built unmodified from the upstream tag, with its Rust crates</li>
+<li><b>quickshell 0.3.0</b> (LGPL-3.0-only), built unmodified from Debian's copy of the release</li>
+<li><b>pcmanfm-qt</b> (GPL-2.0-or-later): the Debian 13 and Ubuntu 26.04 source packages and our two patches (they remove menu entries)</li>
+</ul>
+<pre><code><span class="p">$</span> curl -fsSL https://waydesk.dev/apt/source/README</code></pre>
+<p class="dim">Every file is listed with its checksum in <a href="/apt/source/SHA256SUMS">SHA256SUMS</a>; <a href="/apt/source/">the folder</a> has the archives. Each package also carries its licence under <code>/usr/share/doc/&lt;package&gt;/copyright</code>.</p>
+
+<p class="grp">Key</p>
+<p>Packages and indexes are signed with one ed25519 key, fingerprint <code>C64672B25ECD4773196C39589D8E8874E67617F4</code>, expires 2029-10-21. The public key is <code>/apt/waydesk-archive-keyring.gpg</code>.</p>
+
+
+</div>
+</div>
+</section>

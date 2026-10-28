@@ -1,0 +1,18 @@
+title: Security
+nav: security
+description: What the daemon, the helper and the sessions may do, what is checked at login, and what was reviewed.
+lede: Who may do what, and what was looked at.
+---
+<section class="sect" id="security">
+<div class="win">
+<div class="bar"><span class="t">threat model</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p class="small">The login is the account's password inside TLS, with no second factor: keep the port off the open internet. The daemon has no privileges, a small root helper starts the sessions, and each account is isolated from the others. This is not an audited product: four internal review passes are written down, with what is still open.</p>
+<ul class="plain small">
+<li><a href="https://github.com/zhoorta/waydesk/blob/main/docs/THREAT-MODEL.md"><code>docs/THREAT-MODEL.md</code></a>: who is assumed hostile, and the open items</li>
+<li><a href="https://github.com/zhoorta/waydesk/blob/main/docs/SECURITY-REVIEW.md"><code>docs/SECURITY-REVIEW.md</code></a>: the internal reviews</li>
+<li><a href="https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md"><code>docs/ACCESS.md</code></a>: who can reach the port, certificates, the VPN</li>
+</ul>
+</div>
+</div>
+</section>

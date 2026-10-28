@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Measurements · Waydesk</title>
+<meta name="description" content="Memory per user, capacity of an 8 GB server, bandwidth on a bad link and the GPU figures, each with its method.">
+<link rel="canonical" href="https://waydesk.dev/measurements/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0a1c2a">
+<meta property="og:title" content="Measurements · Waydesk">
+<meta property="og:description" content="Memory per user, capacity of an 8 GB server, bandwidth on a bad link and the GPU figures, each with its method.">
+<meta property="og:url" content="https://waydesk.dev/measurements/">
+<meta property="og:type" content="article">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Pages">
+    <a href="/">home</a>
+    <a href="/start/">start</a>
+    <a href="/connect/">connect</a>
+    <a href="/vpn/">vpn</a>
+    <a href="/cli/">cli</a>
+    <a href="/gpu/">gpu</a>
+    <a href="/architecture/">architecture</a>
+    <a href="/measurements/" aria-current="page">measurements</a>
+    <a href="/security/">security</a>
+    <a href="/reference/">reference</a>
+    <a href="/help/">help</a>
+    <a href="/docs/">all pages</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<main>
+<section class="pagehead">
+<h1>Measurements</h1>
+<p class="lede">Our own servers and our own scripts: each chart says how it was measured, and the failed attempts are in the tables of the repository.</p>
+</section>
+<section class="sect" id="measurements">
+<div class="win">
+<div class="bar"><span class="t">figures and methods</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p class="small">Our own servers: Hetzner cloud with no GPU for the charts, a dedicated Core i7-7700 with its integrated GPU for the GPU figures. Each chart says how it was measured; all tables and the failed attempts are in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MEASUREMENTS.md"><code>docs/MEASUREMENTS.md</code></a>.</p>
+<div class="tiles"><div class="tile"><div class="big">430 to 600 MB</div><div class="cap2">an idle session with the shell</div></div><div class="tile"><div class="big">7 to 8</div><div class="cap2">heavy users on an 8 GB server</div></div><div class="tile"><div class="big">4.5 : 1</div><div class="cap2">compressed swap, zstd</div></div><div class="tile"><div class="big">60 s</div><div class="cap2">a frozen client is cut off</div></div><div class="tile"><div class="big">4.8 % vs 15 %</div><div class="cap2">CPU of the capture and encoding with 20 active heavy users, GPU or CPU</div></div></div>
+<div class="charts">
+<figure><h3>Where the memory goes</h3><svg viewBox="0 0 352 330" role="img" aria-labelledby="c1t c1d">
+<title id="c1t">Available memory as heavy users log in, 8 GB server</title>
+<desc id="c1d">On Debian 13 the available memory falls from 5.4 GB with one user to 1.1 GB with eight; the ninth login is refused. On Ubuntu 26.04 it falls from 5.2 GB to 0.8 GB with seven users; the eighth is refused. A new login is refused when less than about 1.2 GB is available.</desc>
+<line class="gl" x1="42" x2="342" y1="272.0" y2="272.0"/><text class="ax" x="35" y="277.0" text-anchor="end">0</text><line class="gl" x1="42" x2="342" y1="229.0" y2="229.0"/><text class="ax" x="35" y="234.0" text-anchor="end">1</text><line class="gl" x1="42" x2="342" y1="186.0" y2="186.0"/><text class="ax" x="35" y="191.0" text-anchor="end">2</text><line class="gl" x1="42" x2="342" y1="143.0" y2="143.0"/><text class="ax" x="35" y="148.0" text-anchor="end">3</text><line class="gl" x1="42" x2="342" y1="100.0" y2="100.0"/><text class="ax" x="35" y="105.0" text-anchor="end">4</text><line class="gl" x1="42" x2="342" y1="57.0" y2="57.0"/><text class="ax" x="35" y="62.0" text-anchor="end">5</text><line class="gl" x1="42" x2="342" y1="14.0" y2="14.0"/><text class="ax" x="35" y="19.0" text-anchor="end">6</text><text class="ax" x="42.0" y="292" text-anchor="middle">1</text><text class="ax" x="79.5" y="292" text-anchor="middle">2</text><text class="ax" x="117.0" y="292" text-anchor="middle">3</text><text class="ax" x="154.5" y="292" text-anchor="middle">4</text><text class="ax" x="192.0" y="292" text-anchor="middle">5</text><text class="ax" x="229.5" y="292" text-anchor="middle">6</text><text class="ax" x="267.0" y="292" text-anchor="middle">7</text><text class="ax" x="304.5" y="292" text-anchor="middle">8</text><text class="ax" x="342.0" y="292" text-anchor="middle">9</text>
+<line class="th" x1="42" x2="342" y1="222.1" y2="222.1"/>
+<text class="lb warn2" x="50" y="242.1">refused below 1.2 GB</text>
+<line class="ln deb" x1="170" x2="196" y1="40" y2="40"/><text class="lb deb" x="204" y="45">Debian 13</text>
+<line class="ln ubu" x1="170" x2="196" y1="64" y2="64"/><text class="lb ubu" x="204" y="69">Ubuntu 26.04</text>
+<polyline class="ln deb" points="42.0,39.8 79.5,104.3 117.0,168.8 154.5,203.2 192.0,198.9 229.5,203.2 267.0,203.2 304.5,224.7"/><polyline class="ln ubu" points="42.0,48.4 79.5,125.8 117.0,181.7 154.5,177.4 192.0,186.0 229.5,198.9 267.0,237.2"/>
+<circle class="dt deb" cx="42.0" cy="39.8" r="3.5"/><circle class="dt deb" cx="79.5" cy="104.3" r="3.5"/><circle class="dt deb" cx="117.0" cy="168.8" r="3.5"/><circle class="dt deb" cx="154.5" cy="203.2" r="3.5"/><circle class="dt deb" cx="192.0" cy="198.9" r="3.5"/><circle class="dt deb" cx="229.5" cy="203.2" r="3.5"/><circle class="dt deb" cx="267.0" cy="203.2" r="3.5"/><circle class="dt deb" cx="304.5" cy="224.7" r="3.5"/>
+<circle class="dt ubu" cx="42.0" cy="48.4" r="3.5"/><circle class="dt ubu" cx="79.5" cy="125.8" r="3.5"/><circle class="dt ubu" cx="117.0" cy="181.7" r="3.5"/><circle class="dt ubu" cx="154.5" cy="177.4" r="3.5"/><circle class="dt ubu" cx="192.0" cy="186.0" r="3.5"/><circle class="dt ubu" cx="229.5" cy="198.9" r="3.5"/><circle class="dt ubu" cx="267.0" cy="237.2" r="3.5"/>
+<text class="ax" x="192" y="324" text-anchor="middle">heavy users logged in</text>
+<text class="ax" x="11" y="143" text-anchor="middle" transform="rotate(-90 11 143)">available memory, GB</text>
+</svg><figcaption>Available memory (<code>free</code>) after each user logged in over RDP and opened Chromium, LibreOffice Calc with a 300,000-row sheet and VS Code, one at a time, left idle. 4 vCPU, 7.6 GB.</figcaption></figure>
+<figure><h3>A slow, lossy link</h3><svg viewBox="0 0 352 330" role="img" aria-labelledby="c2t c2d"><title id="c2t">TCP BBR against CUBIC on a link with 4 % packet loss</title><desc id="c2d">Throughput rose from about 0.3 Mbit/s with CUBIC to 2 to 4 Mbit/s with BBR, and the data waiting unsent on the server fell from 50 to 120 kB to 1 to 13 kB.</desc>
+<text class="lb" x="0" y="16">carried, Mbit/s</text><text class="ax" x="0" y="53">CUBIC</text><rect class="bar cu" x="66" y="32" width="14" height="30" rx="3"/><text class="ax" x="88" y="53">0.3</text><text class="ax" x="0" y="97">BBR</text><rect class="bar bb" x="66" y="76" width="142" height="30" rx="3"/><text class="ax" x="216" y="97">2 to 4</text><text class="lb" x="0" y="176">waiting unsent, kB</text><text class="ax" x="0" y="213">CUBIC</text><rect class="bar cu" x="66" y="192" width="135" height="30" rx="3"/><text class="ax" x="209" y="213">50 to 120</text><text class="ax" x="0" y="257">BBR</text><rect class="bar bb" x="66" y="236" width="11" height="30" rx="3"/><text class="ax" x="85" y="257">1 to 13</text></svg><figcaption>One distant link with about 4&nbsp;% packet loss, the connection inside WireGuard, <code>ss -ti</code> before and after switching CUBIC to BBR. One afternoon.</figcaption></figure>
+<figure><h3>H.264 for screens</h3><svg viewBox="0 0 352 330" role="img" aria-labelledby="c3t c3d"><title id="c3t">H.264 screen-content mode against camera mode</title><desc id="c3d">For a full-screen 720p30 test pattern the screen-content mode needed 6.4 Mbit/s and 43 % of a core; the camera mode needed 12.7 Mbit/s and 15 % of a core.</desc>
+<text class="lb" x="0" y="16">bandwidth, Mbit/s</text><text class="ax" x="0" y="53">screen</text><rect class="bar bb" x="66" y="32" width="94" height="30" rx="3"/><text class="ax" x="168" y="53">6.4</text><text class="ax" x="0" y="97">camera</text><rect class="bar cu" x="66" y="76" width="186" height="30" rx="3"/><text class="ax" x="260" y="97">12.7</text><text class="lb" x="0" y="176">CPU, % of one core</text><text class="ax" x="0" y="213">screen</text><rect class="bar bb" x="66" y="192" width="163" height="30" rx="3"/><text class="ax" x="237" y="213">43</text><text class="ax" x="0" y="257">camera</text><rect class="bar cu" x="66" y="236" width="57" height="30" rx="3"/><text class="ax" x="131" y="257">15</text></svg><figcaption>A full-screen 720p30 test pattern, software OpenH264 on 2 vCPUs. Screen mode costs a near-constant share of a core, so a mostly still desktop costs more CPU in screen mode than in camera mode.</figcaption></figure>
+</div>
+<h3 class="gpuh">With and without a GPU</h3>
+<p class="small">Active users, not idle ones: Chromium and a terminal that scroll and type, Calc on 300,000 rows and VS Code with keystrokes, GIMP for one in four, a looping video for one in four. One at a time on a Core i7-7700 (8 threads, 64 GB, integrated HD 630), each with its own RDP client on another machine. The CPU is of the whole machine.</p>
+<div class="tw"><table>
+<tr><th>Active heavy users</th><th>CPU, GPU on</th><th>CPU, GPU off</th><th>Capture and encoding, GPU on / off</th></tr>
+<tr><td>10</td><td>47 %</td><td>45 %</td><td>4.2 % / 8.7 %</td></tr>
+<tr><td>15</td><td>49 %</td><td>60 %</td><td>4.6 % / 11.7 %</td></tr>
+<tr><td>20</td><td>50 %</td><td>69 %</td><td>4.8 % / 15.4 %</td></tr>
+<tr><td>24</td><td>refused at 22 (memory)</td><td>94 %</td><td>&ndash; / 21.1 %</td></tr>
+</table></div>
+<ul class="plain">
+<li>The GPU flattens the CPU (about 50 % from 15 users on, against 3 to 4 points more for each user without it), but on this machine it did <strong>not</strong> add users: 21 fit with it, 24 without, because an integrated GPU takes system memory (2.24 GB a user against 1.95 GB). Memory ended both runs.</li>
+<li>Full-screen WebGL on the HD 630: 60 fps each for two users, 47 for three, 20 for six, 13 for ten; the card is the limit, the CPU stays under 40 %. Without the GPU the page does not animate.</li>
+<li>When a GPU cannot encode, the session falls back to OpenH264 and keeps working: the worker takes 12 % of the machine instead of 3 %. <code>waydesk-admin status</code> shows it.</li>
+<li>An NVIDIA RTX 4000 SFF Ada (driver 615 or newer) runs the desktop and a NVENC encoder: 61 fps on the WebGL page, the encoder engine 4 % busy.</li>
+</ul>
+<p class="method">Not measured: a build or a recalculation, the delay between a click and its picture, AMD, a card with its own memory under many users, runs longer than 45 minutes. Raw tables and the scripts: <a href="https://github.com/zhoorta/waydesk/tree/main/docs/measure-data"><code>docs/measure-data</code></a>. Setting it up and reading it: <a href="/gpu/">using a GPU</a>.</p>
+</div>
+</div>
+</section>
+
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/measurements.html">a file in the repository</a>: corrections are welcome.</p>
+</main>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>

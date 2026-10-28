@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference · Waydesk</title>
+<meta name="description" content="The tested systems, clients, files, ports and settings of Waydesk, in tables.">
+<link rel="canonical" href="https://waydesk.dev/reference/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0a1c2a">
+<meta property="og:title" content="Reference · Waydesk">
+<meta property="og:description" content="The tested systems, clients, files, ports and settings of Waydesk, in tables.">
+<meta property="og:url" content="https://waydesk.dev/reference/">
+<meta property="og:type" content="article">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Pages">
+    <a href="/">home</a>
+    <a href="/start/">start</a>
+    <a href="/connect/">connect</a>
+    <a href="/vpn/">vpn</a>
+    <a href="/cli/">cli</a>
+    <a href="/gpu/">gpu</a>
+    <a href="/architecture/">architecture</a>
+    <a href="/measurements/">measurements</a>
+    <a href="/security/">security</a>
+    <a href="/reference/" aria-current="page">reference</a>
+    <a href="/help/">help</a>
+    <a href="/docs/">all pages</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<main>
+<section class="pagehead">
+<h1>Reference</h1>
+<p class="lede">Where things are, and what was tested.</p>
+</section>
+<section class="sect" id="reference">
+<div class="win">
+<div class="bar"><span class="t">commands and files</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<div class="tw"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>waydesk-admin status [--watch]</code></td><td>memory, swap, load, the GPUs and how busy they are, running sessions, what each account uses and runs (GPU or CPU, the video encoder); <code>--watch</code> keeps refreshing, <code>--json --watch</code> writes a line of JSON each time</td></tr>
+<tr><td><code>waydesk-admin users ...</code></td><td>accounts, passwords, per-account limits; <code>sessions list | end NAME</code></td></tr>
+<tr><td><code>waydesk-admin access | cert | vpn</code></td><td>who can reach the port, the certificate clients check, a WireGuard VPN</td></tr>
+<tr><td><code>waydesk-setup-admin</code></td><td>the first administrator, and how clients connect</td></tr>
+<tr><td><code>waydesk-setup</code></td><td>choose browsers, office, developer and creative apps (the shell comes with <code>waydesk</code>)</td></tr>
+<tr><td><code>/etc/default/waydesk</code></td><td>the daemon's and the sessions' options</td></tr>
+<tr><td><code>/etc/xdg/waydesk/sway.conf</code></td><td>the session's sway configuration</td></tr>
+</table></div>
+<p class="method">Every command with its real output: <a href="/cli/">the command line</a>; first steps: <a href="/start/">getting started</a>; when something is wrong: <a href="/help/">troubleshooting</a>.</p>
+<p class="small">Every package, command, unit and file is listed in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/REFERENCE.md"><code>docs/REFERENCE.md</code></a>.</p>
+<h3>Source code and licences</h3>
+<p>Waydesk is MIT or Apache-2.0 (<a href="https://github.com/zhoorta/waydesk">source on GitHub</a>); so are the other programs we build: sway, wlroots, DankMaterialShell, danksearch and dgop. Three copyleft programs are in the repository as binaries, and their source is offered here, from the same place as the packages, at no charge:</p>
+<ul class="plain">
+<li><b>matugen 4.2.0</b> (GPL-2.0-or-later), built unmodified from the upstream tag, with its Rust crates</li>
+<li><b>quickshell 0.3.0</b> (LGPL-3.0-only), built unmodified from Debian's copy of the release</li>
+<li><b>pcmanfm-qt</b> (GPL-2.0-or-later): the Debian 13 and Ubuntu 26.04 source packages and our two patches (they remove menu entries)</li>
+</ul>
+<pre><code><span class="p">$</span> curl -fsSL https://waydesk.dev/apt/source/README</code></pre>
+<p class="dim">Every file is listed with its checksum in <a href="/apt/source/SHA256SUMS">SHA256SUMS</a>; <a href="/apt/source/">the folder</a> has the archives. Each package also carries its licence under <code>/usr/share/doc/&lt;package&gt;/copyright</code>.</p>
+
+<p class="grp">Key</p>
+<p>Packages and indexes are signed with one ed25519 key, fingerprint <code>C64672B25ECD4773196C39589D8E8874E67617F4</code>, expires 2029-10-21. The public key is <code>/apt/waydesk-archive-keyring.gpg</code>.</p>
+
+
+</div>
+</div>
+</section>
+
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/reference.html">a file in the repository</a>: corrections are welcome.</p>
+</main>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,77 @@
+title: Architecture
+nav: architecture
+description: How a login reaches a session, what each of the three parts may do, and how the capture and the encoder work.
+lede: Three parts with different rights: the network-facing daemon has none, a small root helper checks passwords and starts sessions, and each session runs as the account itself.
+---
+<div class="win diagram">
+<div class="bar"><span class="t">how a login reaches a session</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<div class="dg">
+<svg viewBox="0 0 520 556" role="img" aria-labelledby="dgt dgd">
+<title id="dgt">How a login reaches a session</title>
+<desc id="dgd">The client connects with TLS and RDP to the waydesk daemon, which has no privileges. The daemon asks the root helper, over a unix socket, to check the password and start a session. The helper starts the session as the account itself. The session sends screen, input, audio and clipboard back to the daemon.</desc>
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#e08a3c"/></marker></defs>
+
+<rect class="box" x="110" y="8" width="240" height="46" rx="3"/>
+<text class="nm" x="230" y="28" text-anchor="middle">client</text>
+<text class="dm" x="230" y="45" text-anchor="middle">FreeRDP, Windows App</text>
+<path class="arrow" d="M230 54V120" marker-end="url(#ah)"/>
+<text x="242" y="92">TLS, RDP</text>
+
+<rect class="zone" x="8" y="100" width="504" height="116" rx="4"/>
+<text class="zl" x="20" y="117">network-facing, no privileges</text>
+<rect class="box" x="110" y="124" width="240" height="76" rx="3"/>
+<text class="nm" x="230" y="145" text-anchor="middle">waydesk.service</text>
+<text class="rn" x="230" y="162" text-anchor="middle">runs as: waydesk</text>
+<text class="dm" x="230" y="180" text-anchor="middle">TLS, RDP, H.264 framing</text>
+<text class="dm" x="230" y="195" text-anchor="middle">no PAM, no user files</text>
+
+<path class="arrow" d="M230 200V260" marker-end="url(#ah)"/>
+<text x="242" y="236">unix socket,</text>
+<text x="242" y="251">peer credentials checked</text>
+
+<rect class="zone" x="8" y="226" width="504" height="108" rx="4"/>
+<text class="zl" x="20" y="243">root, no network</text>
+<rect class="box root" x="110" y="262" width="240" height="64" rx="3"/>
+<text class="nm" x="230" y="283" text-anchor="middle">waydesk-helper.service</text>
+<text class="rn" x="230" y="300" text-anchor="middle">runs as: root</text>
+<text class="dm" x="230" y="317" text-anchor="middle">PAM check, memory admission</text>
+
+<path class="arrow" d="M230 326V402" marker-end="url(#ah)"/>
+<text x="242" y="360">starts the session</text>
+<text x="242" y="375">as that account</text>
+
+<rect class="zone" x="8" y="342" width="504" height="206" rx="4"/>
+<text class="zl" x="20" y="359">the account itself</text>
+<text class="zl" x="500" y="540" text-anchor="end">own logind session, own cgroup</text>
+<rect class="box" x="110" y="402" width="240" height="120" rx="3"/>
+<text class="nm" x="230" y="423" text-anchor="middle">waydesk-session@UID</text>
+<text class="rn" x="230" y="440" text-anchor="middle">runs as: the account</text>
+<text class="dm" x="230" y="460" text-anchor="middle">sway (headless)</text>
+<text class="dm" x="230" y="476" text-anchor="middle">capture, H.264 encode, input</text>
+<text class="dm" x="230" y="492" text-anchor="middle">audio, clipboard</text>
+<text class="dm" x="230" y="508" text-anchor="middle">shell, apps</text>
+
+<path class="arrow" d="M350 462H492V162H354" marker-start="url(#ah)" marker-end="url(#ah)"/>
+<text x="484" y="436" text-anchor="end">screen, input,</text>
+<text x="484" y="451" text-anchor="end">audio, clipboard</text>
+</svg>
+</div>
+</div>
+</div>
+<div class="grid">
+  <div class="win card">
+    <div class="bar"><span class="t">no privileges</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3><code>waydesk</code></h3><p><span class="k2">does</span> TLS, the RDP protocol, channel framing, rate limits per address.</p><p><span class="k2">never</span> touches user files, calls PAM, keeps a password after the check.</p></div>
+  </div>
+  <div class="win card">
+    <div class="bar"><span class="t">root, no network</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3><code>waydesk-helper</code></h3><p><span class="k2">does</span> checks the password through PAM, starts and finds sessions, admits or refuses by memory.</p><p><span class="k2">never</span> parses RDP or TLS, listens on the network.</p></div>
+  </div>
+  <div class="win card">
+    <div class="bar"><span class="t">the account</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3><code>waydesk-session@UID</code></h3><p><span class="k2">does</span> its sway, capture, encoder, input, audio, clipboard, hooks.</p><p><span class="k2">never</span> anything as another user.</p></div>
+  </div>
+</div>
+<p class="note">A session is a systemd unit of the account: it survives a disconnect, sits in <code>user-UID.slice</code> (limits there apply) and is killed with its control group. A second login from the same account takes the running session over. Design notes: <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MULTIUSER-DESIGN.md"><code>docs/MULTIUSER-DESIGN.md</code></a>.</p>
+

@@ -3,7 +3,7 @@
 
 Each page is `key: value` lines, a line `---`, then Markdown of a small kind: `##` starts a section (shown in one of the site's windows, `## Title {bar: label}`
 names the title bar), `###` a sub-heading, paragraphs, `-` and `1.` lists, pipe tables, `>` notes, fenced code (```console puts the prompt and comments in
-colour). The output goes to site/<slug>/index.html, with the header, footer and stylesheet of the home page, and sitemap.xml lists the home page and the
+colour; ```html is passed through). A page that is a file `name.html` has the same front matter (and a `lede:` line) and a body of HTML sections written by hand: the charts and diagrams of the architecture, measurements, security and reference pages. The output goes to site/<slug>/index.html, with the header, footer and stylesheet of the home page, and sitemap.xml lists the home page and the
 pages. The generated files are committed (the site is a folder that is copied as it is), so run this after editing a page and commit both. Deploy with
 `rsync -a --exclude=.DS_Store --exclude=build.py --exclude=pages -e "ssh -i ~/.ssh/id_ed25519_metproof -o IdentitiesOnly=yes" site/ waydesk@2.28.140.203:app/` (no --delete: the apt repository lives in app/apt).
 """
@@ -19,7 +19,7 @@ CAP = '<span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x
 GH_ICON = (SITE / "index.html").read_text().split('<a class="gh" href="https://github.com/zhoorta/waydesk">')[1].split("</a>")[0]
 
 # The order of the pages in the navigation and in the index.
-NAV = ["start", "connect", "vpn", "cli", "gpu", "help"]
+NAV = ["start", "connect", "vpn", "cli", "gpu", "architecture", "measurements", "security", "reference", "help"]
 
 
 def inline(text):
@@ -84,7 +84,7 @@ def blocks(md):
                 buf.append(lines[i])
                 i += 1
             code = "\n".join(buf)
-            out.append(console(code) if lang == "console" else "<pre><code>" + html.escape(code, quote=False) + "</code></pre>")
+            out.append(console(code) if lang == "console" else code if lang == "html" else "<pre><code>" + html.escape(code, quote=False) + "</code></pre>")
         elif line.startswith("### "):
             flush()
             out.append("<h3>" + inline(line[4:]) + "</h3>")
@@ -129,6 +129,8 @@ def blocks(md):
 def parse(path):
     head, _, body = path.read_text().partition("\n---\n")
     meta = dict(l.split(": ", 1) for l in head.strip().split("\n") if ": " in l)
+    if path.suffix == ".html":
+        return meta, meta.get("lede", ""), body
     intro, sections, cur = [], [], None
     for line in body.split("\n"):
         m = re.match(r"## (.+?)(?: \{bar: (.+)\})?$", line)
@@ -152,8 +154,8 @@ def page_html(meta, intro, sections, pages, source_name):
         return f'<a href="/{s}/"{current}>{pages[s][0]["nav"]}</a>'
 
     nav = "\n    ".join(link(s) for s in NAV if s in pages)
-    secs = []
-    for s in sections:
+    secs = sections if isinstance(sections, str) else []
+    for s in [] if isinstance(sections, str) else sections:
         secs.append(
             f'<section class="sect" id="{slugify(s["title"])}">\n<h2>{inline(s["title"])}</h2>\n<div class="win">\n'
             f'<div class="bar"><span class="t">{html.escape(s["bar"])}</span>{CAP}</div>\n<div class="body">\n{blocks(chr(10).join(s["lines"]))}\n</div>\n</div>\n</section>'
@@ -193,7 +195,7 @@ def page_html(meta, intro, sections, pages, source_name):
 <h1>{inline(title)}</h1>
 <p class="lede">{inline(intro.strip())}</p>
 </section>
-{chr(10).join(secs)}
+{secs if isinstance(secs, str) else chr(10).join(secs)}
 <p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/{source_name}">a file in the repository</a>: corrections are welcome.</p>
 </main>
 <footer>
@@ -226,7 +228,7 @@ def index_html(pages):
 
 def main():
     pages = {}
-    for path in sorted(PAGES.glob("*.md")):
+    for path in sorted(PAGES.glob("*.md")) + sorted(PAGES.glob("*.html")):
         meta, intro, sections = parse(path)
         meta["slug"] = meta.get("slug", path.stem)
         pages[meta["slug"]] = (meta, intro, sections, path.name)

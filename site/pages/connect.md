@@ -4,6 +4,43 @@ description: The ways an RDP client can reach a Waydesk server: an SSH tunnel, t
 ---
 The RDP login is a TLS login with the account's password, and there is no second factor. So the port is **closed to the network until you open it**. Four things are set, each with one command: where it listens, which addresses may connect, what certificate clients check, and, if you want one, a VPN.
 
+## How a client reaches the port {bar: diagram}
+```html
+<div class="dg">
+<svg viewBox="0 0 520 250" role="img" aria-labelledby="adt ads">
+<title id="adt">How a client reaches the RDP port</title>
+<desc id="ads">The RDP client reaches the waydesk daemon in one of three ways: through an SSH tunnel (the default, the port listens on this machine only), over the local network (only the allowed addresses), or over a WireGuard VPN (recommended). On the server the daemon checks the source address against the allowed list, then the TLS certificate, then the account's password, and only then starts a session.</desc>
+<defs><marker id="ah2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#ee9a45"/></marker></defs>
+<rect class="zone" x="330" y="8" width="182" height="234" rx="8"/>
+<text class="zl" x="344" y="28">this server</text>
+<rect class="box" x="8" y="97" width="104" height="56" rx="6"/>
+<text class="nm" x="60" y="122" text-anchor="middle">RDP client</text>
+<text class="dm" x="60" y="140" text-anchor="middle">any client</text>
+<rect class="box" x="170" y="26" width="136" height="52" rx="6"/>
+<text class="nm" x="238" y="49" text-anchor="middle">SSH tunnel</text>
+<text class="dm" x="238" y="66" text-anchor="middle">the default</text>
+<rect class="box" x="170" y="99" width="136" height="52" rx="6"/>
+<text class="nm" x="238" y="122" text-anchor="middle">local network</text>
+<text class="dm" x="238" y="139" text-anchor="middle">allowlist</text>
+<rect class="box" x="170" y="172" width="136" height="52" rx="6"/>
+<text class="nm" x="238" y="195" text-anchor="middle">WireGuard VPN</text>
+<text class="dm" x="238" y="212" text-anchor="middle">recommended</text>
+<rect class="box root" x="346" y="46" width="152" height="182" rx="6"/>
+<text class="nm" x="422" y="70" text-anchor="middle">waydesk daemon</text>
+<text class="dm" x="422" y="108" text-anchor="middle">1 source address</text>
+<text class="dm" x="422" y="132" text-anchor="middle">2 TLS certificate</text>
+<text class="dm" x="422" y="156" text-anchor="middle">3 account password</text>
+<text class="rn" x="422" y="196" text-anchor="middle">then a session</text>
+<path class="arrow" d="M112 118 L170 52" marker-end="url(#ah2)"/>
+<path class="arrow" d="M112 125 L170 125" marker-end="url(#ah2)"/>
+<path class="arrow" d="M112 132 L170 198" marker-end="url(#ah2)"/>
+<path class="arrow" d="M306 52 L346 100" marker-end="url(#ah2)"/>
+<path class="arrow" d="M306 125 L346 125" marker-end="url(#ah2)"/>
+<path class="arrow" d="M306 198 L346 150" marker-end="url(#ah2)"/>
+</svg>
+</div>
+```
+
 ## Where it listens, and who may connect {bar: table}
 | mode | the port listens on | addresses that may connect |
 |---|---|---|
