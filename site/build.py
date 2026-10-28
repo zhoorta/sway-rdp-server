@@ -52,8 +52,13 @@ def console(code):
     return '<pre><code>' + "\n".join(lines) + "</code></pre>"
 
 
+def split_row(row):
+    """The cells of one table row; `\\|` is a pipe inside a cell (the commands of waydesk-admin list their alternatives with it)."""
+    return [c.replace("\\|", "|").strip() for c in re.split(r"(?<!\\)\|", row.strip().strip("|"))]
+
+
 def table(rows):
-    cells = [[c.strip() for c in r.strip().strip("|").split("|")] for r in rows]
+    cells = [split_row(r) for r in rows]
     head, body = cells[0], cells[2:]
     th = "".join(f"<th>{inline(c)}</th>" for c in head)
     trs = "".join("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in row) + "</tr>" for row in body)

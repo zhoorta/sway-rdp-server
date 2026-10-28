@@ -273,7 +273,9 @@ figure svg text.warn2 { fill: var(--warn); font-weight: 400; }
 .grid + .note { margin-top: var(--s4); }
 
 /* the subpages (site/build.py) */
-.pagehead { margin: var(--s6) 0 var(--s2); max-width: 78ch; }
+.pagehead { margin: calc(var(--s6) + var(--s5)) 0 var(--s3); max-width: 78ch; }
+/* a section reached by a link is not hidden behind the bar at the top */
+main section[id] { scroll-margin-top: 6rem; }
 nav a[aria-current="page"] { color: var(--copper); }
 blockquote { margin: var(--s3) 0; padding: var(--s2) var(--s3); border-left: 3px solid var(--copper); background: rgba(255, 255, 255, .04); font-size: var(--fs-s); max-width: 78ch; }
 .win > .body > h3 { margin-top: var(--s4); }
