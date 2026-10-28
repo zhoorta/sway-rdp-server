@@ -175,14 +175,14 @@ def shell(title, desc, url, body, kind="article"):
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<meta name="theme-color" content="#0a1c2a">
+<meta name="theme-color" content="#06121c">
 <meta property="og:title" content="{html.escape(title)} \u00b7 Waydesk">
 <meta property="og:description" content="{html.escape(desc, quote=True)}">
 <meta property="og:url" content="{BASE}{url}">
 <meta property="og:type" content="{kind}">
 <link rel="stylesheet" href="/style.css">
 </head>
-<body>
+<body class="sans">
 <div class="col">
 <header>
   <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>

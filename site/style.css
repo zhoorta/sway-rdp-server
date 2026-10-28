@@ -1,7 +1,7 @@
 /* Waydesk site. One type scale (13, 14, 15, 18, 32 px), one spacing scale (4, 8, 16, 24, 32, 48, 64), one palette. */
 :root {
   /* colour */
-  --bg: #0a1c2a;
+  --bg: #06121c;
   --panel: rgba(12, 16, 22, .92);
   --bar: #0a0c10;
   --line: #2a323c;
@@ -53,10 +53,10 @@ body {
   font: var(--fs-m) / 1.6 var(--mono);
   -webkit-font-smoothing: antialiased;
   background:
-    radial-gradient(900px 520px at 50% 30%, rgba(24, 160, 170, .55) 0, transparent 66%),
-    radial-gradient(1100px 700px at 90% -5%, #14968e 0, transparent 60%),
-    radial-gradient(900px 650px at -5% 42%, #1654a8 0, transparent 60%),
-    radial-gradient(1000px 600px at 55% 112%, #0f6f94 0, transparent 60%),
+    radial-gradient(900px 520px at 50% 30%, rgba(24, 160, 170, .26) 0, transparent 66%),
+    radial-gradient(1100px 700px at 90% -5%, rgba(20, 150, 142, .5) 0, transparent 60%),
+    radial-gradient(900px 650px at -5% 42%, rgba(22, 84, 168, .5) 0, transparent 60%),
+    radial-gradient(1000px 600px at 55% 112%, rgba(15, 111, 148, .45) 0, transparent 60%),
     var(--bg);
   background-attachment: fixed;
 }
@@ -355,11 +355,10 @@ blockquote { margin: var(--s3) 0; padding: var(--s2) var(--s3); border-left: 3px
   .side a { border-left: 0; padding: 2px 0; }
 }
 
-#apps + .grid, #fast + .grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+#apps + .grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
 .lede { max-width: 56ch; }
 
-/* a variant: running text in the system's sans-serif, the monospace kept for headings, code, navigation and the install box.
-   Used by putting class="sans" on <body>; not used by default. */
+/* running text in the system's sans-serif; the monospace is kept for headings, code, navigation and the install box (class="sans" on <body>) */
 body.sans p, body.sans li, body.sans figcaption, body.sans td, body.sans .lede { font-family: var(--sans); }
 body.sans p, body.sans li, body.sans td { font-size: 16px; line-height: 1.65; }
 body.sans .card p, body.sans .lede { font-size: 16px; }
