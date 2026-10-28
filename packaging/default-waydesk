@@ -61,13 +61,17 @@ WAYDESK_SESSION_ARGS=
 #WAYDESK_H264_USAGE=camera
 
 # A GPU: when the machine has one (a render node in /dev/dri that the accounts of the sessions may open: the package gives waydesk-users the node
-# by a udev rule), every session draws its desktop on it and encodes the H.264 picture with the chip's encoder (VAAPI), which leaves the CPU
-# to the programs. Chromium keeps its GPU process too, with WebGL and video. Measured on an Intel HD 630: OpenGL benchmark 17 times faster, the
-# session's CPU for a full-screen animation 107 % of a core down to 21 %. Without a GPU (or when anything about it fails) nothing changes.
+# by a udev rule), every session draws its desktop on it and encodes the H.264 picture with the chip's encoder (VAAPI on Intel and AMD, NVENC on NVIDIA),
+# which leaves the CPU to the programs. Chromium keeps its GPU process too, with WebGL and video. Measured on an Intel HD 630: OpenGL benchmark 17 times faster, the
+# session's CPU for a full-screen animation 107 % of a core down to 21 %. Without a GPU (or when anything about it fails) nothing changes: a session that
+# cannot be made on the GPU (NVIDIA's driver 550, which Debian ships, cannot give the compositor its buffers; 615 or newer from NVIDIA's own repository can)
+# is made again in software, and an encoder that does not start falls back to OpenH264; `waydesk-admin status` shows what each session runs.
 #   WAYDESK_GPU=off              software rendering, as without a GPU. Another value: the render node to use, e.g. /dev/dri/renderD129.
-#   WAYDESK_ENCODER=software     keep the GPU for drawing, but encode on the CPU. (auto and vaapi are the others.)
+#   WAYDESK_ENCODER=software     keep the GPU for drawing, but encode on the CPU. (auto, vaapi and nvenc are the others: auto tries VAAPI, then NVENC.)
+#   WAYDESK_NVENC_DEVICE=1       the NVIDIA card (CUDA number) that encodes; by default the card the session draws on, else the first.
 # The encoder's quantiser stays at the picture quality asked for (two steps below --quality) and rises, one step at a time and only after a
-# second of overload, up to 40 when the link is slower than the picture needs; each step costs one keyframe. To change the two ends:
+# second of overload, up to 40 when the link is slower than the picture needs (a step is a number in the next picture's header: no keyframe). To change
+# the two ends:
 #WAYDESK_VA_MIN_QP=18
 #WAYDESK_VA_MAX_QP=40
 # Takes effect for sessions that start after the change (end the session or log out first).

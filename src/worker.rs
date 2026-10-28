@@ -264,8 +264,34 @@ async fn serve_client(
         None => {
             let layout = keyboard_layout(klid, &cfg.opts.default_layout);
             info!(width, height, klid = format!("{klid:#06x}"), %layout, "creating session");
-            let opts = cfg.opts.clone();
-            match tokio::task::spawn_blocking(move || Session::create((width, height), &layout, &opts)).await {
+            let mut attempt = 0;
+            let created = loop {
+                let (layout, opts) = (layout.clone(), cfg.opts.clone());
+                // `WAYDESK_TEST_GPU_SESSION_FAILS=1` (testing only) makes the first attempt on a GPU fail, to try the fallback where the GPU works.
+                let simulate = attempt == 0 && sway.as_ref().is_some_and(|s| s.on_gpu) && std::env::var_os("WAYDESK_TEST_GPU_SESSION_FAILS").is_some();
+                let result = if simulate {
+                    Ok(Err(anyhow::anyhow!("simulated: the compositor could not hand over a picture")))
+                } else {
+                    tokio::task::spawn_blocking(move || Session::create((width, height), &layout, &opts)).await
+                };
+                match result {
+                    // A GPU that sway starts on but cannot allocate for (NVIDIA's driver 550: the first capture fails) would leave the account with no desktop at
+                    // all: the same session once more on a sway in software.
+                    Ok(Err(e)) if attempt == 0 && sway.as_ref().is_some_and(|s| s.on_gpu) => {
+                        warn!("the session could not be made on the GPU ({e:#}): software rendering");
+                        attempt += 1;
+                        if let Some(old) = sway.take() {
+                            let _ = tokio::task::spawn_blocking(move || drop(old)).await;
+                        }
+                        match OwnSway::start(None).await {
+                            Ok(new) => *sway = Some(new),
+                            Err(e2) => break Ok(Err(e2.context(format!("and sway in software did not start either; the GPU said: {e:#}")))),
+                        }
+                    }
+                    other => break other,
+                }
+            };
+            match created {
                 Ok(Ok(s)) => {
                     watch_keyboard(s.input.clone(), klid, cfg.opts.default_layout.clone());
                     s
@@ -492,6 +518,8 @@ impl Worker {
 /// account's own runtime directory, which no other account can enter. Stopped when dropped.
 struct OwnSway {
     child: std::process::Child,
+    /// True when it renders on a GPU: a session that cannot be made on it is made again on a sway that does not.
+    on_gpu: bool,
 }
 
 impl OwnSway {
@@ -562,7 +590,7 @@ impl OwnSway {
             .process_group(0)
             .spawn()
             .context("cannot start sway")?;
-        let mut me = Self { child };
+        let mut me = Self { child, on_gpu: gpu.is_some() };
         let ipc = runtime.join(format!("sway-ipc.{uid}.{}.sock", me.child.id()));
         for _ in 0..100 {
             if ipc.exists() {

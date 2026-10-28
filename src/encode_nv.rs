@@ -8,6 +8,7 @@
 //! driver is not affected by having this in the binary.
 
 use std::ffi::c_void;
+use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Result};
@@ -82,15 +83,68 @@ impl Drop for DeviceBuffer {
     }
 }
 
+/// `0000:01:00.0`: the PCI address of a CUDA device, the way sysfs names it.
+fn pci_string(domain: i32, bus: i32, device: i32) -> String {
+    format!("{domain:04x}:{bus:02x}:{device:02x}.0")
+}
+
+/// The PCI address of the card behind a render node (`/dev/dri/renderD129`), from sysfs.
+fn node_pci(node: &Path) -> Option<String> {
+    let name = node.file_name()?.to_str()?;
+    let device = std::fs::canonicalize(format!("/sys/class/drm/{name}/device")).ok()?;
+    Some(device.file_name()?.to_string_lossy().to_lowercase())
+}
+
+/// The CUDA ordinal whose PCI address is `pci`.
+fn device_for(pci: &str, cuda: &[String]) -> Option<usize> {
+    cuda.iter().position(|d| d.eq_ignore_ascii_case(pci))
+}
+
+/// The PCI address of every CUDA device, by ordinal (no context is made for them).
+fn cuda_pci_addresses() -> Result<Vec<String>> {
+    result::init().map_err(|e| anyhow!("CUDA: {e}"))?;
+    let count = result::device::get_count().map_err(|e| anyhow!("CUDA: {e}"))?;
+    (0..count)
+        .map(|i| {
+            let dev = result::device::get(i).map_err(|e| anyhow!("CUDA: {e}"))?;
+            let attr = |a: sys::CUdevice_attribute| {
+                // SAFETY: `dev` is a device CUDA just returned.
+                unsafe { result::device::get_attribute(dev, a) }.map_err(|e| anyhow!("CUDA: {e}"))
+            };
+            Ok(pci_string(
+                attr(sys::CUdevice_attribute::CU_DEVICE_ATTRIBUTE_PCI_DOMAIN_ID)?,
+                attr(sys::CUdevice_attribute::CU_DEVICE_ATTRIBUTE_PCI_BUS_ID)?,
+                attr(sys::CUdevice_attribute::CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID)?,
+            ))
+        })
+        .collect()
+}
+
+/// The CUDA device to encode on: `WAYDESK_NVENC_DEVICE` when it says one; else the card the session renders on, if that is an NVIDIA card; else
+/// the first (a machine with an Intel or AMD card that renders and an NVIDIA one that only encodes, or one NVIDIA card).
+fn choose_device(node: Option<&Path>) -> usize {
+    if let Some(n) = std::env::var("WAYDESK_NVENC_DEVICE").ok().and_then(|v| v.trim().parse::<usize>().ok()) {
+        return n;
+    }
+    let Some(pci) = node.and_then(node_pci) else { return 0 };
+    match cuda_pci_addresses() {
+        Ok(list) => device_for(&pci, &list).unwrap_or(0),
+        Err(_) => 0,
+    }
+}
+
 fn qp_of(qp: u32) -> NV_ENC_QP {
     let q = qp.clamp(1, 51);
     NV_ENC_QP { qpInterP: q, qpInterB: q, qpIntra: q }
 }
 
 impl NvH264 {
-    pub fn new(width: u16, height: u16, t: Tuning) -> Result<Self> {
+    /// `node` is the render node the session's sway draws on, if any: the encoder then runs on that card when it is an NVIDIA one.
+    pub fn new(node: Option<&Path>, width: u16, height: u16, t: Tuning) -> Result<Self> {
         let (sw, sh) = surface_size(usize::from(width), usize::from(height));
-        let ctx = CudaContext::new(0).map_err(|e| anyhow!("CUDA: {e}"))?;
+        let ordinal = choose_device(node);
+        tracing::debug!(device = ordinal, "NVENC on this CUDA device");
+        let ctx = CudaContext::new(ordinal).map_err(|e| anyhow!("CUDA device {ordinal}: {e}"))?;
         let encoder = Encoder::initialize_with_cuda(Arc::clone(&ctx)).map_err(|e| anyhow!("NVENC: {e:?}"))?;
         let encodes_h264 = encoder.get_encode_guids().map_err(|e| anyhow!("NVENC: {e:?}"))?.contains(&NV_ENC_CODEC_H264_GUID);
         if !encodes_h264 {
@@ -240,11 +294,23 @@ mod tests {
     }
 
     #[test]
+    fn a_render_node_is_matched_to_its_cuda_device_by_pci_address() {
+        let cuda = vec!["0000:01:00.0".to_string(), "0000:41:00.0".to_string()];
+        assert_eq!(pci_string(0, 1, 0), "0000:01:00.0");
+        assert_eq!(pci_string(0, 0x41, 0), "0000:41:00.0");
+        assert_eq!(pci_string(0x10, 0xa, 0x1f), "0010:0a:1f.0");
+        assert_eq!(device_for("0000:41:00.0", &cuda), Some(1));
+        assert_eq!(device_for("0000:41:00.0".to_uppercase().as_str(), &cuda), Some(1), "sysfs and CUDA may differ in case");
+        assert_eq!(device_for("0000:00:02.0", &cuda), None, "the Intel card of a hybrid machine is not a CUDA device");
+        assert_eq!(node_pci(Path::new("/dev/dri/renderD999")), None, "a node that is not there has no address");
+    }
+
+    #[test]
     #[ignore = "needs an NVIDIA GPU"]
     fn nvenc_encodes_keyframes_and_inter_frames() {
         assert!(nvidia_video_codec_sdk::nvenc_available(), "libnvidia-encode.so.1 not found");
         let (w, h) = (1680usize, 1050usize);
-        let mut enc = NvH264::new(w as u16, h as u16, Tuning { bitrate: 20_000_000, max_qp: 20, fps: 30 }).expect("encoder");
+        let mut enc = NvH264::new(None, w as u16, h as u16, Tuning { bitrate: 20_000_000, max_qp: 20, fps: 30 }).expect("encoder");
         let mut out = Vec::new();
         for i in 0..30 {
             let au = enc.encode(&frame(w, h, i * 3), w, h).expect("encode").expect("a frame");

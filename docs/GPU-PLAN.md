@@ -174,4 +174,11 @@ Looked at by eye on the RTX 4000 SFF Ada, through an SSH tunnel: **Windows App o
 smooth window drags; a full-screen noise page ends up coarse on a slow link, as designed (the quantiser goes up to 40 and back to 18 within 20 s of the noise stopping).
 The NVENC stream is CABAC (the VAAPI one CAVLC) and both clients take it.
 
-Not done: zero-copy from NVIDIA (the dmabuf to NVENC), GL and Vulkan apps measured on it, several users on one card (how much GPU memory a session's CUDA context takes).
+Two things were added afterwards, without the card (it had been returned): **a session that cannot be made on the GPU is made again in software** (with Debian's driver 550 sway starts
+on the card and then fails at the first capture, which used to leave the account with no desktop; the worker now ends that sway and starts one in software, once; tried on the Intel server with a
+test hook, `WAYDESK_TEST_GPU_SESSION_FAILS=1`: the client stayed connected and `waydesk-admin status` showed `cpu` / `vaapi`), and **the NVENC encoder runs on the card the session draws on**
+(the render node's PCI address matched to the CUDA devices; `WAYDESK_NVENC_DEVICE` overrides; the first card when the session draws on a non-NVIDIA one). The matching is unit-tested, but it was
+not run on a machine with two cards.
+
+Not done: zero-copy from NVIDIA (the dmabuf to NVENC), GL and Vulkan apps measured on it, several users on one card (how much GPU memory a session's CUDA context takes, and what happens at the
+session limit of GeForce cards: the encoder falls back to OpenH264).

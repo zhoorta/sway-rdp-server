@@ -252,7 +252,7 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
     #[cfg(feature = "nvenc")]
     if matches!(choice, Choice::Auto | Choice::Nvenc) {
         if nvidia_video_codec_sdk::nvenc_available() {
-            match crate::encode_nv::NvH264::new(width, height, tuning) {
+            match crate::encode_nv::NvH264::new(crate::gpu::usable_node().as_deref(), width, height, tuning) {
                 Ok(enc) => {
                     tracing::info!("H.264 encoder: NVENC");
                     crate::sessionstatus::set_encoder("nvenc");
