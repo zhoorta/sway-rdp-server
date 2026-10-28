@@ -388,3 +388,90 @@ started the numbers were taken. The applications are left idle: an upper bound. 
 - **Cost**: 123.60 euros a month for 12 heavy accounts is about 10.30 euros per account and month; with the browser-and-shell use of an ordinary account (about 1 GB) roughly twice as many fit.
 - **Not measured**: applications that are busy (the numbers are for idle ones), a second round of the same accounts, and a server with a GPU.
 
+
+## A GPU: heavy active users, WebGL, applications, the fallback, and NVIDIA (2026-10-28)
+Hetzner server auction, dedicated: Intel Core i7-7700 (4 cores, 8 threads), its integrated HD Graphics 630, 64 GB, Debian 13 (kernel 6.12), installed with `installimage` with kernel mode setting on (Hetzner's image
+adds `nomodeset` and blacklists `i915` by default, and `/dev/dri` does not appear until both are undone). The 0.3.1 packages with the server binary of the commits of the day (`2082cd5` and after: the GPU for the desktop,
+the VAAPI encoder, zero-copy capture, the quantiser in the slice headers), about 0.12 euros an hour. The users are accounts made by `waydesk-admin users add`; the raw tables are in `docs/measure-data/` and the scripts that
+produced them in `docs/measure-data/harness/`.
+
+**What a user does** (the *heavy* workload, each user active, not idle): Chromium with a page that scrolls by itself every 2 to 5 seconds, a terminal that types at 5 to 12 characters a second and prints bursts of output,
+LibreOffice Calc with a 300,000 x 10 sheet and VS Code (Flatpak) on a 28 MB source tree, both with keystrokes sent into them (Page Down, typing; `wtype`) every few seconds, a switch of window every 15 to 30 seconds; every fourth
+user also has GIMP on a 4000 x 3000 image (zoom in and out); every fourth a muted 720p video looping in a second Chromium; three users watch the same video with sound (the audio is uncompressed 48 kHz stereo, 1.5 Mbit/s each).
+Users are added one at a time (about 3.5 minutes each), each with its own RDP client, until the machine refuses one. The clients are `sdl-freerdp3` on **a separate cloud server in the same data centre** (8 vCPU, 0.5 ms
+away), so that the decoding of 20 pictures does not take the CPU of the machine measured (they took about 2 % of the machine per user when they were on it). The CPU is the busy share of all 8 threads (`/proc/stat`) over a
+60-second sample taken 100 seconds after the user's applications started; "workers" is what the session processes (capture and encoding) used, as a share of the whole machine; the "probe" is how long `swaymsg -t get_version`
+took in the newest user's session.
+
+| Active heavy users | CPU, GPU | workers, GPU | free memory, GPU | CPU, software | workers, software | free memory, software |
+|---|---|---|---|---|---|---|
+| 1 | 23 % | 1.9 % | 53.4 GB | 21 % | 3.7 % | 53.6 GB |
+| 5 | 45 % | 3.7 % | 44.2 GB | 48 % | 9.3 % | 45.6 GB |
+| 10 | 47 % | 4.2 % | 32.7 GB | 45 % | 8.7 % | 35.8 GB |
+| 15 | 49 % | 4.6 % | 21.6 GB | 60 % | 11.7 % | 26.3 GB |
+| 20 | 50 % | 4.8 % | 10.7 GB | 69 % | 15.4 % | 16.6 GB |
+| 21 | the 22nd was refused | | | 78 % | 16.4 % | 14.9 GB |
+| 24 | | | | 94 % | 21.1 % | 8.5 GB |
+| 25 | | | | refused | | |
+
+- **The GPU takes the load off the CPU, but on this machine it did not raise the number of users.** With the GPU (sway on the HD 630, the VAAPI encoder, zero-copy capture) 21 users fit and the 22nd was refused (8789 MB
+  available, 9613 MB needed: the daemon's rule of 15 % of the RAM). With the GPU off (pixman, OpenH264) 24 fit and the 25th was refused (9157 MB available). What ended both runs was memory.
+- **Memory per user is higher with the GPU**: 2.24 GB against 1.95 GB (from the first to the 20th user), because an integrated GPU draws its buffers from the system memory. A card with its own memory would not do this.
+- **CPU stays flat with the GPU and does not without**: from 15 users on the GPU run stayed near 50 % (the average of users 16 to 20: 49 %) while the software run climbed 3 to 4 points per user (65 % on average for users
+  16 to 20, 94 % at 24). The capture and encoding share is about 70 % lower: 4.8 % against 15.4 % at 20 users. With the memory of a bigger machine the GPU run had CPU for more users; that is an estimate, it was not measured.
+- **Nothing failed in either run** (no error in the journal, no frame error, no out-of-memory kill). The probe median was 21 ms with the GPU (largest 45 ms) and 9 ms without (largest 33 ms); the GPU is shared by all sessions, which
+  may be why it answers a little later, but this was not looked into.
+- **How busy the GPU was**, from a 90-second sample with all 21 users active: its render engine 15 % busy, its video engine 25 %, at about 690 MHz, 18 W for the whole package (the CPU 45 % in that window). (The sampler lost the GPU columns for
+  users 14 to 21 during the run, a bug of the sampler: its output pipe filled up with many clients; the table keeps the CPU and memory figures, which were not affected, and the row of user 21 of the GPU run is missing because the
+  connection of the controlling machine dropped during it.)
+- **A lighter first run**, the same users doing only the browsing page, the typing terminal and the video, with the clients on the same machine: 20 users fit with the GPU on before the CPU reached 98 % (the clients themselves
+  took 36 % of the machine at 20 users, which is why the later runs put them elsewhere). `docs/measure-data/gpu-i7-7700-light-clients-local.tsv`.
+
+### Full-screen WebGL, one page per user
+Each user has a Chromium window full screen on a WebGL shader that draws noise at every pixel (the heaviest picture to draw and to encode), the frame rate being what the page itself reports (`fps N` in its title).
+
+| Users | frame rate of each page | median | GPU (render engine) | CPU |
+|---|---|---|---|---|
+| 1 | 60 | 60 | 53 % | 23 % |
+| 2 | 60, 60 | 60 | 93 % | 34 % |
+| 3 | 50, 47, 36 | 47 | 100 % | 32 % |
+| 4 | 27, 33, 33, 37 | 33 | 100 % | 34 % |
+| 6 | 27, 17, 23, 22, 19, 15 | 20.5 | 100 % | 36 % |
+| 8 | between 11 and 20 | 17 | 100 % | 37 % |
+| 10 | between 6 and 19 | 13 | 100 % | 39 % |
+| 12 | between 10 and 24 | 17 | 100 % | 39 % |
+| GPU off, 1 or 2 | the page does not animate (0 fps) | 0 | 0 % | 14 to 15 % |
+
+- **The HD 630 gives 60 fps to two full-screen WebGL users, and then the render engine is the limit**: it is at 100 % from the third user on, the frames are shared about evenly (each of ten users gets 6 to 19 fps), and the CPU
+  stays low (39 % with twelve). This is a deliberately heavy page; a page that draws less shares among more users.
+- **Without the GPU the page does not animate at all** in the browser as the desktop starts it (`--disable-gpu`, where there is no usable render node).
+
+### Applications, with and without the GPU
+Started in a session, 35 seconds each, as the account (Zed 1.25 from Flathub; Blender, Kdenlive, darktable, `vkcube` and `glxgears` from Debian). "Opens" means a window appeared and the program kept running (for Blender, whose process my check did not match by name, only the window).
+
+| | with the GPU | with the GPU off |
+|---|---|---|
+| Zed, Blender, Kdenlive, darktable | open | open |
+| `glxgears` (OpenGL) | opens, the card 17 % busy | opens, on the CPU (0 % on the card) |
+| `vkcube` (Vulkan) | opens, the card 21 % busy | **fails**: `demo_init_vk_swapchain: Assertion '!err' failed` |
+
+The software compositor takes no GPU buffers, so a Vulkan application cannot present its window; everything that uses OpenGL falls back to the CPU. **The failure the site used to list for Zed ("Failed to create surface")
+did not reproduce** with Zed 1.25 in either mode; whether it still fails on a server with no render node at all (a cloud server) has not been tried again. These applications were opened, not used: how fast they are with and
+without the GPU was not measured.
+
+### When the GPU cannot encode
+The desktop and the capture on the GPU, but `LIBVA_DRIVER_NAME` pointing at a driver that does not exist (what a machine looks like when VAAPI has no encoder, as NVIDIA's before NVENC), one user on the full-screen WebGL page:
+the session starts, the client stays connected, the page runs at 62 fps, and the log says `VAAPI encoder not available (...): OpenH264 on the CPU`. The session worker then takes **12.3 % of the machine, against 2.9 % with VAAPI** (OpenH264
+at about 42 ms a frame, the picture read back from the GPU). `waydesk-admin status` now shows this fallback per session.
+
+### An NVIDIA card (RTX 4000 SFF Ada, driver 615)
+A Hetzner auction server with an Intel Core i5-13500 (and its UHD 770) and the RTX 4000 SFF Ada, 62 GB, about 0.38 euros an hour. Details in `docs/GPU-PLAN.md`. In short: with Debian's driver (550) a headless sway cannot allocate its buffers on the card;
+with NVIDIA's own 615.71.10 it can, and a full session runs on the card. The VAAPI encoder does not exist on NVIDIA, so there is an NVENC one (`src/encode_nv.rs`): for one user on the full-screen WebGL page, **61 fps, 4 to 9 ms
+an encoded frame, the card's encoder engine 4 % busy, the session worker 8 % of a core** (13 % with OpenH264). `ffmpeg h264_nvenc` encodes a 1680x1050 test pattern at 527 fps; the Intel iGPU of the same machine through VAAPI at 446
+fps. The stream was looked at in the Windows App on a Mac and in mstsc on Windows 11 (ARM, in a VM): no washed-out picture, sharp text, smooth dragging. A full-screen noise page ends up coarse on a slow link, as designed (the quantiser
+rises to 40 and is back at 18 within 20 seconds of the noise stopping). Several users on one card were not measured.
+
+### Not measured
+Other GPUs than these two (AMD through VAAPI should work and was not tried; Intel Arc was not seen, and the UHD 770 only in a short test); a card with its own memory under many users; how fast applications are with and without the GPU, apart from
+WebGL; the delay between a click and its picture and the frame rate each user really receives (the page's own frame rate was read, not what arrived at the client); runs longer than the 45 minutes each ramp took; clients far away
+over a slow link with many users (a link of 4 Mbit/s was met by accident and the encoder followed it down to 1 Mbit/s); more than one data centre.

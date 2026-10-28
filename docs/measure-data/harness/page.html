@@ -1,0 +1,12 @@
+<!doctype html><meta charset=utf-8><title>work</title>
+<style>body{font:16px/1.5 system-ui;max-width:46em;margin:2em auto;padding:0 1em}#c{position:fixed;top:4px;right:10px;font:14px monospace}h2{margin-top:1.6em}</style>
+<div id=c></div><div id=d></div>
+<script>
+const w="linux desktop remote session server window text editor terminal browser memory network render frame picture screen encoder quality".split(" ");
+let h="";for(let s=0;s<60;s++){h+="<h2>Section "+s+"</h2>";for(let p=0;p<4;p++){let t="";for(let i=0;i<90;i++)t+=w[(s*7+p*13+i*5)%w.length]+" ";h+="<p>"+t+"</p>"}}
+d.innerHTML=h;
+setInterval(()=>c.textContent=new Date().toLocaleTimeString(),1000);
+(function go(){const m=document.documentElement.scrollHeight-innerHeight;
+ if(scrollY>=m-50)scrollTo({top:0,behavior:"smooth"});else scrollBy({top:250+Math.random()*450,behavior:"smooth"});
+ setTimeout(go,2000+Math.random()*3000)})();
+</script>
