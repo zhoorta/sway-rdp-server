@@ -163,5 +163,8 @@ OpenH264; `nvenc` forces it. The libraries (`libnvidia-encode`, `libcuda`) are l
   worker 8 % of a core against 13 % with OpenH264 (what is left is the shared-memory capture and the copy to the card). The stream decodes without errors in ffmpeg
   (High profile, CABAC, one reference frame), three quantiser changes in a session made no new parameter sets.
 
-Not done: zero-copy from NVIDIA (the dmabuf to NVENC), GL and Vulkan apps measured on it, several users on one card, the stream in Windows App and the Windows client
-(this one is CABAC, the VAAPI one CAVLC).
+Looked at by eye on the RTX 4000 SFF Ada, through an SSH tunnel: **Windows App on a Mac** (EGFX 10.7) and **mstsc in a Windows 11 ARM VM**: no washed-out picture, sharp text,
+smooth window drags; a full-screen noise page ends up coarse on a slow link, as designed (the quantiser goes up to 40 and back to 18 within 20 s of the noise stopping).
+The NVENC stream is CABAC (the VAAPI one CAVLC) and both clients take it.
+
+Not done: zero-copy from NVIDIA (the dmabuf to NVENC), GL and Vulkan apps measured on it, several users on one card (how much GPU memory a session's CUDA context takes).
