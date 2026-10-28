@@ -132,11 +132,8 @@
 <p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect: through an SSH tunnel (the default), from the local network, or over a WireGuard VPN that Waydesk sets up for you. Clients that were tried: the Windows App on macOS, mstsc on Windows 11 and FreeRDP. <a href="/docs/connect/">How to connect</a> &middot; <a href="/docs/vpn/">VPN and security</a>.</p>
 </section>
 
-<section class="sect" id="install">
+<section class="band" id="install">
 <h2>Install</h2>
-<div class="win">
-<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
 <h3>1. Add the repository and check the key</h3>
 <pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
 <span class="p">$</span> sudo apt install ./waydesk-repo.deb
@@ -170,8 +167,6 @@ lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 
 </table></div>
 <p class="method">Tested means a clean server, SSH hardened first, these steps, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on
 macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoders; older Windows clients were not tested.</p>
-</div>
-</div>
 </section>
 
 <section class="band" id="docs">
