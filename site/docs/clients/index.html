@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect to a Linux RDP desktop from macOS, Windows or Linux: Waydesk clients</title>
+<meta name="description" content="Step by step for the Windows App on macOS, mstsc on Windows and FreeRDP on Linux: the tunnel, the account, the certificate and the first connection.">
+<link rel="canonical" href="https://waydesk.dev/docs/clients/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#06121c">
+<meta property="og:title" content="Connect to a Linux RDP desktop from macOS, Windows or Linux: Waydesk clients">
+<meta property="og:description" content="Step by step for the Windows App on macOS, mstsc on Windows and FreeRDP on Linux: the tunnel, the account, the certificate and the first connection.">
+<meta property="og:url" content="https://waydesk.dev/docs/clients/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Waydesk">
+<meta property="og:image" content="https://waydesk.dev/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Connect to a Linux RDP desktop from macOS, Windows or Linux: Waydesk clients">
+<meta name="twitter:description" content="Step by step for the Windows App on macOS, mstsc on Windows and FreeRDP on Linux: the tunnel, the account, the certificate and the first connection.">
+<meta name="twitter:image" content="https://waydesk.dev/og.jpg">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Waydesk", "item": "https://waydesk.dev/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://waydesk.dev/docs/"}, {"@type": "ListItem", "position": 3, "name": "Set up your RDP client", "item": "https://waydesk.dev/docs/clients/"}]}</script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="sans">
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Site">
+    <a href="/">home</a>
+    <a href="/docs/" aria-current="page">documentation</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<div class="docs">
+<div class="side">
+<nav aria-label="Documentation">
+<h2>Get started</h2>
+<ul>
+<li><a href="/docs/install/">Install</a></li>
+<li><a href="/docs/connect/">Connect</a></li>
+<li><a href="/docs/clients/" aria-current="page">RDP clients</a><ul><li><a href="#what-you-need-first">What you need first</a></li><li><a href="#windows-app-on-macos">Windows App on macOS</a></li><li><a href="#mstsc-on-windows">mstsc on Windows</a></li><li><a href="#freerdp-on-linux">FreeRDP on Linux</a></li><li><a href="#if-it-does-not-connect">If it does not connect</a></li></ul></li>
+<li><a href="/docs/vpn/">VPN and security</a></li>
+</ul>
+<h2>Run it</h2>
+<ul>
+<li><a href="/docs/cli/">Command line</a></li>
+<li><a href="/docs/recipes/">Recipes</a></li>
+<li><a href="/docs/gpu/">GPU</a></li>
+<li><a href="/docs/reference/">Files and settings</a></li>
+</ul>
+<h2>Understand it</h2>
+<ul>
+<li><a href="/docs/architecture/">Architecture</a></li>
+<li><a href="/docs/measurements/">Measurements</a></li>
+<li><a href="/docs/compare/">How it compares</a></li>
+<li><a href="/docs/limits/">Limits and status</a></li>
+</ul>
+<h2>Help</h2>
+<ul>
+<li><a href="/docs/help/">Troubleshooting</a></li>
+<li><a href="/docs/faq/">FAQ</a></li>
+</ul>
+</nav>
+</div>
+<main class="doc">
+<div class="pagehead">
+<h1>Set up your RDP client</h1>
+<p class="lede">Waydesk speaks standard RDP, so any RDP client can connect. This page shows the ones that were tried, in the order a first connection goes. Remmina, iOS and Android clients were not tried.</p>
+</div>
+<section id="what-you-need-first">
+<h2>What you need first</h2>
+<ul class="plain"><li><strong>An account.</strong> The one <code>waydesk-setup-admin</code> made, or one an administrator made with <code>waydesk-admin users add NAME</code>.</li><li><strong>A way to the port.</strong> By default it listens on the server's own <code>127.0.0.1</code> only, so you reach it through an SSH tunnel (below), or the server was opened to a local network or a VPN, see <a href="/docs/connect/">Connect</a>.</li><li><strong>The certificate fingerprint</strong>, to compare on the first connection: <code>sudo waydesk-admin cert status</code> on the server prints it. A <a href="/docs/connect/#a-certificate-you-can-verify">local certificate authority</a> makes the comparison unnecessary.</li></ul>
+<p>The tunnel, from your own computer (macOS, Linux, or PowerShell on Windows 10 and 11, which has an OpenSSH client):</p>
+<pre><code><span class="p">$</span> ssh -N -L 3389:127.0.0.1:3389 you@your-server  <span class="c"># keep this running</span></code></pre>
+<p>If your computer already uses port 3389 (a Windows PC with Remote Desktop switched on does), forward <code>13389</code> instead (<code>-L 13389:127.0.0.1:3389</code>) and connect to <code>localhost:13389</code>.</p>
+</section>
+<section id="windows-app-on-macos">
+<h2>Windows App on macOS</h2>
+<p>Tried, works, with the Retina display sharp and the window resizing live.</p>
+<ol class="plain"><li>Start the tunnel and leave it running.</li><li>In the Windows App, add a PC and give it the name <code>localhost</code> (or <code>localhost:13389</code>).</li><li>Give it the Waydesk account's name and password.</li><li>Connect. The first time, the app shows the server's certificate: compare its fingerprint with the one from <code>waydesk-admin cert status</code>, then accept.</li></ol>
+<p>A MacBook's keyboard sends some keys to other places than a PC's. Waydesk follows the client's layout, and there is a Keyboard window in the desktop if a key arrives wrong.</p>
+</section>
+<section id="mstsc-on-windows">
+<h2>mstsc on Windows</h2>
+<p>Tried on Windows 11 for ARM in a virtual machine, through an SSH tunnel; the VPN was not tried with it.</p>
+<ol class="plain"><li>Start the tunnel in PowerShell (<code>ssh -N -L 13389:127.0.0.1:3389 you@your-server</code>).</li><li>Press Win+R, type <code>mstsc</code>, and enter <code>localhost:13389</code> as the computer. Under *Show options*, enter the account's name.</li><li>Connect and enter the password.</li><li>The certificate warning is expected with the server's own certificate. Windows shows a SHA-1 thumbprint where Waydesk prints a SHA-256 fingerprint, so the two cannot be compared by eye: for Windows clients the practical way is the <a href="/docs/connect/#a-certificate-you-can-verify">local certificate authority</a>, imported once with <code>certmgr.msc</code> into Trusted Root Certification Authorities.</li></ol>
+</section>
+<section id="freerdp-on-linux">
+<h2>FreeRDP on Linux</h2>
+<p>Tried with Debian 13's <code>sdl-freerdp3</code> (FreeRDP 3.15).</p>
+<pre><code><span class="p">$</span> sudo apt install freerdp3-sdl
+<span class="p">$</span> sdl-freerdp3 /v:localhost /u:alice /size:1680x1050 /gfx:AVC420</code></pre>
+<p><code>/gfx:AVC420</code> asks for the H.264 stream Waydesk sends, and <code>/size</code> sets the window. It asks for the password and shows the certificate: compare the fingerprint with <code>waydesk-admin cert status</code>. <strong>On Ubuntu</strong>, the packaged <code>xfreerdp3</code> (3.32) cannot decode that stream: use Debian's client, or another client from the list above.</p>
+</section>
+<section id="if-it-does-not-connect">
+<h2>If it does not connect</h2>
+<p>Is the tunnel still running? Is the port the one you forwarded? <code>waydesk-admin access show</code> on the server says where it listens and who may connect, and <a href="/docs/help/">troubleshooting</a> lists the rest in the order to check them.</p>
+</section>
+<nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/connect/"><span>previous</span>Connect</a><a class="next" href="/docs/vpn/"><span>next</span>VPN and securing access</a></nav>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/clients.md">a file in the repository</a>: corrections are welcome.</p>
+</main>
+</div>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>

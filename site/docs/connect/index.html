@@ -42,11 +42,13 @@
 <ul>
 <li><a href="/docs/install/">Install</a></li>
 <li><a href="/docs/connect/" aria-current="page">Connect</a><ul><li><a href="#how-a-client-reaches-the-port">How a client reaches the port</a></li><li><a href="#where-it-listens-and-who-may-connect">Where it listens, and who may connect</a></li><li><a href="#an-ssh-tunnel">An SSH tunnel</a></li><li><a href="#the-local-network">The local network</a></li><li><a href="#a-vpn">A VPN</a></li><li><a href="#a-certificate-you-can-verify">A certificate you can verify</a></li><li><a href="#which-client">Which client</a></li></ul></li>
+<li><a href="/docs/clients/">RDP clients</a></li>
 <li><a href="/docs/vpn/">VPN and security</a></li>
 </ul>
 <h2>Run it</h2>
 <ul>
 <li><a href="/docs/cli/">Command line</a></li>
+<li><a href="/docs/recipes/">Recipes</a></li>
 <li><a href="/docs/gpu/">GPU</a></li>
 <li><a href="/docs/reference/">Files and settings</a></li>
 </ul>
@@ -147,9 +149,10 @@ Connect: from your computer run  ssh -N -L 3389:127.0.0.1:3389 ACCOUNT@THIS-SERV
 </section>
 <section id="which-client">
 <h2>Which client</h2>
+<p>Step by step for each of them: <a href="/docs/clients/">Set up your RDP client</a>.</p>
 <div class="tw"><table><tr><th>client</th><th>tried</th><th>notes</th></tr><tr><td>Windows App (macOS)</td><td>yes</td><td>add the PC as <code>localhost</code> through the tunnel; compare the certificate's fingerprint with the one the server printed</td></tr><tr><td>mstsc (Windows 11)</td><td>yes, on ARM in a VM</td><td>through an SSH tunnel; the VPN was not tried with it</td></tr><tr><td>FreeRDP / Remmina (Linux)</td><td>yes, Debian 13's FreeRDP 3.15</td><td>Ubuntu's own <code>xfreerdp3</code> 3.32 cannot decode the H.264 stream</td></tr><tr><td>older Windows clients, iOS, Android</td><td>not tried</td><td></td></tr></table></div>
 </section>
-<nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/install/"><span>previous</span>Install and first login</a><a class="next" href="/docs/vpn/"><span>next</span>VPN and securing access</a></nav>
+<nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/install/"><span>previous</span>Install and first login</a><a class="next" href="/docs/clients/"><span>next</span>Set up your RDP client</a></nav>
 <p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/connect.md">a file in the repository</a>: corrections are welcome.</p>
 </main>
 </div>

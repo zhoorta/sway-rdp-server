@@ -100,6 +100,8 @@ $ sudo waydesk-admin cert export-ca         # prints the path of the authority's
 Copy that file to each client and import it **once** (macOS: add it to the login keychain and set Trust to Always Trust; Windows: `certmgr.msc`, Trusted Root Certification Authorities; Linux: `/usr/local/share/ca-certificates/` and `update-ca-certificates`). From then on every connection is checked and nothing is compared by hand. A timer renews the certificate before it ends. Where the server has a public name, `cert install --cert FULLCHAIN.pem --key KEY.pem` puts a Let's Encrypt certificate in place instead.
 
 ## Which client {bar: table}
+Step by step for each of them: [Set up your RDP client](/docs/clients/).
+
 | client | tried | notes |
 |---|---|---|
 | Windows App (macOS) | yes | add the PC as `localhost` through the tunnel; compare the certificate's fingerprint with the one the server printed |
