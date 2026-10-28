@@ -7,7 +7,7 @@ Waydesk is early, free software, written and tested by one person on real server
 ## Status {bar: notes}
 - **Early software.** Version 0.4.0. Expect rough edges; [open an issue](https://github.com/zhoorta/waydesk/issues) when you find one.
 - **Systems:** Debian 13 and Ubuntu 26.04 on amd64 (arm64 packages are built; they have not been installed on a machine yet).
-- **No second factor.** The login is the account's password inside TLS: keep the port behind an SSH tunnel or a [VPN](/docs/vpn/#security).
+- **No second factor.** The login is the account's password inside TLS: keep the port behind an SSH tunnel or a [VPN](/docs/vpn/#security-what-protects-the-login).
 - **Not an audited product.** Four internal review passes are written down, with what is still open.
 
 ## Clients {bar: table}
