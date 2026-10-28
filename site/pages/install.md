@@ -13,7 +13,6 @@ From a fresh server to a desktop in about ten minutes: one package, one command 
 </video>
 <figcaption>A 20-second silent loop, recorded inside a Waydesk session on a 4-vCPU cloud server with no GPU. The typing and window moves are scripted; the desktop is the real one.</figcaption>
 </figure>
-<script>(function () { var v = document.querySelector('video.demo, .demo video'); if (!v || matchMedia('(prefers-reduced-motion: reduce)').matches) return; v.controls = false; v.play().catch(function () { v.controls = true; }); v.addEventListener('click', function () { v.paused ? v.play() : v.pause(); }); })();</script>
 ```
 
 ## Install {bar: terminal}
