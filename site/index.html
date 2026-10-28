@@ -22,11 +22,11 @@
   <a class="logo" href="/"><img src="logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
   <nav aria-label="Sections">
     <a href="#see">see it</a>
+    <a href="#who">who for</a>
     <a href="#fast">fast</a>
     <a href="#apps">apps</a>
     <a href="#connect">connect</a>
     <a href="#install">install</a>
-    <a href="#measurements">numbers</a>
     <a href="/docs/">docs</a>
     <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
   </nav>
@@ -61,6 +61,17 @@
 <figcaption>A 20-second silent loop, recorded inside a Waydesk session on a 4-vCPU cloud server with no GPU. The typing and window moves are scripted; the desktop is the real one.</figcaption>
 </figure>
 <script>(function () { var v = document.querySelector('video.demo, .demo video'); if (!v || matchMedia('(prefers-reduced-motion: reduce)').matches) return; v.controls = false; v.play().catch(function () { v.controls = true; }); v.addEventListener('click', function () { v.paused ? v.play() : v.pause(); }); })();</script>
+
+<section class="band" id="who">
+<h2>Who it is for</h2>
+<div class="grid">
+  <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>A small team on one server</h3><p>Each person gets a desktop of their own on a shared Debian or Ubuntu machine, with memory limits, and one RDP client is all they need.</p></div></div>
+  <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>Developers on a bigger machine</h3><p>Work in a browser, an editor and a terminal that live on the server, from a laptop or a Mac, and pick the session up again where you left it.</p></div></div>
+  <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>Labs, courses and support desks</h3><p>A ready desktop per account with a few applications, made with <code>waydesk-admin users add</code>, on a server you already run.</p></div></div>
+  <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>Anyone on a slow or distant link</h3><p>The picture follows what the link delivers, so a session across a long or lossy connection stays usable.</p></div></div>
+</div>
+<p class="note">Not for you (yet) if you need Windows applications, a second factor at the login, or more than the dozen or two users at once it has been tried with: <a href="/docs/limits/">Limits and status</a> says what was tested.</p>
+</section>
 
 <section class="band" id="fast">
 <h2>Built to stay light and fast</h2>
@@ -159,17 +170,6 @@ lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 
 </table></div>
 <p class="method">Tested means a clean server, SSH hardened first, these steps, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on
 macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoders; older Windows clients were not tested.</p>
-</div>
-</div>
-</section>
-
-<section class="sect" id="measurements">
-<h2>Measured, not promised</h2>
-<div class="win">
-<div class="bar"><span class="t">the numbers</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-<div class="body">
-<div class="tiles"><div class="tile"><div class="big">430 to 600 MB</div><div class="cap2">an idle session with the shell</div></div><div class="tile"><div class="big">7 to 8</div><div class="cap2">heavy users on an 8 GB server</div></div><div class="tile"><div class="big">4.5 : 1</div><div class="cap2">compressed swap, zstd</div></div><div class="tile"><div class="big">60 s</div><div class="cap2">a frozen client is cut off</div></div><div class="tile"><div class="big">4.8 % vs 15 %</div><div class="cap2">CPU of the capture and encoding with 20 active heavy users, GPU or CPU</div></div></div>
-<p class="small">Our own servers and scripts; each chart says how it was measured. Charts, tables and method: <a href="/docs/measurements/">measurements</a>; what a GPU changes: <a href="/docs/gpu/">the GPU page</a>.</p>
 </div>
 </div>
 </section>
