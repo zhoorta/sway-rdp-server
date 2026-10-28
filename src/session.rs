@@ -125,7 +125,7 @@ fn start_capture(output: &str) -> Result<(Arc<Shared>, Arc<AtomicBool>)> {
     let mut cap = Capturer::new(Some(output)).context("capture setup")?;
     let first = cap.next_frame().context("first capture")?;
     info!(%output, width = first.width, height = first.height, "capturing");
-    let shared = Arc::new(Shared::new(first.width, first.height, first.data));
+    let shared = Arc::new(Shared::new(first.width, first.height, first.pixels));
     let stop = Arc::new(AtomicBool::new(false));
     let (pusher, flag) = (shared.clone(), stop.clone());
     std::thread::spawn(move || {
@@ -136,7 +136,7 @@ fn start_capture(output: &str) -> Result<(Arc<Shared>, Arc<AtomicBool>)> {
                     break;
                 }
                 Ok(f) if f.width == pusher.width && f.height == pusher.height => {
-                    pusher.push(f.data, f.damage);
+                    pusher.push(f.pixels, f.damage);
                     // About 30 fps at most; damage that arrives meanwhile is merged.
                     std::thread::sleep(std::time::Duration::from_millis(30));
                 }

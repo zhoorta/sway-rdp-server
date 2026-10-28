@@ -1,0 +1,56 @@
+diff -ru cros-libva.orig/bindgen_gen.rs cros-libva/bindgen_gen.rs
+--- cros-libva.orig/bindgen_gen.rs	2006-07-24 02:21:28
++++ cros-libva/bindgen_gen.rs	2026-10-27 21:08:09
+@@ -3,7 +3,7 @@
+ // found in the LICENSE file.
+ 
+ /// The allow list of VA functions, structures and enum values.
+-const ALLOW_LIST_TYPE : &str = ".*ExternalBuffers.*|.*PRIME.*|.*MPEG2.*|.*VP8.*|.*VP9.*|.*H264.*|.*HEVC.*|VACodedBufferSegment|.*AV1.*|VAEncMisc.*|VASurfaceDecodeMBErrors|VADecodeErrorType";
++const ALLOW_LIST_TYPE : &str = ".*ExternalBuffers.*|.*PRIME.*|.*MPEG2.*|.*VP8.*|.*VP9.*|.*H264.*|.*HEVC.*|VACodedBufferSegment|.*AV1.*|VAEncMisc.*|VASurfaceDecodeMBErrors|VADecodeErrorType|VAProc.*";
+ 
+ // The common bindgen builder for VA-API.
+ pub fn vaapi_gen_builder(builder: bindgen::Builder) -> bindgen::Builder {
+diff -ru cros-libva.orig/libva-wrapper.h cros-libva/libva-wrapper.h
+--- cros-libva.orig/libva-wrapper.h	2006-07-24 02:21:28
++++ cros-libva/libva-wrapper.h	2026-10-27 21:08:09
+@@ -5,3 +5,4 @@
+ #include <va/va.h>
+ #include <va/va_drm.h>
+ #include <va/va_drmcommon.h>
++#include <va/va_vpp.h>
+diff -ru cros-libva.orig/src/config.rs cros-libva/src/config.rs
+--- cros-libva.orig/src/config.rs	2006-07-24 02:21:28
++++ cros-libva/src/config.rs	2026-10-27 21:08:09
+@@ -61,7 +61,7 @@
+     }
+ 
+     /// Returns the ID of this config.
+-    pub(crate) fn id(&self) -> bindings::VAConfigID {
++    pub fn id(&self) -> bindings::VAConfigID {
+         self.id
+     }
+ 
+diff -ru cros-libva.orig/src/context.rs cros-libva/src/context.rs
+--- cros-libva.orig/src/context.rs	2006-07-24 02:21:28
++++ cros-libva/src/context.rs	2026-10-27 21:08:09
+@@ -74,7 +74,7 @@
+     }
+ 
+     /// Returns the ID of this context.
+-    pub(crate) fn id(&self) -> bindings::VAContextID {
++    pub fn id(&self) -> bindings::VAContextID {
+         self.id
+     }
+ 
+diff -ru cros-libva.orig/src/display.rs cros-libva/src/display.rs
+--- cros-libva.orig/src/display.rs	2006-07-24 02:21:28
++++ cros-libva/src/display.rs	2026-10-27 21:08:09
+@@ -138,7 +138,7 @@
+     }
+ 
+     /// Returns the handle of this display.
+-    pub(crate) fn handle(&self) -> bindings::VADisplay {
++    pub fn handle(&self) -> bindings::VADisplay {
+         self.handle
+     }
+ 

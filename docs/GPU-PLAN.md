@@ -1,6 +1,6 @@
 # GPU support: plan
 
-Status: stages 1 and 2 built and measured, stage 3 (zero copy) open. 2026-10-27.
+Status: stages 1 and 2 committed; stage 3 (zero copy) built and measured but NOT committed, with one open bug (the "veil" in Windows App, below). 2026-10-27.
 
 ## Today
 
@@ -78,8 +78,9 @@ What did not work, and why the encoder looks the way it does:
 - **Hardware CBR.** Intel pads every frame to the target: a static grey picture costs 29.8 KB a frame at 8 Mbit/s (VBR: 0.08 KB). A window being dragged
   cost 5.1 Mbit/s against 1.0 for OpenH264. The chip also expects a steady frame rate, and ours come when something changes.
 - **VBR** is not in the crate (it offers CBR and constant quantiser); a patch means vendoring 5 MB.
-- **Changing the quantiser per frame** through `tune()`: the crate starts a new sequence on every change, which is a keyframe, so every frame became a
-  600 KB keyframe. `BackendRequest` has private fields, so its lower layer (per-frame `slice_qp_delta`) cannot be driven from outside.
+- **Changing the quantiser per frame** through `tune()`: the crate builds new parameter sets (the initial QP is in the PPS) and carries on with P frames,
+  with no IDR (a forced keyframe is only a non-IDR I picture there; just the first frame is an IDR). A decoder may keep the old PPS. So a new
+  quantiser makes a new encoder now (`submit` in `encode_va.rs`): its first frame is a real IDR with fresh SPS and PPS. `BackendRequest` has private fields, so its lower layer (per-frame `slice_qp_delta`) cannot be driven from outside.
 - So: constant quantiser, two steps below `--quality` (18 by default), and a controller (`QpControl`) that moves it up in tiers to 40 only after a second of
   overload and back after five of calm, never twice in two seconds. Dragging a window: 1.0 to 1.3 Mbit/s (OpenH264: 1.0). A random-noise shader cannot reach
   8 Mbit/s at any sensible quantiser, with either encoder.
@@ -91,3 +92,39 @@ window and the WebGL page, was smooth, "even the OpenGL".
 Still open: stage 3 (dmabuf capture and the colour conversion on the GPU, which would take the CPU copy and `bgra_to_yuv_nv12` away); text sharpness of the
 hardware encoder against OpenH264's screen-content mode (looked the same by eye, no PSNR yet); AMD (`mesa-va-drivers`) and NVIDIA (NVENC, not VAAPI) are untested;
 many users at once on one GPU; the arm64 build with `vaapi` (compiles in the build container, no GPU to run it on).
+
+## Stage 3: zero copy (2026-10-27)
+
+The compositor renders the capture into dmabufs (GBM, linear XRGB8888, `src/dmabuf.rs`); the encoder imports one as a VA surface and the GPU's video
+processor converts it to NV12 (`src/vpp.rs`), so the picture never reaches the CPU. The VA binding needed two things it does not offer: the display
+handle and the video-processing structures, so `cros-libva` is vendored with a five-line patch (`patches/cros-libva.diff`).
+
+- `copy_with_damage` writes only the changed regions, so rotating buffers come out mostly black. The capture uses one persistent *oracle* buffer for the
+  damage and a plain `copy` into rotating snapshot buffers for the picture (two requests per frame; a lease keeps a buffer from being reused while the
+  encoder holds it). The damage is trusted (never short in drag tests at scale 1, 1.5 and 2), with a full refresh every 10 s as a safety net.
+- Session worker CPU for the full-screen WebGL page at 20 fps: about 2 to 3 % of a core, against about 21 % with the shm capture and the CPU conversion.
+- The video processor's default chroma siting is *left*; the CPU conversion averages at the *centre*. Thin light strokes on dark (text) came out with colour
+  fringes (chroma error 5.2 against the CPU's); centre siting gives 0.08 and the top-bar chroma went from 39 to 50 dB. The scaling quality flags change nothing.
+- A bug of ours: `DmaPool` dropped its GBM device before the buffer objects (a segfault whenever a session ended).
+- `WAYDESK_DUMP_DIR` writes every frame and its bitstream (`src-NNNNN.bgra`, `stream.h264`, `frames.txt`, `rects.txt`) for decoding and comparing (PSNR, and a
+  simulation of a client that paints only the dirty rectangles). Off by default: it writes the screen to disk.
+
+### The veil in Windows App (2026-10-28, fixed)
+
+With the VAAPI encoder, while the full-screen WebGL page was open, Windows App (Mac) showed the whole screen washed out: nothing darker than about RGB 100,
+nothing brighter than about 190, also on areas that never changed, with ghost text and teal streaks at window edges, until the page was closed and a window
+dragged. The software encoder was clean, and our stream decoded correctly in ffmpeg every time.
+
+The cause was the quantiser being in the PPS (`pic_init_qp`): each tier change (18, 25, 32, 40 within a few seconds under noise) meant new parameter sets, first
+through `tune()` and then through a new encoder with a fresh IDR. Several of those in a row and the client was left decoding against grey. The bisect, all with
+VAAPI and the shm capture (so not the zero-copy path, and not the High profile or the missing `bitstream_restriction` either; we write that now, as OpenH264
+does, and it changed nothing): quantiser pinned at 26, clean; 26 to 27 (one new encoder), clean; 26 up to 32 (three in 5 s), veil; pinned at 32, clean. So not
+the value of the quantiser and not one new sequence, but parameter sets that keep changing.
+
+The fix is in the vendored `cros-codecs` (`patches/cros-codecs.diff`): the PPS keeps `pic_init_qp` 26 for good, each slice carries the real quantiser in
+`slice_qp_delta`, and `tune()` only makes new parameter sets when the frame rate changes. A quantiser change is then just a different number in the next slice
+header: no new encoder, no IDR. One IDR in a whole run of the harness, slice deltas of -8, -1, 6 and 14, no veil in Windows App with the normal tiers.
+
+Also in that patch: with constant quality the coded buffer was a fixed 1.5 MB, and a keyframe of full-screen noise at QP 18 (1.8 MB) overflowed it ("allocated
+memory size is not enough"), which ended the session's connection, again at every reconnect while the noise was on screen. The buffer is now as large as a raw
+NV12 picture. Not yet tried: zero-copy with the fix in Windows App, and the same in sdl-freerdp.

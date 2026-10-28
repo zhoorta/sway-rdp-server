@@ -9,6 +9,8 @@ mod capture;
 mod base64;
 mod clipboard;
 mod cursors;
+#[cfg(feature = "vaapi")]
+mod dmabuf;
 mod egfx;
 mod encode;
 #[cfg(feature = "vaapi")]
@@ -27,6 +29,8 @@ mod sessionaudio;
 mod sessionclip;
 mod spawn;
 mod tcpinfo;
+#[cfg(feature = "vaapi")]
+mod vpp;
 mod worker;
 
 use std::num::{NonZeroU16, NonZeroUsize};

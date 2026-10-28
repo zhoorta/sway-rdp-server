@@ -1,0 +1,168 @@
+diff -ru cros-codecs.orig/Cargo.toml cros-codecs/Cargo.toml
+--- cros-codecs.orig/Cargo.toml	2026-10-28 10:06:12
++++ cros-codecs/Cargo.toml	2026-10-28 10:24:46
+@@ -19,18 +19,6 @@
+ license = "BSD-3-Clause"
+ repository = "https://github.com/chromeos/cros-codecs"
+ 
+-[[example]]
+-name = "ccdec"
+-required-features = ["backend"]
+-
+-[[example]]
+-name = "ccenc"
+-required-features = ["backend"]
+-
+-[[example]]
+-name = "perf_test"
+-required-features = ["backend"]
+-
+ [dependencies.anyhow]
+ version = "1.0.75"
+ optional = true
+diff -ru cros-codecs.orig/src/backend/vaapi/encoder.rs cros-codecs/src/backend/vaapi/encoder.rs
+--- cros-codecs.orig/src/backend/vaapi/encoder.rs	2026-10-28 10:06:12
++++ cros-codecs/src/backend/vaapi/encoder.rs	2026-10-28 10:24:46
+@@ -163,6 +163,8 @@
+ 
+     _va_profile: VAProfile::Type,
+     scratch_pool: VaSurfacePool<()>,
++    /// The size of a raw NV12 picture: no coded picture is expected to be larger, so it is the coded buffer size without a bitrate target.
++    raw_size: usize,
+     _phantom: PhantomData<(M, H)>,
+ }
+ 
+@@ -209,6 +211,7 @@
+             true,
+         )?;
+ 
++        let raw_size = coded_size.width as usize * coded_size.height as usize * 3 / 2;
+         let mut scratch_pool = VaSurfacePool::new(
+             Rc::clone(&display),
+             rt_format,
+@@ -223,6 +226,7 @@
+             va_config,
+             context,
+             scratch_pool,
++            raw_size,
+             _va_profile: va_profile,
+             _phantom: Default::default(),
+         })
+@@ -239,13 +243,14 @@
+         // Coded buffer size multiplier. It's inteded to give head room for the encoder.
+         const CODED_SIZE_MUL: usize = 2;
+ 
+-        // Default coded buffer size if bitrate control is not used.
++        // Default coded buffer size if bitrate control is not used. A fixed 1.5 MB overflowed on a keyframe of full-screen noise at a low
++        // quantiser ("allocated memory size is not enough"), so without a target the buffer is as large as a raw picture.
+         const DEFAULT_CODED_SIZE: usize = 1_500_000;
+ 
+         let coded_size = rate_control
+             .bitrate_target()
+             .map(|e| e as usize * CODED_SIZE_MUL)
+-            .unwrap_or(DEFAULT_CODED_SIZE);
++            .unwrap_or(DEFAULT_CODED_SIZE.max(self.raw_size));
+ 
+         Ok(self.context().create_enc_coded(coded_size)?)
+     }
+diff -ru cros-codecs.orig/src/codec/h264/parser.rs cros-codecs/src/codec/h264/parser.rs
+--- cros-codecs.orig/src/codec/h264/parser.rs	2026-10-28 10:06:12
++++ cros-codecs/src/codec/h264/parser.rs	2026-10-28 10:24:46
+@@ -464,6 +464,11 @@
+         self.num_ref_idx_l1_active_minus1(value - 1)
+     }
+ 
++    pub fn slice_qp_delta(mut self, value: i8) -> Self {
++        self.0.slice_qp_delta = value;
++        self
++    }
++
+     pub fn build(self) -> SliceHeader {
+         self.0
+     }
+diff -ru cros-codecs.orig/src/encoder/stateless/h264/predictor.rs cros-codecs/src/encoder/stateless/h264/predictor.rs
+--- cros-codecs.orig/src/encoder/stateless/h264/predictor.rs	2026-10-28 10:06:12
++++ cros-codecs/src/encoder/stateless/h264/predictor.rs	2026-10-28 10:24:46
+@@ -31,6 +31,11 @@
+ pub(crate) const MIN_QP: u8 = 1;
+ pub(crate) const MAX_QP: u8 = 51;
+ 
++/// The quantiser every PPS starts from. With constant quality the real one goes in each slice header (`slice_qp_delta`), so a change of
++/// quality needs no new parameter sets: a client that rebuilds its decoder on a new PPS, or loses the keyframe while it does, shows a
++/// washed-out picture until the next keyframe (Windows App).
++const PPS_INIT_QP: u8 = 26;
++
+ pub(crate) struct LowDelayH264Delegate {
+     /// Current sequence SPS
+     sps: Option<Rc<Sps>>,
+@@ -70,6 +75,18 @@
+         }
+     }
+ 
++    /// The slice quantiser relative to the PPS: constant quality asks for its own, the other modes start from the middle as the PPS used to.
++    fn slice_qp_delta(&self) -> i8 {
++        let min_qp = self.tunings.min_quality.max(MIN_QP as u32);
++        let max_qp = self.tunings.max_quality.min(MAX_QP as u32);
++        let qp = if let RateControl::ConstantQuality(qp) = self.tunings.rate_control {
++            qp.clamp(min_qp, max_qp) as i32
++        } else {
++            ((min_qp + max_qp) / 2) as i32
++        };
++        (qp - i32::from(PPS_INIT_QP)) as i8
++    }
++
+     fn new_sequence(&mut self) {
+         trace!("beginning new sequence");
+         let config = &self.delegate.config;
+@@ -100,20 +117,9 @@
+             .timing_info(1, self.tunings.framerate * 2, false)
+             .build();
+ 
+-        let min_qp = self.tunings.min_quality.max(MIN_QP as u32);
+-        let max_qp = self.tunings.max_quality.min(MAX_QP as u32);
+-
+-        let init_qp = if let RateControl::ConstantQuality(init_qp) = self.tunings.rate_control {
+-            // Limit QP to valid values
+-            init_qp.clamp(min_qp, max_qp) as u8
+-        } else {
+-            // Pick middle QP for default qp
+-            ((min_qp + max_qp) / 2) as u8
+-        };
+-
+         let pps = PpsBuilder::new(Rc::clone(&sps))
+             .pic_parameter_set_id(0)
+-            .pic_init_qp(init_qp)
++            .pic_init_qp(PPS_INIT_QP)
+             .deblocking_filter_control_present_flag(true)
+             .num_ref_idx_l0_default_active(1)
+             // Unused, P frame relies only on list0
+@@ -154,6 +160,7 @@
+             .slice_type(SliceType::I)
+             .first_mb_in_slice(0)
+             .pic_order_cnt_lsb(dpb_meta.poc)
++            .slice_qp_delta(self.slice_qp_delta())
+             .build();
+ 
+         let mut headers = vec![];
+@@ -218,6 +225,7 @@
+             .slice_type(SliceType::P)
+             .first_mb_in_slice(0)
+             .pic_order_cnt_lsb(dpb_meta.poc)
++            .slice_qp_delta(self.slice_qp_delta())
+             .build();
+ 
+         let mut headers = Vec::new();
+@@ -262,8 +270,11 @@
+         Ok(())
+     }
+ 
+-    fn apply_tunings(&mut self, _tunings: &Tunings) -> EncodeResult<()> {
+-        self.new_sequence();
++    fn apply_tunings(&mut self, tunings: &Tunings) -> EncodeResult<()> {
++        // The quantiser is in the slice headers now; only the frame rate (in the SPS) needs new parameter sets.
++        if tunings.framerate != self.tunings.framerate {
++            self.new_sequence();
++        }
+         Ok(())
+     }
+ }

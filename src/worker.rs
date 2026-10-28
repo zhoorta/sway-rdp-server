@@ -399,6 +399,7 @@ impl Worker {
             Down::UseBitmaps => {
                 self.bitmaps = true;
                 self.enc = None;
+                crate::capture::PREFER_SHM.store(true, std::sync::atomic::Ordering::Relaxed);
                 session.shared.force_full();
             }
             Down::Clipboard { data } => self.clipboard.set(data),
@@ -435,15 +436,16 @@ impl Worker {
         }
     }
 
-    async fn send_frame(&mut self, frame: &Arc<Vec<u8>>, r: Rect) -> Result<()> {
+    async fn send_frame(&mut self, frame: &Arc<crate::capture::Pixels>, r: Rect) -> Result<()> {
         let shared = self.session.as_ref().expect("session").shared.clone();
         let (w, h) = (usize::from(shared.width), usize::from(shared.height));
         if self.bitmaps {
+            let bytes = frame.bgra()?;
             let stride = w * 4;
             let mut data = Vec::with_capacity(r.w as usize * r.h as usize * 4);
             for row in r.y..r.y + r.h {
                 let start = row as usize * stride + r.x as usize * 4;
-                data.extend_from_slice(&frame[start..start + r.w as usize * 4]);
+                data.extend_from_slice(&bytes[start..start + r.w as usize * 4]);
             }
             self.credits -= 1;
             let _ = self.up.send(Up::Frame { x: r.x as u16, y: r.y as u16, w: r.w as u16, h: r.h as u16, kind: FrameKind::Bgra, data });
@@ -452,10 +454,16 @@ impl Worker {
         if self.enc.is_none() {
             let tuning = self.tuning.context("no encoder settings")?;
             let tuning = Tuning { bitrate: self.bitrate.unwrap_or(tuning.bitrate), ..tuning };
-            self.enc = Some(crate::encoder::open(shared.width, shared.height, tuning)?);
+            let enc = crate::encoder::open(shared.width, shared.height, tuning)?;
+            // Pictures that stay in GPU memory are for the encoder that takes them from there; any other gets them from shm, as before.
+            if !enc.takes_gpu_frames() {
+                crate::capture::PREFER_SHM.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+            self.enc = Some(enc);
         }
-        match self.enc.as_mut().expect("encoder").encode(frame, w, h)? {
+        match self.enc.as_mut().expect("encoder").encode_frame(frame, w, h)? {
             Some(data) => {
+                crate::encoder::dump_rect(r.x, r.y, r.w, r.h);
                 self.credits -= 1;
                 if self.settling {
                     self.settling = false;

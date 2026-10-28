@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 
 [features]
 default = ["vaapi"]
-vaapi = ["dep:cros-codecs"]
+vaapi = ["dep:cros-codecs", "dep:gbm", "dep:wayland-protocols"]
 
 [dependencies]
 ironrdp-server = { version = "0.13", features = ["helper", "egfx"] }
@@ -26,6 +26,9 @@ openh264-sys2 = { version = "0.9", default-features = false, features = ["libloa
 yuv = "0.8"
 # H.264 on the GPU (VAAPI), for sessions that render on one: the encoder of the ChromiumOS project (BSD-3), linked to libva at run time by the loader.
 cros-codecs = { version = "0.0.6", optional = true, default-features = false, features = ["vaapi"] }
+# GPU buffers for the capture: the compositor renders into a dmabuf (stage 3 of docs/GPU-PLAN.md).
+gbm = { version = "0.15", optional = true, default-features = false }
+wayland-protocols = { version = "0.32", optional = true, features = ["client"] }
 anyhow = "1"
 serde_json = "1"
 libc = "0.2"
@@ -42,3 +45,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Local patch: frame markers around surface updates (see patches/ironrdp-server.diff).
 [patch.crates-io]
 ironrdp-server = { path = "patches/ironrdp-server" }
+# cros-libva with the display and context handles public and the video-processing structures bound (see patches/cros-libva.diff).
+cros-libva = { path = "patches/cros-libva" }
+# cros-codecs with the H.264 quantiser in the slice headers instead of the PPS (see patches/cros-codecs.diff).
+cros-codecs = { path = "patches/cros-codecs" }

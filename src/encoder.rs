@@ -3,11 +3,21 @@
 
 use anyhow::Result;
 
+use crate::capture::Pixels;
 use crate::encode::{Tuning, H264};
 
 pub trait Encode: Send {
     /// Encodes a tight BGRA frame of `w` x `h`. `None` when the encoder dropped the frame.
     fn encode(&mut self, bgra: &[u8], w: usize, h: usize) -> Result<Option<Vec<u8>>>;
+    /// Encodes a captured picture, which may be in GPU memory. An encoder that cannot take it from there gets it read out.
+    fn encode_frame(&mut self, frame: &Pixels, w: usize, h: usize) -> Result<Option<Vec<u8>>> {
+        let bgra = frame.bgra()?;
+        self.encode(&bgra, w, h)
+    }
+    /// True for an encoder that takes pictures in GPU memory as they are (the capture then renders into dmabufs and the CPU never sees them).
+    fn takes_gpu_frames(&self) -> bool {
+        false
+    }
     /// Changes the bitrate the encoder aims for, while it runs.
     fn set_bitrate(&mut self, bps: u32);
     /// The next frame is a keyframe.
@@ -41,12 +51,9 @@ impl Timed {
     fn new(inner: Box<dyn Encode>, name: &'static str) -> Self {
         Self { inner, name, since: std::time::Instant::now(), frames: 0, dropped: 0, busy: Default::default(), bytes: 0 }
     }
-}
 
-impl Encode for Timed {
-    fn encode(&mut self, bgra: &[u8], w: usize, h: usize) -> Result<Option<Vec<u8>>> {
-        let start = std::time::Instant::now();
-        let out = self.inner.encode(bgra, w, h)?;
+    /// Counts a frame that took since `start`, and reports every 5 s.
+    fn account(&mut self, start: std::time::Instant, out: Option<Vec<u8>>) -> Result<Option<Vec<u8>>> {
         self.busy += start.elapsed();
         match &out {
             Some(d) => {
@@ -71,6 +78,22 @@ impl Encode for Timed {
         }
         Ok(out)
     }
+}
+
+impl Encode for Timed {
+    fn encode(&mut self, bgra: &[u8], w: usize, h: usize) -> Result<Option<Vec<u8>>> {
+        let start = std::time::Instant::now();
+        let out = self.inner.encode(bgra, w, h)?;
+        self.account(start, out)
+    }
+    fn encode_frame(&mut self, frame: &Pixels, w: usize, h: usize) -> Result<Option<Vec<u8>>> {
+        let start = std::time::Instant::now();
+        let out = self.inner.encode_frame(frame, w, h)?;
+        self.account(start, out)
+    }
+    fn takes_gpu_frames(&self) -> bool {
+        self.inner.takes_gpu_frames()
+    }
     fn set_bitrate(&mut self, bps: u32) {
         tracing::debug!(encoder = self.name, bps, "bitrate");
         self.inner.set_bitrate(bps)
@@ -88,6 +111,93 @@ impl Encode for Gone {
     }
     fn set_bitrate(&mut self, _: u32) {}
     fn force_keyframe(&mut self) {}
+}
+
+/// For diagnosing the picture: with `WAYDESK_DUMP_DIR` set, every frame is written there as it was given to the encoder (`src-NNNNN.bgra`) next to the
+/// bitstream it became (`stream.h264`, one line per frame in `frames.txt`), for comparing what was decoded with what was captured. Off by default: it writes
+/// the screen to disk, and a few hundred frames of it.
+struct Dump {
+    inner: Box<dyn Encode>,
+    dir: std::path::PathBuf,
+    n: u32,
+    stream: std::fs::File,
+    index: std::fs::File,
+}
+
+impl Dump {
+    fn new(inner: Box<dyn Encode>, dir: std::path::PathBuf) -> Option<Self> {
+        std::fs::create_dir_all(&dir).ok()?;
+        let stream = std::fs::File::create(dir.join("stream.h264")).ok()?;
+        let index = std::fs::File::create(dir.join("frames.txt")).ok()?;
+        Some(Self { inner, dir, n: 0, stream, index })
+    }
+}
+
+impl Encode for Dump {
+    fn encode(&mut self, bgra: &[u8], w: usize, h: usize) -> Result<Option<Vec<u8>>> {
+        use std::io::Write;
+        let out = self.inner.encode(bgra, w, h)?;
+        if let (Some(data), true) = (&out, self.n < 900) {
+            let _ = std::fs::write(self.dir.join(format!("src-{:05}.bgra", self.n)), bgra);
+            let _ = self.stream.write_all(data);
+            let _ = writeln!(self.index, "{} {} {w} {h}", self.n, data.len());
+            self.n += 1;
+        }
+        Ok(out)
+    }
+    fn encode_frame(&mut self, frame: &Pixels, w: usize, h: usize) -> Result<Option<Vec<u8>>> {
+        let bgra = frame.bgra()?;
+        // The encoder gets the picture as it is (zero-copy included) so that what is tested is what is used; the copy is only for the dump.
+        use std::io::Write;
+        let out = self.inner.encode_frame(frame, w, h)?;
+        if let (Some(data), true) = (&out, self.n < 900) {
+            let _ = std::fs::write(self.dir.join(format!("src-{:05}.bgra", self.n)), &*bgra);
+            let _ = self.stream.write_all(data);
+            let _ = writeln!(self.index, "{} {} {w} {h}", self.n, data.len());
+            self.n += 1;
+        }
+        Ok(out)
+    }
+    fn takes_gpu_frames(&self) -> bool {
+        self.inner.takes_gpu_frames()
+    }
+    fn set_bitrate(&mut self, bps: u32) {
+        self.inner.set_bitrate(bps)
+    }
+    fn force_keyframe(&mut self) {
+        self.inner.force_keyframe()
+    }
+}
+
+/// With the dump on, the rectangle of the frame just encoded is added to `rects.txt` (what the client paints of it).
+pub fn dump_rect(x: u32, y: u32, w: u32, h: u32) {
+    use std::io::Write;
+    if let Some(dir) = std::env::var_os("WAYDESK_DUMP_DIR") {
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).create(true).open(std::path::Path::new(&dir).join("rects.txt")) {
+            let _ = writeln!(f, "{x} {y} {w} {h}");
+        }
+    }
+}
+
+/// Wraps `enc` in the dump when `WAYDESK_DUMP_DIR` asks for it.
+fn maybe_dump(enc: Box<dyn Encode>) -> Box<dyn Encode> {
+    match std::env::var_os("WAYDESK_DUMP_DIR") {
+        Some(dir) => {
+            tracing::warn!(dir = ?dir, "WAYDESK_DUMP_DIR: the encoder writes the screen to disk");
+            // `Dump::new` needs the encoder by value and gives it back on failure through the Option: rebuild on error.
+            let dir = std::path::PathBuf::from(dir);
+            let takes = enc.takes_gpu_frames();
+            match Dump::new(enc, dir) {
+                Some(d) => Box::new(d),
+                None => {
+                    tracing::warn!("cannot write the dump directory");
+                    let _ = takes;
+                    Box::new(Gone)
+                }
+            }
+        }
+        None => enc,
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -115,7 +225,7 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
             match crate::encode_va::VaH264::new(&node, width, height, tuning) {
                 Ok(enc) => {
                     tracing::info!(node = %node.display(), "H.264 encoder: VAAPI");
-                    return Ok(Box::new(Timed::new(Box::new(enc), "vaapi")));
+                    return Ok(maybe_dump(Box::new(Timed::new(Box::new(enc), "vaapi"))));
                 }
                 Err(e) => tracing::warn!("VAAPI encoder not available ({e:#}): OpenH264 on the CPU"),
             }
@@ -127,7 +237,7 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
     if choice == Choice::Vaapi {
         tracing::warn!("WAYDESK_ENCODER=vaapi, but this build has no VAAPI support: OpenH264 on the CPU");
     }
-    Ok(Box::new(Timed::new(Box::new(H264::new(width, height, tuning)?), "openh264")))
+    Ok(maybe_dump(Box::new(Timed::new(Box::new(H264::new(width, height, tuning)?), "openh264"))))
 }
 
 #[cfg(test)]

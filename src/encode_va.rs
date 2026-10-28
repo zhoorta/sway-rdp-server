@@ -6,6 +6,8 @@
 //! Intel), and it expects a steady frame rate while ours come only when something changes. The encoder runs at a constant quantiser instead,
 //! and `QpControl` moves that quantiser between a floor (the picture quality wanted) and a ceiling (what a slow link may cost).
 
+use std::collections::HashMap;
+use std::os::fd::{AsRawFd, OwnedFd};
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Mutex;
@@ -17,12 +19,18 @@ use cros_codecs::codec::h264::parser::{Level, Profile};
 use cros_codecs::encoder::h264::EncoderConfig;
 use cros_codecs::encoder::stateless::h264::StatelessEncoder;
 use cros_codecs::encoder::{FrameMetadata, RateControl, Tunings, VideoEncoder};
-use cros_codecs::libva::{self, Display, Surface, UsageHint, VAEntrypoint, VAProfile, VA_FOURCC_NV12, VA_RT_FORMAT_YUV420};
+use cros_codecs::libva::{
+    self, Display, ExternalBufferDescriptor, MemoryType, Surface, UsageHint, VADRMPRIMESurfaceDescriptor, VAEntrypoint, VAProfile, VA_FOURCC_BGRX, VA_FOURCC_NV12,
+    VA_RT_FORMAT_RGB32, VA_RT_FORMAT_YUV420,
+};
 use cros_codecs::video_frame::{ReadMapping, VideoFrame, WriteMapping};
 use cros_codecs::{BlockingMode, Fourcc, FrameLayout, PlaneLayout, Resolution};
 use yuv::{bgra_to_yuv_nv12, BufferStoreMut, YuvBiPlanarImageMut, YuvConversionMode, YuvRange, YuvStandardMatrix};
 
+use crate::capture::Pixels;
+use crate::dmabuf::GpuFrame;
 use crate::encode::{surface_size, Tuning};
+use crate::vpp::Vpp;
 
 /// A frame the encoder takes: a VA surface already filled with the picture, handed over once.
 struct VaFrame {
@@ -139,6 +147,33 @@ impl QpControl {
     }
 }
 
+/// A captured dmabuf (linear XRGB8888) as a VA surface the video processor can read.
+struct DmabufXrgb {
+    fd: OwnedFd,
+    width: u32,
+    height: u32,
+    stride: u32,
+}
+
+impl ExternalBufferDescriptor for DmabufXrgb {
+    const MEMORY_TYPE: MemoryType = MemoryType::DrmPrime2;
+    type DescriptorAttribute = VADRMPRIMESurfaceDescriptor;
+
+    fn va_surface_attribute(&mut self) -> VADRMPRIMESurfaceDescriptor {
+        let mut d = VADRMPRIMESurfaceDescriptor { width: self.width, height: self.height, fourcc: VA_FOURCC_BGRX, num_objects: 1, num_layers: 1, ..Default::default() };
+        d.objects[0].fd = self.fd.as_raw_fd();
+        d.objects[0].size = self.stride * self.height;
+        d.objects[0].drm_format_modifier = 0; // linear
+        d.layers[0].drm_format = crate::dmabuf::XRGB8888;
+        d.layers[0].num_planes = 1;
+        d.layers[0].pitch[0] = self.stride;
+        d
+    }
+}
+
+/// How many imported buffers the encoder keeps: the capture rotates through a few, so this is more than enough.
+const MAX_IMPORTS: usize = 16;
+
 type Encoder = StatelessEncoder<VaFrame, VaapiBackend<(), Surface<()>>>;
 
 pub struct VaH264 {
@@ -149,7 +184,14 @@ pub struct VaH264 {
     framerate: u32,
     qp: QpControl,
     current_qp: u32,
+    /// What makes the encoder again for a new quantiser (see `submit`).
+    config: EncoderConfig,
+    low_power: bool,
     image_format: libva::VAImageFormat,
+    /// Video processing (RGB to NV12 on the GPU) and the captured buffers imported for it, by buffer; created with the first GPU frame.
+    vpp: Option<Vpp>,
+    imports: HashMap<u64, Surface<DmabufXrgb>>,
+    gpu_failed: bool,
     keyframe: bool,
     timestamp: u64,
 }
@@ -191,12 +233,14 @@ impl VaH264 {
         let config = EncoderConfig { resolution: size, profile: Profile::High, level: Level::L5_1, initial_tunings: tunings.clone(), ..Default::default() };
         let fourcc = Fourcc::from(b"NV12");
         let mut encoder = None;
+        let mut used_low_power = false;
         let mut last_error = String::new();
         for low_power in modes {
             match Encoder::new_vaapi(Rc::clone(&display), config.clone(), fourcc, size, low_power, BlockingMode::Blocking) {
                 Ok(e) => {
                     tracing::info!(low_power, "VAAPI H.264 encoder opened");
                     encoder = Some(e);
+                    used_low_power = low_power;
                     break;
                 }
                 Err(e) => last_error = format!("{} encoder: {e:?}", if low_power { "low power" } else { "full" }),
@@ -211,17 +255,47 @@ impl VaH264 {
                 PlaneLayout { buffer_index: 0, offset: sw * sh, stride: sw },
             ],
         };
-        Ok(Self { display, encoder, layout, size, framerate: t.fps, qp: QpControl::new(floor, ceiling, t.bitrate), current_qp: floor, image_format, keyframe: true, timestamp: 0 })
+        Ok(Self { display, encoder, layout, size, framerate: t.fps, qp: QpControl::new(floor, ceiling, t.bitrate), current_qp: floor, config, low_power: used_low_power, image_format, vpp: None, imports: HashMap::new(), gpu_failed: false, keyframe: true, timestamp: 0 })
     }
 
-    /// A surface holding the picture: `bgra` (`w` x `h`) converted into its top left corner, black around it.
-    fn picture(&self, bgra: &[u8], w: usize, h: usize) -> Result<Surface<()>> {
+    /// An empty NV12 surface of the encoder's size.
+    fn new_surface(&self) -> Result<Surface<()>> {
         let (sw, sh) = (self.size.width, self.size.height);
         let mut surfaces = self
             .display
             .create_surfaces(VA_RT_FORMAT_YUV420, Some(VA_FOURCC_NV12), sw, sh, Some(UsageHint::USAGE_HINT_ENCODER), vec![()])
             .map_err(|e| anyhow!("VA surface: {e}"))?;
-        let surface = surfaces.pop().context("no VA surface")?;
+        surfaces.pop().context("no VA surface")
+    }
+
+    /// A surface holding the picture in GPU memory: the captured buffer imported (once per buffer) and converted by the video processor.
+    fn picture_from_gpu(&mut self, g: &GpuFrame, flip: bool, w: usize, h: usize) -> Result<Surface<()>> {
+        if !self.imports.contains_key(&g.id) {
+            if self.imports.len() >= MAX_IMPORTS {
+                self.imports.clear();
+            }
+            let fd = g.dmabuf().try_clone().context("dup of the dmabuf")?;
+            let desc = DmabufXrgb { fd, width: g.width, height: g.height, stride: g.stride };
+            let surface = self
+                .display
+                .create_surfaces(VA_RT_FORMAT_RGB32, Some(VA_FOURCC_BGRX), g.width, g.height, Some(UsageHint::USAGE_HINT_ENCODER), vec![desc])
+                .map_err(|e| anyhow!("VA import of the dmabuf: {e}"))?
+                .pop()
+                .context("no VA surface")?;
+            self.imports.insert(g.id, surface);
+        }
+        if self.vpp.is_none() {
+            self.vpp = Some(Vpp::new(&self.display, self.size.width, self.size.height)?);
+        }
+        let out = self.new_surface()?;
+        self.vpp.as_ref().expect("vpp").convert(&self.imports[&g.id], &out, w as u32, h as u32, flip)?;
+        Ok(out)
+    }
+
+    /// A surface holding the picture: `bgra` (`w` x `h`) converted into its top left corner, black around it.
+    fn picture(&self, bgra: &[u8], w: usize, h: usize) -> Result<Surface<()>> {
+        let (sw, sh) = (self.size.width, self.size.height);
+        let surface = self.new_surface()?;
         {
             let mut image = libva::Image::create_from(&surface, self.image_format, (sw, sh), (sw, sh)).map_err(|e| anyhow!("VA image: {e}"))?;
             let va = *image.image();
@@ -253,9 +327,9 @@ impl VaH264 {
     }
 }
 
-impl crate::encoder::Encode for VaH264 {
-    fn encode(&mut self, bgra: &[u8], w: usize, h: usize) -> Result<Option<Vec<u8>>> {
-        let surface = self.picture(bgra, w, h)?;
+impl VaH264 {
+    /// Encodes the picture in `surface` and moves the quantiser if the link asks for it.
+    fn submit(&mut self, surface: Surface<()>) -> Result<Option<Vec<u8>>> {
         let frame = VaFrame { surface: Mutex::new(Some(surface)), size: self.size };
         let meta = FrameMetadata { timestamp: self.timestamp, layout: self.layout.clone(), force_keyframe: std::mem::take(&mut self.keyframe) };
         self.timestamp += 1;
@@ -263,16 +337,122 @@ impl crate::encoder::Encode for VaH264 {
         let Some(coded) = self.encoder.poll().map_err(|e| anyhow!("VAAPI poll: {e:?}"))? else { return Ok(None) };
         let qp = self.qp.after_frame(coded.bitstream.len());
         if qp != self.current_qp {
+            // The quantiser travels in the slice headers (patches/cros-codecs.diff), so this sends no new SPS or PPS and starts no new sequence: a
+            // client that rebuilt its decoder on every new parameter set lost the keyframe and showed a washed-out picture (Windows App).
             let tunings = Tunings { rate_control: RateControl::ConstantQuality(qp), framerate: self.framerate, min_quality: 1, max_quality: 51 };
             match self.encoder.tune(tunings) {
                 Ok(()) => {
                     tracing::debug!(from = self.current_qp, to = qp, "quantiser");
                     self.current_qp = qp;
                 }
-                Err(e) => tracing::warn!(qp, "the encoder did not take the new quantiser: {e:?}"),
+                Err(e) => tracing::warn!(qp, "could not change the quantiser: {e:?}"),
             }
         }
-        Ok(Some(coded.bitstream))
+        Ok(Some(declare_no_reordering(coded.bitstream)))
+    }
+}
+
+/// cros-codecs writes an SPS without `bitstream_restriction` (the last bit of its VUI is 0). A decoder then has to assume the worst for the
+/// level: reordering and a DPB of up to 16 frames, with POC type 0. We never reorder and keep one reference, and OpenH264's stream says so
+/// (0 and 1). So the SPS at the front of a keyframe gets the restriction appended; any other input comes back unchanged.
+fn declare_no_reordering(bs: Vec<u8>) -> Vec<u8> {
+    let Some(p) = bs.iter().take(8).collect::<Vec<_>>().windows(3).position(|w| *w[0] == 0 && *w[1] == 0 && *w[2] == 1) else { return bs };
+    if bs.get(p + 3).map(|b| b & 0x1f) != Some(7) {
+        return bs;
+    }
+    let body = p + 4;
+    let Some(mut end) = bs[body..].windows(3).position(|w| w == [0, 0, 1]).map(|i| body + i) else { return bs };
+    while end > body && bs[end - 1] == 0 {
+        end -= 1;
+    }
+    let Some(sps) = restrict_sps(&bs[body..end]) else { return bs };
+    let mut out = Vec::with_capacity(bs.len() + 16);
+    out.extend_from_slice(&bs[..body]);
+    out.extend_from_slice(&sps);
+    out.extend_from_slice(&bs[end..]);
+    out
+}
+
+/// The SPS payload (after the NAL header byte, with emulation prevention) with `bitstream_restriction_flag` 0 replaced by the flag 1 and
+/// its fields: vectors over the picture edge, no byte/bit limits, vector length 2^16, 0 frames reordered, 1 frame buffered.
+fn restrict_sps(escaped: &[u8]) -> Option<Vec<u8>> {
+    let mut raw = Vec::with_capacity(escaped.len());
+    let mut zeros = 0;
+    for &b in escaped {
+        if zeros >= 2 && b == 3 {
+            zeros = 0;
+            continue;
+        }
+        zeros = if b == 0 { zeros + 1 } else { 0 };
+        raw.push(b);
+    }
+    let last = *raw.last()?;
+    if last == 0 {
+        return None;
+    }
+    let total = raw.len() * 8 - last.trailing_zeros() as usize - 1;
+    let bit = |i: usize| raw[i / 8] >> (7 - i % 8) & 1;
+    if bit(total - 1) != 0 {
+        return None;
+    }
+    let mut bits: Vec<u8> = (0..total - 1).map(bit).collect();
+    let ue = |bits: &mut Vec<u8>, v: u32| {
+        let n = 32 - (v + 1).leading_zeros() as usize;
+        bits.extend(std::iter::repeat(0).take(n - 1));
+        bits.extend((0..n).rev().map(|i| ((v + 1) >> i & 1) as u8));
+    };
+    bits.extend([1, 1]);
+    for v in [0, 0, 16, 16, 0, 1] {
+        ue(&mut bits, v);
+    }
+    bits.push(1);
+    while bits.len() % 8 != 0 {
+        bits.push(0);
+    }
+    let mut out = Vec::with_capacity(bits.len() / 8 + 2);
+    let mut zeros = 0;
+    for byte in bits.chunks(8).map(|c| c.iter().fold(0u8, |a, b| a << 1 | b)) {
+        if zeros >= 2 && byte <= 3 {
+            out.push(3);
+            zeros = 0;
+        }
+        zeros = if byte == 0 { zeros + 1 } else { 0 };
+        out.push(byte);
+    }
+    Some(out)
+}
+
+impl crate::encoder::Encode for VaH264 {
+    fn encode(&mut self, bgra: &[u8], w: usize, h: usize) -> Result<Option<Vec<u8>>> {
+        let surface = self.picture(bgra, w, h)?;
+        self.submit(surface)
+    }
+
+    fn takes_gpu_frames(&self) -> bool {
+        !self.gpu_failed
+    }
+
+    fn encode_frame(&mut self, frame: &Pixels, w: usize, h: usize) -> Result<Option<Vec<u8>>> {
+        match frame {
+            Pixels::Cpu(bgra) => self.encode(bgra, w, h),
+            Pixels::Gpu(g, flip) => {
+                if !self.gpu_failed {
+                    match self.picture_from_gpu(g, *flip, w, h) {
+                        Ok(surface) => return self.submit(surface),
+                        Err(e) => {
+                            // Not every driver imports a dmabuf or converts it the way the Intel one does: from now on the picture comes through
+                            // shm and the CPU conversion, as without the GPU capture.
+                            tracing::warn!("VAAPI cannot take the captured buffer ({e:#}): reading pictures through shm");
+                            self.gpu_failed = true;
+                            self.imports.clear();
+                            crate::capture::PREFER_SHM.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    }
+                }
+                let bgra = g.read_bgra(*flip)?;
+                self.encode(&bgra, w, h)
+            }
+        }
     }
 
     fn set_bitrate(&mut self, bps: u32) {
