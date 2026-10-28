@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect · Waydesk</title>
+<meta name="description" content="The ways an RDP client can reach a Waydesk server: an SSH tunnel, the local network, a WireGuard VPN, and certificates a client can verify.">
+<link rel="canonical" href="https://waydesk.dev/connect/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0a1c2a">
+<meta property="og:title" content="Connect · Waydesk">
+<meta property="og:description" content="The ways an RDP client can reach a Waydesk server: an SSH tunnel, the local network, a WireGuard VPN, and certificates a client can verify.">
+<meta property="og:url" content="https://waydesk.dev/connect/">
+<meta property="og:type" content="article">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Pages">
+    <a href="/">home</a>
+    <a href="/start/">start</a>
+    <a href="/connect/" aria-current="page">connect</a>
+    <a href="/vpn/">vpn</a>
+    <a href="/cli/">cli</a>
+    <a href="/gpu/">gpu</a>
+    <a href="/help/">help</a>
+    <a href="/docs/">all pages</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<main>
+<section class="pagehead">
+<h1>Connect</h1>
+<p class="lede">The RDP login is a TLS login with the account's password, and there is no second factor. So the port is <strong>closed to the network until you open it</strong>. Four things are set, each with one command: where it listens, which addresses may connect, what certificate clients check, and, if you want one, a VPN.</p>
+</section>
+<section class="sect" id="where-it-listens-and-who-may-connect">
+<h2>Where it listens, and who may connect</h2>
+<div class="win">
+<div class="bar"><span class="t">table</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<div class="tw"><table><tr><th>mode</th><th>the port listens on</th><th>addresses that may connect</th></tr><tr><td><code>local</code> (the default)</td><td><code>127.0.0.1:3389</code></td><td>this machine; reach it with an SSH tunnel</td></tr><tr><td><code>lan</code></td><td>this server's address on the local network</td><td>that network only (for example <code>192.168.1.0/24</code>)</td></tr><tr><td><code>vpn</code></td><td>the VPN address (<code>10.8.0.1</code>)</td><td>the VPN's addresses only</td></tr><tr><td><code>custom</code></td><td>what you choose with <code>--bind</code></td><td>what you choose with <code>--allow</code> (default: private networks)</td></tr></table></div>
+<p>The daemon checks the source address as soon as it accepts a connection, before TLS and before any login: an address that is not allowed gets nothing, so scans and password guessing from elsewhere never reach the login. Failed logins are delayed 2 seconds, and after five in a row every login is refused for a minute. Only members of <code>waydesk-users</code> may log in, and never root.</p>
+<pre><code><span class="p">$</span> waydesk-admin access show
+Listening on     127.0.0.1:3389  (local)
+Who may connect   this machine only
+Signed by        CN=your-server
+Fingerprint      6F:E1:32:12:8C:64:71:A3:C0:51:C6:BB:80:37:64:B9:C4:E4:C7:1E:C7:C2:B8:93:E3:48:42:A5:C9:A4:FD:10
+
+Connect: from your computer run  ssh -N -L 3389:127.0.0.1:3389 ACCOUNT@THIS-SERVER  and point the RDP client at localhost.
+<span class="p">$</span> sudo waydesk-admin access lan                   <span class="c"># this server's local network</span>
+<span class="p">$</span> sudo waydesk-admin access lan --allow "192.168.1.0/24 192.168.7.5"
+<span class="p">$</span> sudo waydesk-admin access vpn                   <span class="c"># the WireGuard VPN made by `vpn init`</span>
+<span class="p">$</span> sudo waydesk-admin access local                 <span class="c"># back to this machine only</span></code></pre>
+<p>A list the daemon cannot read makes it refuse to start, so a typo never opens the port, and <code>access</code> puts the old settings back if the daemon does not start with the new ones.</p>
+</div>
+</div>
+</section>
+<section class="sect" id="an-ssh-tunnel">
+<h2>An SSH tunnel</h2>
+<div class="win">
+<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p>One user, no setup on the server. Leave the port on <code>127.0.0.1</code> and, from your computer:</p>
+<pre><code><span class="p">$</span> ssh -N -L 3389:127.0.0.1:3389 you@your-server</code></pre>
+<p>Connect the RDP client to <code>localhost</code>. The tunnel lives only as long as that command runs; <code>ServerAliveInterval 30</code> in <code>~/.ssh/config</code>, or <code>autossh</code>, keeps it up across short drops.</p>
+<blockquote>A tunnel runs TCP inside TCP, which stalls on a link with a long round trip (about 100 ms, another country): the picture follows the link down as far as it must, but a VPN is better there.</blockquote>
+</div>
+</div>
+</section>
+<section class="sect" id="the-local-network">
+<h2>The local network</h2>
+<div class="win">
+<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<pre><code><span class="p">$</span> sudo waydesk-admin access lan</code></pre>
+<p>opens the port to this server's network only (other addresses are closed before TLS). <code>--allow</code> narrows or widens it. Do not use <code>--allow any</code> without a firewall you trust.</p>
+</div>
+</div>
+</section>
+<section class="sect" id="a-vpn">
+<h2>A VPN</h2>
+<div class="win">
+<div class="bar"><span class="t">notes</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p>The recommendation for several people or devices, and for anything over the internet: a key per device, nothing exposed but one UDP port. <a href="/vpn/">The VPN page</a> walks through it.</p>
+</div>
+</div>
+</section>
+<section class="sect" id="a-certificate-you-can-verify">
+<h2>A certificate you can verify</h2>
+<div class="win">
+<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p>At install the server makes a self-signed certificate, and the client has to compare its fingerprint on the first connection (<code>waydesk-admin cert status</code> prints it). A local certificate authority removes the comparison:</p>
+<pre><code><span class="p">$</span> sudo waydesk-admin cert local-ca          <span class="c"># also --san NAME_OR_IP for more names</span>
+<span class="p">$</span> sudo waydesk-admin cert export-ca         <span class="c"># prints the path of the authority's certificate</span></code></pre>
+<p>Copy that file to each client and import it <strong>once</strong> (macOS: add it to the login keychain and set Trust to Always Trust; Windows: <code>certmgr.msc</code>, Trusted Root Certification Authorities; Linux: <code>/usr/local/share/ca-certificates/</code> and <code>update-ca-certificates</code>). From then on every connection is checked and nothing is compared by hand. A timer renews the certificate before it ends. Where the server has a public name, <code>cert install --cert FULLCHAIN.pem --key KEY.pem</code> puts a Let's Encrypt certificate in place instead.</p>
+</div>
+</div>
+</section>
+<section class="sect" id="which-client">
+<h2>Which client</h2>
+<div class="win">
+<div class="bar"><span class="t">table</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<div class="tw"><table><tr><th>client</th><th>tried</th><th>notes</th></tr><tr><td>Windows App (macOS)</td><td>yes</td><td>add the PC as <code>localhost</code> through the tunnel; compare the certificate's fingerprint with the one the server printed</td></tr><tr><td>mstsc (Windows 11)</td><td>yes, on ARM in a VM</td><td>through an SSH tunnel; the VPN was not tried with it</td></tr><tr><td>FreeRDP / Remmina (Linux)</td><td>yes, Debian 13's FreeRDP 3.15</td><td>Ubuntu's own <code>xfreerdp3</code> 3.32 cannot decode the H.264 stream</td></tr><tr><td>older Windows clients, iOS, Android</td><td>not tried</td><td></td></tr></table></div>
+</div>
+</div>
+</section>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/connect.md">a file in the repository</a>: corrections are welcome.</p>
+</main>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>

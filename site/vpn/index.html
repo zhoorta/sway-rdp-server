@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A VPN with WireGuard · Waydesk</title>
+<meta name="description" content="Put the RDP port behind a WireGuard VPN with three commands: init, add a client, scan the QR code. A key per device and one UDP port open.">
+<link rel="canonical" href="https://waydesk.dev/vpn/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0a1c2a">
+<meta property="og:title" content="A VPN with WireGuard · Waydesk">
+<meta property="og:description" content="Put the RDP port behind a WireGuard VPN with three commands: init, add a client, scan the QR code. A key per device and one UDP port open.">
+<meta property="og:url" content="https://waydesk.dev/vpn/">
+<meta property="og:type" content="article">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Pages">
+    <a href="/">home</a>
+    <a href="/start/">start</a>
+    <a href="/connect/">connect</a>
+    <a href="/vpn/" aria-current="page">vpn</a>
+    <a href="/cli/">cli</a>
+    <a href="/gpu/">gpu</a>
+    <a href="/help/">help</a>
+    <a href="/docs/">all pages</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<main>
+<section class="pagehead">
+<h1>A VPN with WireGuard</h1>
+<p class="lede">For several people or devices, or anything over the internet, do not publish the RDP port: put it behind a VPN. <code>waydesk-admin vpn</code> makes the WireGuard server side, one client at a time, and a QR code for a phone. The RDP port then listens on the VPN address only, so without a key it does not exist for anyone.</p>
+</section>
+<section class="sect" id="make-the-vpn">
+<h2>Make the VPN</h2>
+<div class="win">
+<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p><code>vpn init</code> installs <code>wireguard-tools</code> if needed, makes the server side on its own interface (<code>waydesk0</code>, UDP 51820, <code>10.8.0.0/24</code>; change them with <code>--interface</code>, <code>--port</code>, <code>--subnet</code>), makes RDP listen on the VPN address only, starts the daemon after the VPN, and opens the port in <code>ufw</code> if it is on. The endpoint is the name or public address clients will connect to.</p>
+<pre><code><span class="p">$</span> sudo waydesk-admin vpn init --endpoint vpn.example.com
+Open UDP 51820 to the internet in this machine's firewall and in the provider's security group, if there is one.
+Done.
+Listening on     10.8.0.1:3389  (vpn)
+Who may connect   10.8.0.0/24
+Signed by        CN=your-server
+Fingerprint      6F:E1:32:12:8C:64:71:A3:C0:51:C6:BB:80:37:64:B9:C4:E4:C7:1E:C7:C2:B8:93:E3:48:42:A5:C9:A4:FD:10
+
+Connect: bring the VPN up on the client, then point the RDP client at 10.8.0.1. `waydesk-admin vpn add NAME` makes a client.
+
+The VPN is ready. Add a client with:  sudo waydesk-admin vpn add NAME</code></pre>
+<p><strong>Open UDP 51820</strong> in the provider's firewall too (a cloud security group is outside the machine). Do not open 3389: the RDP port exists only inside the tunnel. <code>vpn init</code> refuses to replace an existing configuration without <code>--force</code> (it keeps a backup) and uses an interface name of its own, so a <code>wg0</code> you made by hand is left alone.</p>
+</div>
+</div>
+</section>
+<section class="sect" id="add-a-client">
+<h2>Add a client</h2>
+<div class="win">
+<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p>One client per device, so that a lost laptop is one entry to remove. Install <code>qrencode</code> first if you want the QR code for a phone:</p>
+<pre><code><span class="p">$</span> sudo apt install qrencode
+<span class="p">$</span> sudo waydesk-admin vpn add phone
+Client phone (10.8.0.2) added. Import this in the WireGuard app (or scan the QR code), then connect the RDP client to 10.8.0.1:
+
+[Interface]
+PrivateKey = &lt;the client's private key&gt;
+Address = 10.8.0.2/32
+
+[Peer]
+PublicKey = &lt;the server's public key&gt;
+PresharedKey = &lt;a preshared key, on top of the keys&gt;
+Endpoint = vpn.example.com:51820
+AllowedIPs = 10.8.0.1/32
+PersistentKeepalive = 25
+
+(the QR code of the same configuration follows)</code></pre>
+<p>On the phone or laptop, install the WireGuard app, scan the code (or import the text), and switch the tunnel on. <code>AllowedIPs = 10.8.0.1/32</code> sends only the traffic for the server through the tunnel; the rest of the client's traffic is not touched. Then connect the RDP client to **<code>10.8.0.1</code>**.</p>
+<p>The configurations stay in <code>/etc/waydesk/vpn/peers</code> (root only), so <code>vpn show NAME</code> prints one again.</p>
+</div>
+</div>
+</section>
+<section class="sect" id="see-and-remove-clients">
+<h2>See and remove clients</h2>
+<div class="win">
+<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<pre><code><span class="p">$</span> sudo waydesk-admin vpn list
+Interface    waydesk0  (10.8.0.1, subnet 10.8.0.0/24, UDP port 51820)
+Endpoint     vpn.example.com:51820
+State        up
+
+CLIENT               ADDRESS         LAST CONNECTED
+phone                10.8.0.2        never
+<span class="p">$</span> sudo waydesk-admin vpn remove phone        <span class="c"># stops its access at once</span></code></pre>
+<p><code>vpn status</code> shows the same listing. After the phone connects, <code>LAST CONNECTED</code> says when.</p>
+</div>
+</div>
+</section>
+<section class="sect" id="what-it-gives-and-what-it-does-not">
+<h2>What it gives, and what it does not</h2>
+<div class="win">
+<div class="bar"><span class="t">notes</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<ul class="plain"><li>The RDP port is invisible to anyone without a peer key, and the password login only travels inside the tunnel.</li><li><strong>A peer key is not a login.</strong> The account's password is still asked, and the memory and user limits still apply.</li><li>Everyone with a peer can try passwords for every account, so give peers only to people you would let near the login.</li><li>There is still no second factor: long, random passwords matter.</li></ul>
+</div>
+</div>
+</section>
+<section class="sect" id="vpn-or-ssh-tunnel">
+<h2>VPN or SSH tunnel</h2>
+<div class="win">
+<div class="bar"><span class="t">table</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<div class="tw"><table><tr><th></th><th>WireGuard VPN</th><th>SSH tunnel</th></tr><tr><td>Server setup</td><td>one command</td><td>none (sshd is usually there)</td></tr><tr><td>Many users and devices</td><td>yes, a key per device</td><td>an SSH account each</td></tr><tr><td>Always on</td><td>yes, in the background</td><td>only while the command runs</td></tr><tr><td>Long round trips</td><td>handles them well</td><td>TCP inside TCP stalls</td></tr><tr><td>Port exposed</td><td>UDP 51820</td><td>TCP 22</td></tr></table></div>
+<p>The manual way, without <code>waydesk-admin</code>, is in [<code>docs/WIREGUARD.md</code>](https://github.com/zhoorta/waydesk/blob/main/docs/WIREGUARD.md), and the whole access model in [<code>docs/ACCESS.md</code>](https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md).</p>
+</div>
+</div>
+</section>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/vpn.md">a file in the repository</a>: corrections are welcome.</p>
+</main>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>

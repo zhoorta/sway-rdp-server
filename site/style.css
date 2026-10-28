@@ -271,3 +271,11 @@ figure svg text.warn2 { fill: var(--warn); font-weight: 400; }
 /* the labels "does" / "never" of the architecture cards */
 .k2 { color: var(--copper); margin-right: var(--s1); }
 .grid + .note { margin-top: var(--s4); }
+
+/* the subpages (site/build.py) */
+.pagehead { margin: var(--s6) 0 var(--s2); max-width: 78ch; }
+nav a[aria-current="page"] { color: var(--copper); }
+blockquote { margin: var(--s3) 0; padding: var(--s2) var(--s3); border-left: 3px solid var(--copper); background: rgba(255, 255, 255, .04); font-size: var(--fs-s); max-width: 78ch; }
+.win > .body > h3 { margin-top: var(--s4); }
+.win > .body > .tw, .win > .body > pre { max-width: none; }
+.card h3 a { color: inherit; }

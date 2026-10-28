@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>When something is wrong · Waydesk</title>
+<meta name="description" content="What to check when a client cannot connect, a session is refused, the picture is slow or wrong, or the GPU is not used. Where the logs are.">
+<link rel="canonical" href="https://waydesk.dev/help/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0a1c2a">
+<meta property="og:title" content="When something is wrong · Waydesk">
+<meta property="og:description" content="What to check when a client cannot connect, a session is refused, the picture is slow or wrong, or the GPU is not used. Where the logs are.">
+<meta property="og:url" content="https://waydesk.dev/help/">
+<meta property="og:type" content="article">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Pages">
+    <a href="/">home</a>
+    <a href="/start/">start</a>
+    <a href="/connect/">connect</a>
+    <a href="/vpn/">vpn</a>
+    <a href="/cli/">cli</a>
+    <a href="/gpu/">gpu</a>
+    <a href="/help/" aria-current="page">help</a>
+    <a href="/docs/">all pages</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<main>
+<section class="pagehead">
+<h1>When something is wrong</h1>
+<p class="lede">Most problems show in one of three places: <code>waydesk-admin status</code>, <code>waydesk-admin access show</code>, and the journal. Start there.</p>
+</section>
+<section class="sect" id="where-the-logs-are">
+<h2>Where the logs are</h2>
+<div class="win">
+<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<pre><code><span class="p">$</span> journalctl -u waydesk -u waydesk-helper -u waydesk-session@1000 --since "-10 min"</code></pre>
+<p><code>waydesk</code> is the network daemon, <code>waydesk-helper</code> checks passwords and starts sessions, and <code>waydesk-session@UID</code> is one account's session (the uid is in <code>waydesk-admin users list</code>). For more detail, put <code>WAYDESK_LOG=waydesk_server=debug,info</code> in <code>/etc/default/waydesk</code> and restart <code>waydesk</code>: the encoder then reports, every five seconds, its frame rate, milliseconds per frame and kilobytes per frame.</p>
+</div>
+</div>
+</section>
+<section class="sect" id="the-client-cannot-connect">
+<h2>The client cannot connect</h2>
+<div class="win">
+<div class="bar"><span class="t">notes</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<ul class="plain"><li><strong>Is the port reachable at all?</strong> <code>waydesk-admin access show</code> says where it listens and who may connect. The default is <code>127.0.0.1</code>: from another machine you need an SSH tunnel, or <code>access lan</code> or <code>access vpn</code>.</li><li><strong>An address that is not allowed gets nothing</strong>, before TLS: the journal says <code>connection refused: the source address is not in the allowed list</code>. Widen it with <code>access lan --allow "..."</code>.</li><li><strong>The tunnel died.</strong> An SSH tunnel lives only as long as its command; <code>ServerAliveInterval 30</code> in <code>~/.ssh/config</code> keeps it up across short drops. A laptop that sleeps drops it too.</li><li><strong>The certificate warning.</strong> The server's certificate is self-signed unless you made a local authority: compare the fingerprint the client shows with the one from <code>waydesk-admin cert status</code>. Do not accept one you cannot compare.</li><li><strong>Five failed logins in a row</strong> make every login refused for a minute; each failed one is delayed 2 seconds. Only members of <code>waydesk-users</code> may log in, never root: <code>waydesk-admin users list</code> shows the <code>RDP</code> column.</li><li><strong>Forgotten password:</strong> <code>sudo waydesk-admin users passwd NAME</code> sets a new temporary one.</li></ul>
+</div>
+</div>
+</section>
+<section class="sect" id="the-login-is-accepted-but-there-is-no-desktop">
+<h2>The login is accepted but there is no desktop</h2>
+<div class="win">
+<div class="bar"><span class="t">notes</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<ul class="plain"><li><strong>The session was refused for memory.</strong> <code>waydesk-admin status</code> ends its summary with "a new one would be REFUSED: 504 MB available, 1161 MB needed" when the machine is full (a new session needs the larger of 900 MB and 15 % of the memory). End an idle session (<code>sessions end NAME</code>), add memory, or lower another account's <code>users limit</code>. An account that already has a session just reconnects.</li><li><strong>The GPU could not give the desktop its buffers.</strong> On NVIDIA with Debian's driver 550 this used to leave no desktop; since 0.4.0 the session is made again in software. If you see <code>the session could not be made on the GPU (...): software rendering</code> in the journal, the GPU path failed and the session runs on the CPU: see <a href="/gpu/">the GPU page</a>.</li></ul>
+</div>
+</div>
+</section>
+<section class="sect" id="it-is-slow-or-the-picture-is-poor">
+<h2>It is slow, or the picture is poor</h2>
+<div class="win">
+<div class="bar"><span class="t">notes</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<ul class="plain"><li><strong>Check the link first.</strong> The encoder follows what the link delivers, from 300 kbit/s to the maximum, and raises the quantiser (a blockier picture) when the link cannot carry the picture. A full-screen noise or video page asks for tens of Mbit/s; a mostly still desktop needs very little. A link of 4 Mbit/s will make a busy screen coarse, and it goes back to full quality within about half a minute of the screen settling.</li><li><strong>An SSH tunnel on a long round trip</strong> (about 100 ms, another country) stalls, because TCP runs inside TCP. A <a href="/vpn/">WireGuard VPN</a> copes with it.</li><li>**<code>waydesk-admin status --watch</code>** shows the encoder, its quantiser and frame rate per session while you look at the picture.</li></ul>
+</div>
+</div>
+</section>
+<section class="sect" id="the-gpu-is-not-used">
+<h2>The GPU is not used</h2>
+<div class="win">
+<div class="bar"><span class="t">terminal</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<pre><code><span class="p">$</span> ls /dev/dri
+<span class="p">$</span> waydesk-admin status</code></pre>
+<ul class="plain"><li>**No <code>/dev/dri</code>:** the machine has no render node. On a dedicated server, the installer may have added <code>nomodeset</code> to the kernel line or blacklisted the driver; on a cloud server there is simply no GPU.</li><li>**<code>status</code> says <code>cpu</code> or <code>openh264</code>:** the session fell back. The journal line before it says why (<code>sway did not start on the GPU</code>, <code>the session could not be made on the GPU</code>, <code>VAAPI encoder not available</code>, <code>NVENC encoder not available</code>).</li><li><strong>The accounts cannot open the node.</strong> The package grants <code>waydesk-users</code> access with a udev rule; <code>getfacl /dev/dri/renderD128</code> should list the group.</li><li><strong>NVIDIA:</strong> the driver must be NVIDIA's own, 615 or newer; <code>nvidia-smi</code> shows the version. See <a href="/gpu/">the GPU page</a>.</li><li>**<code>WAYDESK_GPU=off</code>** in <code>/etc/default/waydesk</code> switches the GPU off on purpose; <code>status</code> shows what new sessions will use.</li></ul>
+</div>
+</div>
+</section>
+<section class="sect" id="a-window-is-out-of-reach">
+<h2>A window is out of reach</h2>
+<div class="win">
+<div class="bar"><span class="t">notes</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p>Windows can hang over the left and right edges (and below the screen), with 120 pixels left on the screen to grab. <strong>Super+Shift+Up</strong> brings every window entirely back. Super+Up maximises the focused window, Super+Down minimises it, Super+Shift+Down restores a minimised one.</p>
+</div>
+</div>
+</section>
+<section class="sect" id="still-stuck">
+<h2>Still stuck</h2>
+<div class="win">
+<div class="bar"><span class="t">notes</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+<div class="body">
+<p>Open an issue on <a href="https://github.com/zhoorta/waydesk/issues">GitHub</a> with the output of <code>waydesk-admin status</code>, <code>waydesk-admin access show</code> and the last lines of the journal (passwords and keys never appear in them). For a commercial setup there is <a href="https://stackcare.pt/en">StackCare</a>.</p>
+</div>
+</div>
+</section>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/help.md">a file in the repository</a>: corrections are welcome.</p>
+</main>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>

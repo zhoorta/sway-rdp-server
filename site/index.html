@@ -30,6 +30,7 @@
     <a href="#security">security</a>
     <a href="#limits">limits</a>
     <a href="#reference">reference</a>
+    <a href="/docs/">docs</a>
     <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
   </nav>
 </header>
@@ -108,7 +109,7 @@
 
 <section class="band" id="connect">
 <h2>Connect your way</h2>
-<p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect; <code>waydesk-admin access</code> changes it later (<a href="https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md">docs/ACCESS.md</a>).</p>
+<p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect; <code>waydesk-admin access</code> changes it later (<a href="https://github.com/zhoorta/waydesk/blob/main/docs/ACCESS.md">docs/ACCESS.md</a>). Step by step: <a href="/connect/">connect</a> and <a href="/vpn/">the VPN</a>.</p>
 </section>
 <div class="win diagram">
 <div class="bar"><span class="t">how a client reaches the port</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
@@ -327,7 +328,7 @@ macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoder
 <li>When a GPU cannot encode, the session falls back to OpenH264 and keeps working: the worker takes 12 % of the machine instead of 3 %. <code>waydesk-admin status</code> shows it.</li>
 <li>An NVIDIA RTX 4000 SFF Ada (driver 615 or newer) runs the desktop and a NVENC encoder: 61 fps on the WebGL page, the encoder engine 4 % busy.</li>
 </ul>
-<p class="method">Not measured: a build or a recalculation, the delay between a click and its picture, AMD, a card with its own memory under many users, runs longer than 45 minutes. Raw tables and the scripts: <a href="https://github.com/zhoorta/waydesk/tree/main/docs/measure-data"><code>docs/measure-data</code></a>.</p>
+<p class="method">Not measured: a build or a recalculation, the delay between a click and its picture, AMD, a card with its own memory under many users, runs longer than 45 minutes. Raw tables and the scripts: <a href="https://github.com/zhoorta/waydesk/tree/main/docs/measure-data"><code>docs/measure-data</code></a>. Setting it up and reading it: <a href="/gpu/">using a GPU</a>.</p>
 </div>
 </div>
 </section>
@@ -378,6 +379,7 @@ macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoder
 <tr><td><code>/etc/default/waydesk</code></td><td>the daemon's and the sessions' options</td></tr>
 <tr><td><code>/etc/xdg/waydesk/sway.conf</code></td><td>the session's sway configuration</td></tr>
 </table></div>
+<p class="method">Every command with its real output: <a href="/cli/">the command line</a>; first steps: <a href="/start/">getting started</a>; when something is wrong: <a href="/help/">troubleshooting</a>.</p>
 <p class="small">Every package, command, unit and file is listed in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/REFERENCE.md"><code>docs/REFERENCE.md</code></a>.</p>
 <h3>Source code and licences</h3>
 <p>Waydesk is MIT or Apache-2.0 (<a href="https://github.com/zhoorta/waydesk">source on GitHub</a>); so are the other programs we build: sway, wlroots, DankMaterialShell, danksearch and dgop. Three copyleft programs are in the repository as binaries, and their source is offered here, from the same place as the packages, at no charge:</p>
