@@ -15,7 +15,7 @@ Packages, commands, units, ports and files of Waydesk. The short version is on [
 
 ## Commands: administration
 
-- `waydesk-admin status [--json]`: memory, swap, load, running sessions and what each account uses
+- `waydesk-admin status [--json] [--watch [SECONDS]]`: memory, swap, load, the GPUs and how busy they are, running sessions and what each account uses and runs (GPU or CPU rendering, the video encoder: `vaapi`, `nvenc` or `openh264`, with its quantiser and frame rate); `--watch` repeats it (2 s by default), `--json --watch` prints one line of JSON each time
 - `waydesk-admin users list [--json]`: accounts that may log in
 - `waydesk-admin users add NAME [--admin] [--sudo] [--no-rdp]`: create an account; prints a generated password
 - `waydesk-admin users passwd NAME [--stdin]`: set a password (read from stdin, never from an argument)

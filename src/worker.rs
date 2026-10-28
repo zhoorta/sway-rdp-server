@@ -188,6 +188,7 @@ pub async fn run(cfg: Config) -> Result<()> {
         }
     }
     info!("session worker ending");
+    crate::sessionstatus::clear();
     // Dropping the session removes the output and stops the hook.
     drop(session);
     Ok(())
@@ -541,9 +542,11 @@ impl OwnSway {
             Some(node) => {
                 cmd.env("WLR_RENDERER", "gles2").env("WLR_RENDER_DRM_DEVICE", node);
                 info!(node = %node.display(), "sway renders on the GPU");
+                crate::sessionstatus::set_render(Some(node));
             }
             None => {
                 cmd.env("WLR_RENDERER", "pixman");
+                crate::sessionstatus::set_render(None);
             }
         }
         let child = cmd

@@ -110,6 +110,14 @@ pub fn run(cfg: Config) -> Result<()> {
     let dir = cfg.socket.parent().context("--helper-socket needs a directory")?.to_path_buf();
     std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
     let register_path = dir.join("sessions.sock");
+    // Where the session processes say what they run (src/sessionstatus.rs): sticky and open to every account, like /tmp, so that an account can write
+    // its own file and cannot replace another's. The files themselves are readable by their account and root only.
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let status_dir = dir.join("status");
+        std::fs::create_dir_all(&status_dir).with_context(|| format!("creating {}", status_dir.display()))?;
+        std::fs::set_permissions(&status_dir, std::fs::Permissions::from_mode(0o1777)).with_context(|| format!("setting the mode of {}", status_dir.display()))?;
+    }
 
     // The daemon's socket: owner only from the first moment, then handed to the daemon's account.
     let listener = bind(&cfg.socket, 0o177)?;

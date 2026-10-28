@@ -214,6 +214,10 @@ impl Encode for NvH264 {
     fn force_keyframe(&mut self) {
         self.refresh = true;
     }
+
+    fn quantiser(&self) -> Option<u32> {
+        Some(self.current_qp)
+    }
 }
 
 /// The encoder, one frame at a time, on the real hardware: `cargo test nvenc -- --ignored` on a machine with an NVIDIA GPU.

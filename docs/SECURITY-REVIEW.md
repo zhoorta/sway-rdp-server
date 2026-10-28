@@ -159,7 +159,7 @@ the kernel's out-of-memory killer with five accounts logged in; a user (or a han
 
 Noted: `waydesk-admin status` and the account list are open to every local account, like `/proc` is: they show the names of the programs and the memory of the other accounts
 (not their files or what is in them). `users limit` and `users limit ... reset` need root; sizes, weights and task numbers are checked before they reach `systemctl`
-(unit tests: no option, unit or shell syntax gets through). A refused login is only a failed login for the RDP client; nothing tells it why, which is also nothing for an attacker to learn.
+(unit tests: no option, unit or shell syntax gets through). What a session runs (renderer, encoder, quantiser, frame rate; nothing about the client) is written by its worker to `/run/waydesk/status/UID.json`, in a directory the helper makes sticky and world-writable like `/tmp`: the file is mode 0600 and owned by the account, `status` takes only a file owned by the uid it is named for, and an account can neither read another's nor replace it. A refused login is only a failed login for the RDP client; nothing tells it why, which is also nothing for an attacker to learn.
 
 Correction to finding 12 (second pass), found on 2026-10-21 when an administrator of the group `waydesk-admins` was asked for a password in the middle of installing an app: the
 passwordless rule left out `org.freedesktop.Flatpak.modify-repo`, and the second pass described that action as "changing remotes". It is not: Flatpak's system helper asks for it

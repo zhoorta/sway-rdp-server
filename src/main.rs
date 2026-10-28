@@ -29,6 +29,7 @@ mod proto;
 #[cfg(any(feature = "vaapi", feature = "nvenc"))]
 mod qp;
 mod session;
+mod sessionstatus;
 mod sessionaudio;
 mod sessionclip;
 mod spawn;

@@ -22,6 +22,10 @@ pub trait Encode: Send {
     fn set_bitrate(&mut self, bps: u32);
     /// The next frame is a keyframe.
     fn force_keyframe(&mut self);
+    /// The quantiser a constant-quantiser GPU encoder runs at now (what `waydesk-admin status` shows).
+    fn quantiser(&self) -> Option<u32> {
+        None
+    }
 }
 
 impl Encode for H264 {
@@ -64,6 +68,11 @@ impl Timed {
         }
         let elapsed = self.since.elapsed();
         if elapsed >= std::time::Duration::from_secs(5) {
+            // For `waydesk-admin status`, also without a debug log: a screen with nothing on it makes no frames and no statistics.
+            if self.frames > 0 {
+                let secs = elapsed.as_secs_f64();
+                crate::sessionstatus::set_stats(f64::from(self.frames) / secs, (self.bytes as f64 * 8.0 / secs / 1000.0) as u32, self.inner.quantiser());
+            }
             if self.frames + self.dropped > 0 {
                 tracing::debug!(
                     encoder = self.name,
@@ -100,6 +109,9 @@ impl Encode for Timed {
     }
     fn force_keyframe(&mut self) {
         self.inner.force_keyframe()
+    }
+    fn quantiser(&self) -> Option<u32> {
+        self.inner.quantiser()
     }
 }
 
@@ -227,6 +239,7 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
             match crate::encode_va::VaH264::new(&node, width, height, tuning) {
                 Ok(enc) => {
                     tracing::info!(node = %node.display(), "H.264 encoder: VAAPI");
+                    crate::sessionstatus::set_encoder("vaapi");
                     return Ok(maybe_dump(Box::new(Timed::new(Box::new(enc), "vaapi"))));
                 }
                 Err(e) => tracing::warn!("VAAPI encoder not available ({e:#}): OpenH264 on the CPU"),
@@ -242,6 +255,7 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
             match crate::encode_nv::NvH264::new(width, height, tuning) {
                 Ok(enc) => {
                     tracing::info!("H.264 encoder: NVENC");
+                    crate::sessionstatus::set_encoder("nvenc");
                     return Ok(maybe_dump(Box::new(Timed::new(Box::new(enc), "nvenc"))));
                 }
                 Err(e) => tracing::warn!("NVENC encoder not available ({e:#}): OpenH264 on the CPU"),
@@ -254,7 +268,9 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
     if choice == Choice::Vaapi {
         tracing::warn!("WAYDESK_ENCODER=vaapi, but this build has no VAAPI support: OpenH264 on the CPU");
     }
-    Ok(maybe_dump(Box::new(Timed::new(Box::new(H264::new(width, height, tuning)?), "openh264"))))
+    let enc = H264::new(width, height, tuning)?;
+    crate::sessionstatus::set_encoder("openh264");
+    Ok(maybe_dump(Box::new(Timed::new(Box::new(enc), "openh264"))))
 }
 
 #[cfg(test)]

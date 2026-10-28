@@ -9,7 +9,8 @@
 //!   waydesk-admin users sudo NAME on|off        (the group sudo)
 //!   waydesk-admin sessions list [--json]
 //!   waydesk-admin sessions end NAME
-//!   waydesk-admin status [--json]                (memory, swap, load, whether a new session would be accepted, and what each account uses)
+//!   waydesk-admin status [--json] [--watch [SECONDS]]   (memory, swap, load, the GPUs and how busy they are, whether a new session would be accepted, and what each
+//!                                                account uses and runs: renderer and video encoder; `--watch` repeats it, `--json --watch` prints one line of JSON each time)
 //!   waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
 //!   waydesk-admin access [show | local | lan | vpn | custom ...]     who can reach the RDP port (scripts in /usr/lib/waydesk/admin)
 //!   waydesk-admin cert [status | local-ca | reissue | export-ca | install | self-signed]     the certificate clients check
@@ -31,8 +32,12 @@ use std::process::{Command, Stdio};
 use anyhow::{bail, ensure, Context as _, Result};
 use serde_json::json;
 
+#[path = "../gpuinfo.rs"]
+mod gpuinfo;
 #[path = "../memory.rs"]
 mod memory;
+#[path = "../sessionstatus.rs"]
+mod sessionstatus;
 
 const RDP_GROUP: &str = "waydesk-users";
 const ADMIN_GROUP: &str = "waydesk-admins";
@@ -230,7 +235,7 @@ fn run() -> Result<()> {
         ["users", "admin", name, onoff] => set_group(name, ADMIN_GROUP, parse_onoff(onoff)?),
         ["users", "sudo", name, onoff] => users_sudo(name, parse_onoff(onoff)?),
         ["sessions", "list"] => sessions_list(json_out),
-        ["status"] => status(json_out),
+        ["status", rest @ ..] => status(json_out, parse_watch(rest)?),
         ["--version"] | ["-V"] => {
             println!("waydesk-admin {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -262,7 +267,7 @@ usage: waydesk-admin users list [--json]
        waydesk-admin users admin NAME on|off   (Flatpak installs without a password)
        waydesk-admin users sudo NAME on|off
        waydesk-admin sessions list [--json] | end NAME
-       waydesk-admin status [--json]
+       waydesk-admin status [--json] [--watch [SECONDS]]
        waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
        waydesk-admin access [show | local | lan [--address IP] [--allow LIST] | vpn | custom --bind ADDR:PORT [--allow LIST]]
        waydesk-admin cert [status | local-ca [--san NAME] | reissue | export-ca | install --cert FILE --key FILE | self-signed]
@@ -522,6 +527,8 @@ struct Usage {
     cap_mb: Option<u64>,
     /// The programs of the account that hold the most memory (resident, shared pages counted for each process).
     top: Vec<(String, u64)>,
+    /// What the session says it runs (renderer, encoder, quantiser, frame rate): only for a running session whose file the caller may read.
+    video: Option<sessionstatus::Status>,
 }
 
 /// The resident memory (kB) of the programs of each of the accounts, by program name.
@@ -578,6 +585,7 @@ fn gather_usage(sample: std::time::Duration) -> Result<Vec<Usage>> {
             cpu_percent,
             cap_mb: read_number(&dir.join("memory.max")).map(|b| b / 1_048_576),
             top,
+            video: if session { sessionstatus::read(Path::new(sessionstatus::DIR), a.uid) } else { None },
         });
     }
     Ok(out)
@@ -613,12 +621,84 @@ fn swap_devices() -> Vec<(String, u64, u64)> {
     }).collect()
 }
 
-fn status(json_out: bool) -> Result<()> {
+/// `--watch` and its optional number of seconds (default 2, at least 1: a refresh takes a second of sampling anyway).
+fn parse_watch(rest: &[&str]) -> Result<Option<std::time::Duration>> {
+    let secs = |t: &str| -> Result<std::time::Duration> {
+        let v: f64 = t.parse().map_err(|_| anyhow::anyhow!("--watch wants a number of seconds, not {t:?}"))?;
+        ensure!(v.is_finite() && (1.0..=3600.0).contains(&v), "--watch wants between 1 and 3600 seconds");
+        Ok(std::time::Duration::from_secs_f64(v))
+    };
+    match rest {
+        [] => Ok(None),
+        ["--watch"] => Ok(Some(std::time::Duration::from_secs(2))),
+        ["--watch", n] => Ok(Some(secs(n)?)),
+        [one] if one.starts_with("--watch=") => Ok(Some(secs(&one["--watch=".len()..])?)),
+        _ => {
+            eprintln!("{}", USAGE.trim_end());
+            std::process::exit(2);
+        }
+    }
+}
+
+/// `WAYDESK_GPU` as `/etc/default/waydesk` sets it (what the sessions that start next will use): `auto`, `off` or a render node.
+fn gpu_setting() -> String {
+    let text = std::fs::read_to_string("/etc/default/waydesk").unwrap_or_default();
+    text.lines()
+        .filter_map(|l| l.trim().strip_prefix("WAYDESK_GPU="))
+        .map(|v| v.trim().trim_matches(|c| c == '"' || c == '\'').to_owned())
+        .last()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "auto".to_owned())
+}
+
+/// What a session runs, for the table: "gpu" or "cpu" for the renderer, "nvenc q25 17fps" for the encoder.
+fn video_cells(v: Option<&sessionstatus::Status>) -> (String, String) {
+    let Some(v) = v else { return ("-".into(), "-".into()) };
+    let render = if v.render.is_some() { "gpu" } else { "cpu" }.to_owned();
+    let Some(enc) = &v.encoder else { return (render, "-".into()) };
+    let mut cell = enc.clone();
+    if sessionstatus::is_fresh(v) {
+        if let Some(q) = v.qp {
+            cell.push_str(&format!(" q{q}"));
+        }
+        if let Some(f) = v.fps {
+            cell.push_str(&format!(" {f:.0}fps"));
+        }
+    }
+    (render, cell)
+}
+
+fn status(json_out: bool, watch: Option<std::time::Duration>) -> Result<()> {
+    let Some(every) = watch else { return status_once(json_out, false) };
+    // On a terminal each round replaces the last; piped, the rounds follow each other (one line of JSON each with --json).
+    let tty = !json_out && unsafe { libc::isatty(1) } == 1;
+    loop {
+        let started = std::time::Instant::now();
+        if tty {
+            print!("\x1b[H\x1b[2J");
+        }
+        status_once(json_out, true)?;
+        if !json_out {
+            println!("\nevery {:.0} s, Ctrl-C to stop", every.as_secs_f64());
+        }
+        std::io::stdout().flush()?;
+        if let Some(rest) = every.checked_sub(started.elapsed()) {
+            std::thread::sleep(rest);
+        }
+    }
+}
+
+fn status_once(json_out: bool, compact: bool) -> Result<()> {
     let info = memory::read_meminfo().context("cannot read /proc/meminfo")?;
     let load = std::fs::read_to_string("/proc/loadavg").unwrap_or_default().split_whitespace().take(3).map(str::to_owned).collect::<Vec<_>>();
     let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
     let (min_mb, max_users) = helper_policy();
+    // The GPU counters and the CPU of the accounts are measured over the same second.
+    let mut gpus = gpuinfo::list();
+    let sampler = gpuinfo::begin(&gpus);
     let usage = gather_usage(std::time::Duration::from_millis(1000))?;
+    gpuinfo::finish(sampler, &mut gpus);
+    let setting = gpu_setting();
     // The admission rule counts every account with a session, whoever the caller may look at.
     let running = accounts()?.iter().filter(|a| session_state(a.uid).0 == "running").count();
     let admission = memory::admission(&info, running, min_mb, max_users);
@@ -630,21 +710,33 @@ fn status(json_out: bool) -> Result<()> {
     };
     let swaps = swap_devices();
     if json_out {
+        let round = |x: f64| (x * 10.0).round() / 10.0;
         let users: Vec<_> = usage.iter().map(|u| json!({
             "name": u.name, "uid": u.uid, "session": u.session, "mem_mb": u.mem_mb, "swap_mb": u.swap_mb, "tasks": u.tasks,
-            "cpu_percent": (u.cpu_percent * 10.0).round() / 10.0, "cap_mb": u.cap_mb,
+            "cpu_percent": round(u.cpu_percent), "cap_mb": u.cap_mb,
             "top": u.top.iter().map(|(n, mb)| json!({ "name": n, "mb": mb })).collect::<Vec<_>>(),
+            "video": u.video.as_ref().map(|v| json!({
+                "render": v.render, "encoder": v.encoder, "qp": v.qp, "fps": v.fps.map(round), "kbps": v.kbps, "current": sessionstatus::is_fresh(v),
+            })),
         })).collect();
-        println!("{}", serde_json::to_string_pretty(&json!({
+        let gpu_list: Vec<_> = gpus.iter().map(|g| json!({
+            "node": g.node, "vendor": g.vendor, "model": g.model, "driver": g.driver, "pci": g.pci,
+            "busy_percent": g.util.busy.map(round), "encoder_percent": g.util.encoder.map(round),
+            "mem_used_mb": g.util.mem_used_mb, "mem_total_mb": g.util.mem_total_mb, "mhz": g.util.mhz, "watts": g.util.watts.map(round),
+        })).collect();
+        let doc = json!({
             "machine": {
                 "mem_total_mb": info.total_kb / 1024, "mem_available_mb": info.available_kb / 1024,
                 "swap_total_mb": info.swap_total_kb / 1024, "swap_used_mb": (info.swap_total_kb - info.swap_free_kb.min(info.swap_total_kb)) / 1024,
                 "swap_devices": swaps.iter().map(|(n, size, used)| json!({ "name": n, "size_mb": size / 1024, "used_mb": used / 1024 })).collect::<Vec<_>>(),
                 "load": load, "cores": cores,
             },
+            "gpus": gpu_list,
+            "gpu_setting": setting,
             "admission": { "open": open, "reason": reason, "min_available_mb": needed_mb, "max_active_users": max_users, "sessions": running },
             "users": users,
-        }))?);
+        });
+        println!("{}", if compact { serde_json::to_string(&doc)? } else { serde_json::to_string_pretty(&doc)? });
         return Ok(());
     }
     println!("Memory    {} in all, {} available", human_mb(info.total_kb / 1024), human_mb(info.available_kb / 1024));
@@ -655,6 +747,14 @@ fn status(json_out: bool) -> Result<()> {
         println!("Swap      {}", list.join(", "));
     }
     println!("Load      {} ({cores} cores)", load.join(" "));
+    if gpus.is_empty() {
+        println!("GPU       none (no render node: sessions render and encode on the CPU)");
+    } else {
+        for (i, g) in gpus.iter().enumerate() {
+            println!("{}{}", if i == 0 { "GPU       " } else { "          " }, gpuinfo::describe(g));
+        }
+        println!("          new sessions use: {setting}");
+    }
     let limit = if max_users > 0 { format!(", at most {max_users} active users") } else { String::new() };
     if open {
         println!("Sessions  {running} running; a new one would be accepted (needs {} available{limit})", human_mb(needed_mb));
@@ -665,17 +765,20 @@ fn status(json_out: bool) -> Result<()> {
         println!("\nNobody is logged in.");
         return Ok(());
     }
-    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT");
+    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8} {:<6} {:<17}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT", "RENDER", "ENCODER");
     for u in &usage {
         let top: Vec<String> = u.top.iter().map(|(n, mb)| format!("{n} {mb} MB")).collect();
+        let (render, encoder) = video_cells(u.video.as_ref());
         println!(
-            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8}  {}",
+            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8} {:<6} {:<17}  {}",
             u.name,
             if u.session { "running" } else { "-" },
             human_mb(u.mem_mb),
             if u.swap_mb > 0 { human_mb(u.swap_mb) } else { "-".into() },
             u.cpu_percent,
             u.cap_mb.map(human_mb).unwrap_or_else(|| "none".into()),
+            render,
+            encoder,
             top.join(", ")
         );
     }
@@ -761,6 +864,30 @@ fn users_limit(name: &str, rest: &[&str]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn watch_takes_an_optional_number_of_seconds() {
+        assert_eq!(parse_watch(&[]).unwrap(), None);
+        assert_eq!(parse_watch(&["--watch"]).unwrap(), Some(std::time::Duration::from_secs(2)));
+        assert_eq!(parse_watch(&["--watch", "5"]).unwrap(), Some(std::time::Duration::from_secs(5)));
+        assert_eq!(parse_watch(&["--watch=3"]).unwrap(), Some(std::time::Duration::from_secs(3)));
+        assert!(parse_watch(&["--watch", "0"]).is_err(), "a refresh takes a second of sampling");
+        assert!(parse_watch(&["--watch", "soon"]).is_err());
+        assert!(parse_watch(&["--watch", "99999"]).is_err());
+    }
+
+    #[test]
+    fn the_session_cells_say_what_runs_and_how_it_does() {
+        use crate::sessionstatus::Status;
+        assert_eq!(video_cells(None), ("-".to_string(), "-".to_string()));
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        let gpu = Status { render: Some("/dev/dri/renderD129".into()), encoder: Some("nvenc".into()), qp: Some(25), fps: Some(17.4), kbps: Some(9000), stats_at: now };
+        assert_eq!(video_cells(Some(&gpu)), ("gpu".to_string(), "nvenc q25 17fps".to_string()));
+        let soft = Status { render: None, encoder: Some("openh264".into()), qp: None, fps: Some(9.0), kbps: None, stats_at: now };
+        assert_eq!(video_cells(Some(&soft)), ("cpu".to_string(), "openh264 9fps".to_string()));
+        let idle = Status { stats_at: now - 600, ..gpu };
+        assert_eq!(video_cells(Some(&idle)).1, "nvenc", "old statistics are not shown as current");
+    }
 
     #[test]
     fn names_are_what_useradd_takes_and_nothing_that_could_be_an_option_or_a_path() {

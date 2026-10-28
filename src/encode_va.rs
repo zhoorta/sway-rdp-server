@@ -387,4 +387,8 @@ impl crate::encoder::Encode for VaH264 {
     fn force_keyframe(&mut self) {
         self.keyframe = true;
     }
+
+    fn quantiser(&self) -> Option<u32> {
+        Some(self.current_qp)
+    }
 }

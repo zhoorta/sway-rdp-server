@@ -3652,6 +3652,7 @@ dependencies = [
  "ironrdp-server",
  "ironrdp-svc",
  "libc",
+ "libloading",
  "memmap2",
  "nvidia-video-codec-sdk",
  "openh264",
