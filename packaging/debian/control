@@ -4,7 +4,7 @@ Architecture: @ARCH@
 Maintainer: José Mendonça <jmendonca@gmail.com>
 Section: x11
 Priority: optional
-Depends: acl, waydesk-sway | sway, foot, libopenh264-8 (>= 2.6), libva2, libva-drm2, libdrm2, libpam0g, libpam-runtime, libxkbcommon0, openssl, systemd, adduser, systemd-zram-generator, pipewire, pipewire-pulse, pulseaudio-utils, wireplumber, wl-clipboard
+Depends: acl, waydesk-sway | sway, foot, libopenh264-8 (>= 2.6), libva2, libva-drm2, libgbm1, libdrm2, libpam0g, libpam-runtime, libxkbcommon0, openssl, systemd, adduser, systemd-zram-generator, pipewire, pipewire-pulse, pulseaudio-utils, wireplumber, wl-clipboard
 Recommends: wireguard-tools, qrencode, intel-media-va-driver-non-free | intel-media-va-driver | mesa-va-drivers
 Description: RDP server giving each account its own sway desktop
  Accounts log in over RDP with their normal password and get a private,
