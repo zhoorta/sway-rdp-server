@@ -185,8 +185,6 @@ pub struct VaH264 {
     qp: QpControl,
     current_qp: u32,
     /// What makes the encoder again for a new quantiser (see `submit`).
-    config: EncoderConfig,
-    low_power: bool,
     image_format: libva::VAImageFormat,
     /// Video processing (RGB to NV12 on the GPU) and the captured buffers imported for it, by buffer; created with the first GPU frame.
     vpp: Option<Vpp>,
@@ -233,14 +231,12 @@ impl VaH264 {
         let config = EncoderConfig { resolution: size, profile: Profile::High, level: Level::L5_1, initial_tunings: tunings.clone(), ..Default::default() };
         let fourcc = Fourcc::from(b"NV12");
         let mut encoder = None;
-        let mut used_low_power = false;
         let mut last_error = String::new();
         for low_power in modes {
             match Encoder::new_vaapi(Rc::clone(&display), config.clone(), fourcc, size, low_power, BlockingMode::Blocking) {
                 Ok(e) => {
                     tracing::info!(low_power, "VAAPI H.264 encoder opened");
                     encoder = Some(e);
-                    used_low_power = low_power;
                     break;
                 }
                 Err(e) => last_error = format!("{} encoder: {e:?}", if low_power { "low power" } else { "full" }),
@@ -255,7 +251,7 @@ impl VaH264 {
                 PlaneLayout { buffer_index: 0, offset: sw * sh, stride: sw },
             ],
         };
-        Ok(Self { display, encoder, layout, size, framerate: t.fps, qp: QpControl::new(floor, ceiling, t.bitrate), current_qp: floor, config, low_power: used_low_power, image_format, vpp: None, imports: HashMap::new(), gpu_failed: false, keyframe: true, timestamp: 0 })
+        Ok(Self { display, encoder, layout, size, framerate: t.fps, qp: QpControl::new(floor, ceiling, t.bitrate), current_qp: floor, image_format, vpp: None, imports: HashMap::new(), gpu_failed: false, keyframe: true, timestamp: 0 })
     }
 
     /// An empty NV12 surface of the encoder's size.

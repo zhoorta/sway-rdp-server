@@ -437,10 +437,13 @@ impl Capturer {
             return Ok(captured);
         }
         let info = self.state.buffer.clone().context("no buffer info")?;
-        // The pixman renderer gives Xrgb8888 (bytes B G R X in memory, what the encoder takes); a GPU renderer gives Xbgr8888 (R G B X).
-        let swap_rb = match info.format {
-            wl_shm::Format::Xrgb8888 | wl_shm::Format::Argb8888 => false,
-            wl_shm::Format::Xbgr8888 | wl_shm::Format::Abgr8888 => true,
+        // The pixman renderer gives Xrgb8888 (bytes B G R X in memory, what the encoder takes); a GPU renderer gives Xbgr8888 (R G B X), and
+        // NVIDIA's GLES driver reads back in 24 bits: Bgr888 is R G B in memory, Rgb888 is B G R.
+        let (bpp, swap_rb) = match info.format {
+            wl_shm::Format::Xrgb8888 | wl_shm::Format::Argb8888 => (4, false),
+            wl_shm::Format::Xbgr8888 | wl_shm::Format::Abgr8888 => (4, true),
+            wl_shm::Format::Rgb888 => (3, false),
+            wl_shm::Format::Bgr888 => (3, true),
             other => bail!("unsupported shm format {other:?}"),
         };
         let size = info.stride as usize * info.height as usize;
@@ -471,7 +474,14 @@ impl Capturer {
         let mut data = Vec::with_capacity(w * h * 4);
         for row in 0..h {
             let src_row = if self.state.y_invert { h - 1 - row } else { row };
-            data.extend_from_slice(&map[src_row * stride..src_row * stride + w * 4]);
+            let line = &map[src_row * stride..src_row * stride + w * bpp];
+            if bpp == 4 {
+                data.extend_from_slice(line);
+            } else {
+                for px in line.chunks_exact(3) {
+                    data.extend_from_slice(&[px[0], px[1], px[2], 255]);
+                }
+            }
         }
         for px in data.chunks_exact_mut(4) {
             if swap_rb {
