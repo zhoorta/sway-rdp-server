@@ -32,7 +32,7 @@
 <nav aria-label="Documentation">
 <h2>Get started</h2>
 <ul>
-<li><a href="/docs/install/" aria-current="page">Install</a><ul><li><a href="#see-it-first">See it first</a></li><li><a href="#install">Install</a></li><li><a href="#the-first-administrator">The first administrator</a></li><li><a href="#connect">Connect</a></li><li><a href="#what-you-get">What you get</a></li><li><a href="#add-more-people">Add more people</a></li></ul></li>
+<li><a href="/docs/install/" aria-current="page">Install</a><ul><li><a href="#see-it-first">See it first</a></li><li><a href="#install">Install</a></li><li><a href="#the-first-administrator">The first administrator</a></li><li><a href="#connect">Connect</a></li><li><a href="#see-what-it-does">See what it does</a></li><li><a href="#what-you-get">What you get</a></li><li><a href="#add-more-people">Add more people</a></li></ul></li>
 <li><a href="/docs/connect/">Connect</a></li>
 <li><a href="/docs/vpn/">VPN and security</a></li>
 </ul>
@@ -96,6 +96,21 @@
 <pre><code><span class="p">$</span> ssh -N -L 3389:127.0.0.1:3389 you@your-server  <span class="c"># keep this running</span></code></pre>
 <p>Then point the RDP client at <code>localhost</code> and log in as the account you made. If your computer already uses port 3389, forward <code>13389</code> instead and connect to <code>localhost:13389</code>. The <a href="/docs/connect/">Connect</a> page has the other ways (a local network, a VPN, certificates you can verify).</p>
 <p>Clients that were tried: the <strong>Windows App on macOS</strong>, <strong>mstsc on Windows 11</strong> (ARM, in a VM) and <strong>FreeRDP</strong> (Debian 13's <code>sdl-freerdp</code>, version 3.15). Ubuntu's own <code>xfreerdp3</code> 3.32 cannot decode the H.264 stream; use Remmina or Debian's client there.</p>
+</section>
+<section id="see-what-it-does">
+<h2>See what it does</h2>
+<pre><code><span class="p">$</span> sudo waydesk-admin status
+Memory    62.6 GB in all, 53.5 GB available
+Swap      sda1 8.0 GB (0 MB used), zram0 16.0 GB (1.7 GB used)
+Load      2.55 1.95 1.79 (8 cores)
+GPU       Intel HD Graphics 630 (i915, renderD128): 61 % busy, 1100 MHz
+          new sessions use: off
+Sessions  2 running; a new one would be accepted (needs 9.4 GB available)
+
+ACCOUNT  SESSION  MEMORY  SWAP  CPU  LIMIT    RENDER  ENCODER          PROGRAMS (resident)
+lt1      running  860 MB  -     29%  31.3 GB  gpu     vaapi q40 20fps  chromium 1066 MB, qs 329 MB, sway 104 MB
+lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 1109 MB, qs 399 MB, waydesk-server 77 MB</code></pre>
+<p>Real output, trimmed: Debian 13 on a Core i7-7700 with its HD 630, two accounts: one session on the GPU (VAAPI), one with the GPU off (OpenH264 on the CPU). The systems and clients that were tried are on <a href="/docs/limits/">Limits and status</a>.</p>
 </section>
 <section id="what-you-get">
 <h2>What you get</h2>

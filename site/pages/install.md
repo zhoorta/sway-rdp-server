@@ -55,6 +55,23 @@ Then point the RDP client at `localhost` and log in as the account you made. If 
 
 Clients that were tried: the **Windows App on macOS**, **mstsc on Windows 11** (ARM, in a VM) and **FreeRDP** (Debian 13's `sdl-freerdp`, version 3.15). Ubuntu's own `xfreerdp3` 3.32 cannot decode the H.264 stream; use Remmina or Debian's client there.
 
+## See what it does {bar: terminal}
+```console
+$ sudo waydesk-admin status
+Memory    62.6 GB in all, 53.5 GB available
+Swap      sda1 8.0 GB (0 MB used), zram0 16.0 GB (1.7 GB used)
+Load      2.55 1.95 1.79 (8 cores)
+GPU       Intel HD Graphics 630 (i915, renderD128): 61 % busy, 1100 MHz
+          new sessions use: off
+Sessions  2 running; a new one would be accepted (needs 9.4 GB available)
+
+ACCOUNT  SESSION  MEMORY  SWAP  CPU  LIMIT    RENDER  ENCODER          PROGRAMS (resident)
+lt1      running  860 MB  -     29%  31.3 GB  gpu     vaapi q40 20fps  chromium 1066 MB, qs 329 MB, sway 104 MB
+lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 1109 MB, qs 399 MB, waydesk-server 77 MB
+```
+
+Real output, trimmed: Debian 13 on a Core i7-7700 with its HD 630, two accounts: one session on the GPU (VAAPI), one with the GPU off (OpenH264 on the CPU). The systems and clients that were tried are on [Limits and status](/docs/limits/).
+
 ## What you get {bar: desktop}
 - **A desktop of your own for every account**, with a shell, a dock, a file manager and your applications. Reconnect and the windows are where you left them: closing the RDP window does not end the session.
 - **The size follows the client.** A Retina Mac or a laptop at 200 % scaling gets a sharp picture, and the window resizes live.

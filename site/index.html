@@ -145,28 +145,7 @@
 <span class="p">$</span> sudo apt install waydesk
 <span class="p">$</span> sudo waydesk-setup-admin       <span class="c"># asks how you will connect; there is no default account or password</span>
 <span class="p">$</span> waydesk-setup                  <span class="c"># optional, as your own account: choose browsers, office, developer and creative apps</span></code></pre>
-<h3>3. See what it does</h3>
-<pre><code><span class="p">$</span> sudo waydesk-admin status
-<span class="c">Memory    62.6 GB in all, 53.5 GB available
-Swap      sda1 8.0 GB (0 MB used), zram0 16.0 GB (1.7 GB used)
-Load      2.55 1.95 1.79 (8 cores)
-GPU       Intel HD Graphics 630 (i915, renderD128): 61 % busy, 1100 MHz
-          new sessions use: off
-Sessions  2 running; a new one would be accepted (needs 9.4 GB available)
-
-ACCOUNT  SESSION  MEMORY  SWAP  CPU  LIMIT    RENDER  ENCODER          PROGRAMS (resident)
-lt1      running  860 MB  -     29%  31.3 GB  gpu     vaapi q40 20fps  chromium 1066 MB, qs 329 MB, sway 104 MB
-lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 1109 MB, qs 399 MB, waydesk-server 77 MB</span></code></pre>
-<p class="method">Real output, trimmed: Debian 13 on a Core i7-7700 with its HD 630, two accounts: one session on the GPU (VAAPI), one with the GPU off (OpenH264 on the CPU).</p>
-<h3>Tested on</h3>
-<div class="tw"><table>
-<tr><th>System</th><th>amd64</th><th>arm64</th><th>Notes</th></tr>
-<tr><td>Debian 13 (trixie)</td><td class="ok">tested</td><td class="ok">tested</td><td>clean install from the repository, a session with the shell, Chromium, LibreOffice, VS Code</td></tr>
-<tr><td>Ubuntu 26.04 LTS</td><td class="ok">tested</td><td class="ok">tested</td><td>Chromium and Firefox come from Flathub (no Chromium deb)</td></tr>
-<tr><td>Ubuntu 24.04, Fedora, Arch</td><td colspan="2" class="dim">not yet</td><td>different Qt and wlroots; no rpm yet</td></tr>
-</table></div>
-<p class="method">Tested means a clean server, SSH hardened first, these steps, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on
-macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoders; older Windows clients were not tested.</p>
+<p>That is the whole install. Next: <a href="/docs/install/">the first administrator and a first connection</a>, <a href="/docs/connect/">how to connect</a>, and <a href="/docs/limits/">the systems and clients that were tested</a>.</p>
 </section>
 
 <section class="band" id="docs">

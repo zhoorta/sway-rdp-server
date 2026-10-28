@@ -47,7 +47,7 @@
 <li><a href="/docs/architecture/">Architecture</a></li>
 <li><a href="/docs/measurements/">Measurements</a></li>
 <li><a href="/docs/compare/">How it compares</a></li>
-<li><a href="/docs/limits/" aria-current="page">Limits and status</a><ul><li><a href="#status">Status</a></li><li><a href="#clients">Clients</a></li><li><a href="#without-a-gpu">Without a GPU</a></li><li><a href="#with-a-gpu">With a GPU</a></li><li><a href="#how-many-users">How many users</a></li></ul></li>
+<li><a href="/docs/limits/" aria-current="page">Limits and status</a><ul><li><a href="#status">Status</a></li><li><a href="#systems">Systems</a></li><li><a href="#clients">Clients</a></li><li><a href="#without-a-gpu">Without a GPU</a></li><li><a href="#with-a-gpu">With a GPU</a></li><li><a href="#how-many-users">How many users</a></li></ul></li>
 </ul>
 <h2>Help</h2>
 <ul>
@@ -63,7 +63,12 @@
 </div>
 <section id="status">
 <h2>Status</h2>
-<ul class="plain"><li><strong>Early software.</strong> Version 0.4.0. Expect rough edges; <a href="https://github.com/zhoorta/waydesk/issues">open an issue</a> when you find one.</li><li><strong>Systems:</strong> Debian 13 and Ubuntu 26.04 on amd64 (arm64 packages are built; they have not been installed on a machine yet).</li><li><strong>No second factor.</strong> The login is the account's password inside TLS: keep the port behind an SSH tunnel or a <a href="/docs/vpn/#security-what-protects-the-login">VPN</a>.</li><li><strong>Not an audited product.</strong> Four internal review passes are written down, with what is still open.</li></ul>
+<ul class="plain"><li><strong>Early software.</strong> Version 0.4.0. Expect rough edges; <a href="https://github.com/zhoorta/waydesk/issues">open an issue</a> when you find one.</li><li><strong>Systems:</strong> Debian 13 and Ubuntu 26.04, on amd64 and arm64 (the table below). Clean installs of earlier versions passed on both; the 0.4.0 arm64 packages are built but have not been installed on a machine yet.</li><li><strong>No second factor.</strong> The login is the account's password inside TLS: keep the port behind an SSH tunnel or a <a href="/docs/vpn/#security-what-protects-the-login">VPN</a>.</li><li><strong>Not an audited product.</strong> Four internal review passes are written down, with what is still open.</li></ul>
+</section>
+<section id="systems">
+<h2>Systems</h2>
+<div class="tw"><table><tr><th>System</th><th>amd64</th><th>arm64</th><th>Notes</th></tr><tr><td>Debian 13 (trixie)</td><td>tested</td><td>tested</td><td>clean install from the repository, a session with the shell, Chromium, LibreOffice, VS Code</td></tr><tr><td>Ubuntu 26.04 LTS</td><td>tested</td><td>tested</td><td>Chromium and Firefox come from Flathub (no Chromium deb)</td></tr><tr><td>Ubuntu 24.04, Fedora, Arch</td><td>not yet</td><td>not yet</td><td>different Qt and wlroots; no rpm yet</td></tr></table></div>
+<p>Tested means a clean server, SSH hardened first, the install steps, an RDP login from FreeRDP and a look at the session. Ubuntu's own <code>xfreerdp3</code> (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoders; older Windows clients were not tested.</p>
 </section>
 <section id="clients">
 <h2>Clients</h2>

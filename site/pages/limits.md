@@ -6,9 +6,18 @@ Waydesk is early, free software, written and tested by one person on real server
 
 ## Status {bar: notes}
 - **Early software.** Version 0.4.0. Expect rough edges; [open an issue](https://github.com/zhoorta/waydesk/issues) when you find one.
-- **Systems:** Debian 13 and Ubuntu 26.04 on amd64 (arm64 packages are built; they have not been installed on a machine yet).
+- **Systems:** Debian 13 and Ubuntu 26.04, on amd64 and arm64 (the table below). Clean installs of earlier versions passed on both; the 0.4.0 arm64 packages are built but have not been installed on a machine yet.
 - **No second factor.** The login is the account's password inside TLS: keep the port behind an SSH tunnel or a [VPN](/docs/vpn/#security-what-protects-the-login).
 - **Not an audited product.** Four internal review passes are written down, with what is still open.
+
+## Systems {bar: table}
+| System | amd64 | arm64 | Notes |
+|---|---|---|---|
+| Debian 13 (trixie) | tested | tested | clean install from the repository, a session with the shell, Chromium, LibreOffice, VS Code |
+| Ubuntu 26.04 LTS | tested | tested | Chromium and Firefox come from Flathub (no Chromium deb) |
+| Ubuntu 24.04, Fedora, Arch | not yet | not yet | different Qt and wlroots; no rpm yet |
+
+Tested means a clean server, SSH hardened first, the install steps, an RDP login from FreeRDP and a look at the session. Ubuntu's own `xfreerdp3` (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoders; older Windows clients were not tested.
 
 ## Clients {bar: table}
 | Client | Result |
