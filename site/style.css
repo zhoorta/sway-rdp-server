@@ -337,3 +337,8 @@ blockquote { margin: var(--s3) 0; padding: var(--s2) var(--s3); border-left: 3px
 .docs { grid-template-columns: 15rem minmax(0, 1fr); }
 @media (max-width: 860px) { .docs { grid-template-columns: minmax(0, 1fr); } }
 .doc a { overflow-wrap: anywhere; }
+
+/* the demo video */
+.demo { margin: var(--s3) 0 var(--s5); max-width: 1000px; }
+.demo video { display: block; width: 100%; height: auto; border-radius: var(--r-win); box-shadow: 16px 24px 48px rgba(0, 0, 0, .45); background: #1d1a2e; }
+.demo figcaption { margin-top: var(--s2); }

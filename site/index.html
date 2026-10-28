@@ -21,6 +21,7 @@
 <header>
   <a class="logo" href="/"><img src="logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
   <nav aria-label="Sections">
+    <a href="#see">see it</a>
     <a href="#fast">fast</a>
     <a href="#apps">apps</a>
     <a href="#connect">connect</a>
@@ -48,6 +49,18 @@
   </div>
   <div class="shot"><img src="desktop.png" width="1680" height="1050" alt="A Waydesk desktop seen from the Windows App: the shell bar and dock, a browser showing this site, Text Editor and a terminal"></div>
 </div>
+
+<section class="band" id="see">
+<h2>See it</h2>
+</section>
+<figure class="demo">
+<video muted loop playsinline preload="metadata" poster="/demo-poster.jpg" controls aria-label="A short recording of a Waydesk desktop: a terminal runs two commands, then the browser opens on the documentation and a window is dragged">
+<source src="/demo.webm" type="video/webm">
+<source src="/demo.mp4" type="video/mp4">
+</video>
+<figcaption>A 20-second silent loop, recorded inside a Waydesk session on a 4-vCPU cloud server with no GPU. The typing and window moves are scripted; the desktop is the real one.</figcaption>
+</figure>
+<script>(function () { var v = document.querySelector('video.demo, .demo video'); if (!v || matchMedia('(prefers-reduced-motion: reduce)').matches) return; v.controls = false; v.play().catch(function () { v.controls = true; }); v.addEventListener('click', function () { v.paused ? v.play() : v.pause(); }); })();</script>
 
 <section class="band" id="fast">
 <h2>Built to stay light and fast</h2>

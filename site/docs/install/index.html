@@ -32,7 +32,7 @@
 <nav aria-label="Documentation">
 <h2>Get started</h2>
 <ul>
-<li><a href="/docs/install/" aria-current="page">Install</a><ul><li><a href="#install">Install</a></li><li><a href="#the-first-administrator">The first administrator</a></li><li><a href="#connect">Connect</a></li><li><a href="#what-you-get">What you get</a></li><li><a href="#add-more-people">Add more people</a></li></ul></li>
+<li><a href="/docs/install/" aria-current="page">Install</a><ul><li><a href="#see-it-first">See it first</a></li><li><a href="#install">Install</a></li><li><a href="#the-first-administrator">The first administrator</a></li><li><a href="#connect">Connect</a></li><li><a href="#what-you-get">What you get</a></li><li><a href="#add-more-people">Add more people</a></li></ul></li>
 <li><a href="/docs/connect/">Connect</a></li>
 <li><a href="/docs/vpn/">VPN and security</a></li>
 </ul>
@@ -61,6 +61,17 @@
 <h1>Install and first login</h1>
 <p class="lede">From a fresh server to a desktop in about ten minutes: one package, one command to make the first administrator, and an RDP client. Everything below was run on a clean Debian 13 server.</p>
 </div>
+<section id="see-it-first">
+<h2>See it first</h2>
+<figure class="demo">
+<video muted loop playsinline preload="metadata" poster="/demo-poster.jpg" controls aria-label="A short recording of a Waydesk desktop: a terminal runs two commands, then the browser opens on the documentation and a window is dragged">
+<source src="/demo.webm" type="video/webm">
+<source src="/demo.mp4" type="video/mp4">
+</video>
+<figcaption>A 20-second silent loop, recorded inside a Waydesk session on a 4-vCPU cloud server with no GPU. The typing and window moves are scripted; the desktop is the real one.</figcaption>
+</figure>
+<script>(function () { var v = document.querySelector('video.demo, .demo video'); if (!v || matchMedia('(prefers-reduced-motion: reduce)').matches) return; v.controls = false; v.play().catch(function () { v.controls = true; }); v.addEventListener('click', function () { v.paused ? v.play() : v.pause(); }); })();</script>
+</section>
 <section id="install">
 <h2>Install</h2>
 <p>Packages come from a signed apt repository. The first download cannot be verified by the repository itself, so compare its key with the fingerprint printed on the <a href="/#install">home page</a> before you trust it.</p>

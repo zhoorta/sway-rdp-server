@@ -4,6 +4,18 @@ description: Install Waydesk on Debian 13 or Ubuntu 26.04, make the first admini
 ---
 From a fresh server to a desktop in about ten minutes: one package, one command to make the first administrator, and an RDP client. Everything below was run on a clean Debian 13 server.
 
+## See it first
+```html
+<figure class="demo">
+<video muted loop playsinline preload="metadata" poster="/demo-poster.jpg" controls aria-label="A short recording of a Waydesk desktop: a terminal runs two commands, then the browser opens on the documentation and a window is dragged">
+<source src="/demo.webm" type="video/webm">
+<source src="/demo.mp4" type="video/mp4">
+</video>
+<figcaption>A 20-second silent loop, recorded inside a Waydesk session on a 4-vCPU cloud server with no GPU. The typing and window moves are scripted; the desktop is the real one.</figcaption>
+</figure>
+<script>(function () { var v = document.querySelector('video.demo, .demo video'); if (!v || matchMedia('(prefers-reduced-motion: reduce)').matches) return; v.controls = false; v.play().catch(function () { v.controls = true; }); v.addEventListener('click', function () { v.paused ? v.play() : v.pause(); }); })();</script>
+```
+
 ## Install {bar: terminal}
 Packages come from a signed apt repository. The first download cannot be verified by the repository itself, so compare its key with the fingerprint printed on the [home page](/#install) before you trust it.
 
