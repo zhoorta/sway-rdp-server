@@ -11,7 +11,7 @@ From a fresh server to a desktop in about ten minutes: one package, one command 
 <source src="/demo.webm" type="video/webm">
 <source src="/demo.mp4" type="video/mp4">
 </video>
-<figcaption>A 20-second silent loop, recorded inside a Waydesk session on a 4-vCPU cloud server with no GPU. The typing and window moves are scripted; the desktop is the real one.</figcaption>
+<figcaption>A 23-second silent recording, made inside a Waydesk session on a 4-vCPU cloud server with no GPU. The typing and window moves are scripted; the desktop is the real one.</figcaption>
 </figure>
 ```
 

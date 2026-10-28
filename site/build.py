@@ -201,7 +201,7 @@ def shell(title, desc, url, body, kind="article"):
 
 
 def sidebar(pages, current, sections):
-    out = ['<details class="side" open>\n<summary>Documentation</summary>\n<nav aria-label="Documentation">']
+    out = ['<div class="side">\n<nav aria-label="Documentation">']
     for name, slugs in GROUPS:
         out.append(f"<h2>{name}</h2>\n<ul>")
         for s in slugs:
@@ -213,11 +213,9 @@ def sidebar(pages, current, sections):
                 li += "<ul>" + "".join(f'<li><a href="#{slugify(x["title"])}">{inline(x["title"])}</a></li>' for x in sections) + "</ul>"
             out.append(li + "</li>")
         out.append("</ul>")
-    out.append("</nav>\n</details>")
+    out.append("</nav>\n</div>")
     return "\n".join(out)
 
-
-SIDE_JS = "<script>if (matchMedia('(max-width: 860px)').matches) document.querySelector('.side').open = false;</script>"
 
 
 def page_html(meta, intro, sections, pages, source_name):
@@ -244,8 +242,7 @@ def page_html(meta, intro, sections, pages, source_name):
 <nav class="prevnext" aria-label="Previous and next page">{prev}{nxt}</nav>
 <p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/{source_name}">a file in the repository</a>: corrections are welcome.</p>
 </main>
-</div>
-{SIDE_JS}"""
+</div>"""
     return shell(meta["title"], meta["description"], f"/docs/{slug}/", body)
 
 

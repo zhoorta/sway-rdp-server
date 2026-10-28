@@ -343,3 +343,11 @@ blockquote { margin: var(--s3) 0; padding: var(--s2) var(--s3); border-left: 3px
 .demo video { display: block; width: 100%; height: auto; border-radius: var(--r-win); box-shadow: 16px 24px 48px rgba(0, 0, 0, .45); background: #1d1a2e; }
 .demo figcaption { margin-top: var(--s2); }
 #who .grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+
+/* no script on the site (its policy forbids it): on a narrow screen the sidebar is a short wrapped list */
+@media (max-width: 860px) {
+  .side h2 { margin: var(--s2) 0 0; }
+  .side ul { display: flex; flex-wrap: wrap; gap: 0 var(--s3); }
+  .side li ul { display: none; }
+  .side a { border-left: 0; padding: 2px 0; }
+}
