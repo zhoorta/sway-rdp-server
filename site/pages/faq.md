@@ -17,7 +17,7 @@ Each session needs a desktop that can run headless, one per account, and be capt
 Wayland and X11 applications, from the distribution or from Flathub. X11 programs run through XWayland, one server per account. Checked: Chromium, VS Code, LibreOffice, Obsidian, Slack, GNOME Text Editor, GIMP, Zed, Blender, Kdenlive, darktable. `waydesk-setup` offers browsers, office, developer and creative applications.
 
 ## How many users fit on one server? {bar: notes}
-About 7 to 8 heavy users on 8 GB; memory is the limit and a new session is refused rather than slowing everyone down. See [Limits and status](/docs/limits/).
+On an 8 GB server 7 to 8 users fit with Chromium, Calc and VS Code open and left idle; people who are working use more, about 1.6 GB each on the 23 GB server we measured with active users. Memory is the limit, and a new session is refused rather than slowing everyone down. See [Limits and status](/docs/limits/).
 
 ## Is it safe to put on the internet? {bar: notes}
 Not with the port published: the login is a password with no second factor. Use an SSH tunnel or a VPN, which are both a few commands. [VPN and securing access](/docs/vpn/) says what protects the login.

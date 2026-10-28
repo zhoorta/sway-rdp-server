@@ -65,7 +65,9 @@
 <div class="bar"><span class="t">figures and methods</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
 <div class="body">
 <p class="small">Our own servers: Hetzner cloud with no GPU for the charts, a dedicated Core i7-7700 with its integrated GPU for the GPU figures. Each chart says how it was measured; all tables and the failed attempts are in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MEASUREMENTS.md"><code>docs/MEASUREMENTS.md</code></a>.</p>
-<div class="tiles"><div class="tile"><div class="big">430 to 600 MB</div><div class="cap2">an idle session with the shell</div></div><div class="tile"><div class="big">7 to 8</div><div class="cap2">heavy users on an 8 GB server</div></div><div class="tile"><div class="big">4.5 : 1</div><div class="cap2">compressed swap, zstd</div></div><div class="tile"><div class="big">60 s</div><div class="cap2">a frozen client is cut off</div></div><div class="tile"><div class="big">4.8 % vs 15 %</div><div class="cap2">CPU of the capture and encoding with 20 active heavy users, GPU or CPU</div></div></div>
+<h3>Two questions, two kinds of test</h3>
+<p class="small"><strong>How many users fit in memory:</strong> the first chart. Each user logs in and opens Chromium, Calc with 300,000 rows and VS Code, and the applications are left idle; on an 8 GB, 4-vCPU server 8 fit on Debian 13 and 7 on Ubuntu 26.04. <strong>How a server behaves under active users:</strong> the table with and without a GPU, further down: the users scroll, type and watch video, on a 64 GB machine (21 and 24 users) and, earlier, on a 23 GB server that held 12 before it refused the 13th, at about 1.6 GB a user. Active users on an 8 GB server were not measured: it would hold fewer than the idle 7 to 8, about five if the 23 GB figure scaled, and that is arithmetic, not a measurement.</p>
+<div class="tiles"><div class="tile"><div class="big">430 to 600 MB</div><div class="cap2">an idle session with the shell</div></div><div class="tile"><div class="big">7 to 8</div><div class="cap2">users with Chromium, Calc and VS Code open (idle) on an 8 GB server</div></div><div class="tile"><div class="big">4.5 : 1</div><div class="cap2">compressed swap, zstd</div></div><div class="tile"><div class="big">60 s</div><div class="cap2">a frozen client is cut off</div></div><div class="tile"><div class="big">4.8 % vs 15 %</div><div class="cap2">CPU of the capture and encoding with 20 active heavy users, GPU or CPU</div></div></div>
 <div class="charts">
 <figure><h3>Where the memory goes</h3><svg viewBox="0 0 352 330" role="img" aria-labelledby="c1t c1d">
 <title id="c1t">Available memory as heavy users log in, 8 GB server</title>
@@ -101,7 +103,7 @@
 <li>When a GPU cannot encode, the session falls back to OpenH264 and keeps working: the worker takes 12 % of the machine instead of 3 %. <code>waydesk-admin status</code> shows it.</li>
 <li>An NVIDIA RTX 4000 SFF Ada (driver 615 or newer) runs the desktop and a NVENC encoder: 61 fps on the WebGL page, the encoder engine 4 % busy.</li>
 </ul>
-<p class="method">Not measured: a build or a recalculation, the delay between a click and its picture, AMD, a card with its own memory under many users, runs longer than 45 minutes. Raw tables and the scripts: <a href="https://github.com/zhoorta/waydesk/tree/main/docs/measure-data"><code>docs/measure-data</code></a>. Setting it up and reading it: <a href="/docs/gpu/">using a GPU</a>.</p>
+<p class="method">Not measured: active users on an 8 GB server, a build or a recalculation, the delay between a click and its picture, AMD, a card with its own memory under many users, runs longer than 45 minutes. Raw tables and the scripts: <a href="https://github.com/zhoorta/waydesk/tree/main/docs/measure-data"><code>docs/measure-data</code></a>. Setting it up and reading it: <a href="/docs/gpu/">using a GPU</a>.</p>
 </div>
 </div>
 </section>
