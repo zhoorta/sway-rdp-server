@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Waydesk · A Linux desktop over RDP, out of the box</title>
-<meta name="description" content="Waydesk gives every account on a Debian 13 or Ubuntu 26.04 server its own desktop over RDP, out of the box: one apt install, no GPU, tuned for slow links. Signed apt repository, measurements with methods, threat model.">
+<meta name="description" content="Waydesk gives every account on a Debian 13 or Ubuntu 26.04 server its own desktop over RDP, out of the box: one apt install, no GPU needed (it uses one when there is one), tuned for slow links. Signed apt repository, measurements with methods, threat model.">
 <link rel="canonical" href="https://waydesk.dev/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0a1c2a">
 <meta property="og:title" content="Waydesk">
-<meta property="og:description" content="A Linux desktop over RDP, out of the box. One apt install on Debian or Ubuntu, no GPU, tuned for slow links. Measured, documented, free software.">
+<meta property="og:description" content="A Linux desktop over RDP, out of the box. One apt install on Debian or Ubuntu, no GPU needed (it uses one when there is one), tuned for slow links. Measured, documented, free software.">
 <meta property="og:url" content="https://waydesk.dev/">
 <meta property="og:type" content="website">
 <link rel="stylesheet" href="style.css">
@@ -38,7 +38,7 @@
 <div class="hero">
   <div>
     <h1>A Linux desktop over RDP, <em>out of the box.</em></h1>
-    <p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04 (amd64 or arm64). Every account that logs in gets its own desktop, with a shell, a dock and its apps, kept alive between connections. No GPU, no client to install: use the Windows App, Remmina or any RDP client.</p>
+    <p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04 (amd64 or arm64). Every account that logs in gets its own desktop, with a shell, a dock and its apps, kept alive between connections. No GPU needed (an Intel, AMD or NVIDIA one is used when there is one), no client to install: use the Windows App, Remmina or any RDP client.</p>
     <div class="win">
       <div class="bar"><span class="t">install</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
       <div class="body"><pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
@@ -67,7 +67,7 @@
   </div>
   <div class="win card">
     <div class="bar"><span class="t">H.264</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Tuned for screens, in software</h3><p>Screen-content mode, only the changed rectangles: about <span class="num">half the bandwidth</span> of the camera mode. No GPU.</p></div>
+    <div class="body"><h3>Tuned for screens, on the CPU or the GPU</h3><p>Screen-content mode, only the changed rectangles: about <span class="num">half the bandwidth</span> of the camera mode. In software by default; with an Intel, AMD or NVIDIA GPU the desktop and the encoder move to it.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">pointer</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
@@ -180,14 +180,16 @@
 <span class="p">$</span> waydesk-setup                  <span class="c"># optional, as your own account: choose browsers, office, developer and creative apps</span></code></pre>
 <h3>3. See what it does</h3>
 <pre><code><span class="p">$</span> sudo waydesk-admin status
-<span class="c">Memory    7.6 GB in all, 504 MB available
-Swap      zram0 7.6 GB (7.5 GB used)
-Sessions  7 running; a new one would be REFUSED: 504 MB available, 1161 MB needed
+<span class="c">Memory    62.6 GB in all, 53.5 GB available
+Swap      sda1 8.0 GB (0 MB used), zram0 16.0 GB (1.7 GB used)
+Load      2.55 1.95 1.79 (8 cores)
+GPU       Intel HD Graphics 630 (i915, renderD128): 61 % busy, 1100 MHz
+          new sessions use: off
+Sessions  2 running; a new one would be accepted (needs 9.4 GB available)
 
-ACCOUNT   SESSION  MEMORY  SWAP    CPU  LIMIT   PROGRAMS (resident)
-u1        running  416 MB  1.0 GB   3%  3.8 GB  code 194 MB, qs 132 MB, chrome 120 MB
-u2        running  472 MB  1.0 GB   4%  3.8 GB  code 263 MB, qs 133 MB, chrome 126 MB
-u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 265 MB</span></code></pre>
+ACCOUNT  SESSION  MEMORY  SWAP  CPU  LIMIT    RENDER  ENCODER          PROGRAMS (resident)
+lt1      running  860 MB  -     29%  31.3 GB  gpu     vaapi q40 20fps  chromium 1066 MB, qs 329 MB, sway 104 MB
+lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 1109 MB, qs 399 MB, waydesk-server 77 MB</span></code></pre>
 <p class="method">Real output, trimmed: Ubuntu 26.04, 4 vCPU, 7.6 GB, seven accounts each with Chromium, LibreOffice Calc and VS Code open.</p>
 <h3>Tested on</h3>
 <div class="tw"><table>
@@ -277,8 +279,8 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <div class="win">
 <div class="bar"><span class="t">figures and methods</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
 <div class="body">
-<p class="small">Our own servers (Hetzner cloud, no GPU). Each chart says how it was measured; all tables and the failed attempts are in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MEASUREMENTS.md"><code>docs/MEASUREMENTS.md</code></a>.</p>
-<div class="tiles"><div class="tile"><div class="big">430 to 600 MB</div><div class="cap2">an idle session with the shell</div></div><div class="tile"><div class="big">7 to 8</div><div class="cap2">heavy users on an 8 GB server</div></div><div class="tile"><div class="big">4.5 : 1</div><div class="cap2">compressed swap, zstd</div></div><div class="tile"><div class="big">60 s</div><div class="cap2">a frozen client is cut off</div></div></div>
+<p class="small">Our own servers: Hetzner cloud with no GPU for the charts, a dedicated Core i7-7700 with its integrated GPU for the GPU figures. Each chart says how it was measured; all tables and the failed attempts are in <a href="https://github.com/zhoorta/waydesk/blob/main/docs/MEASUREMENTS.md"><code>docs/MEASUREMENTS.md</code></a>.</p>
+<div class="tiles"><div class="tile"><div class="big">430 to 600 MB</div><div class="cap2">an idle session with the shell</div></div><div class="tile"><div class="big">7 to 8</div><div class="cap2">heavy users on an 8 GB server</div></div><div class="tile"><div class="big">4.5 : 1</div><div class="cap2">compressed swap, zstd</div></div><div class="tile"><div class="big">60 s</div><div class="cap2">a frozen client is cut off</div></div><div class="tile"><div class="big">4.8 % vs 15 %</div><div class="cap2">CPU of the capture and encoding with 20 active heavy users, GPU or CPU</div></div></div>
 <div class="charts">
 <figure><h3>Where the memory goes</h3><svg viewBox="0 0 352 330" role="img" aria-labelledby="c1t c1d">
 <title id="c1t">Available memory as heavy users log in, 8 GB server</title>
@@ -299,7 +301,22 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <figure><h3>H.264 for screens</h3><svg viewBox="0 0 352 330" role="img" aria-labelledby="c3t c3d"><title id="c3t">H.264 screen-content mode against camera mode</title><desc id="c3d">For a full-screen 720p30 test pattern the screen-content mode needed 6.4 Mbit/s and 43 % of a core; the camera mode needed 12.7 Mbit/s and 15 % of a core.</desc>
 <text class="lb" x="0" y="16">bandwidth, Mbit/s</text><text class="ax" x="0" y="53">screen</text><rect class="bar bb" x="66" y="32" width="94" height="30" rx="3"/><text class="ax" x="168" y="53">6.4</text><text class="ax" x="0" y="97">camera</text><rect class="bar cu" x="66" y="76" width="186" height="30" rx="3"/><text class="ax" x="260" y="97">12.7</text><text class="lb" x="0" y="176">CPU, % of one core</text><text class="ax" x="0" y="213">screen</text><rect class="bar bb" x="66" y="192" width="163" height="30" rx="3"/><text class="ax" x="237" y="213">43</text><text class="ax" x="0" y="257">camera</text><rect class="bar cu" x="66" y="236" width="57" height="30" rx="3"/><text class="ax" x="131" y="257">15</text></svg><figcaption>A full-screen 720p30 test pattern, software OpenH264 on 2 vCPUs. Screen mode costs a near-constant share of a core, so a mostly still desktop costs more CPU in screen mode than in camera mode.</figcaption></figure>
 </div>
-<p class="method">Not measured: CPU under active work (a build, a recalculation), typing and scrolling latency, frame rate on x86 with moving screens.</p>
+<h3 class="gpuh">With and without a GPU</h3>
+<p class="small">Active users, not idle ones: Chromium and a terminal that scroll and type, Calc on 300,000 rows and VS Code with keystrokes, GIMP for one in four, a looping video for one in four. One at a time on a Core i7-7700 (8 threads, 64 GB, integrated HD 630), each with its own RDP client on another machine. The CPU is of the whole machine.</p>
+<div class="tw"><table>
+<tr><th>Active heavy users</th><th>CPU, GPU on</th><th>CPU, GPU off</th><th>Capture and encoding, GPU on / off</th></tr>
+<tr><td>10</td><td>47 %</td><td>45 %</td><td>4.2 % / 8.7 %</td></tr>
+<tr><td>15</td><td>49 %</td><td>60 %</td><td>4.6 % / 11.7 %</td></tr>
+<tr><td>20</td><td>50 %</td><td>69 %</td><td>4.8 % / 15.4 %</td></tr>
+<tr><td>24</td><td>refused at 22 (memory)</td><td>94 %</td><td>&ndash; / 21.1 %</td></tr>
+</table></div>
+<ul class="plain">
+<li>The GPU flattens the CPU (about 50 % from 15 users on, against 3 to 4 points more for each user without it), but on this machine it did <strong>not</strong> add users: 21 fit with it, 24 without, because an integrated GPU takes system memory (2.24 GB a user against 1.95 GB). Memory ended both runs.</li>
+<li>Full-screen WebGL on the HD 630: 60 fps each for two users, 47 for three, 20 for six, 13 for ten; the card is the limit, the CPU stays under 40 %. Without the GPU the page does not animate.</li>
+<li>When a GPU cannot encode, the session falls back to OpenH264 and keeps working: the worker takes 12 % of the machine instead of 3 %. <code>waydesk-admin status</code> shows it.</li>
+<li>An NVIDIA RTX 4000 SFF Ada (driver 615 or newer) runs the desktop and a NVENC encoder: 61 fps on the WebGL page, the encoder engine 4 % busy.</li>
+</ul>
+<p class="method">Not measured: a build or a recalculation, the delay between a click and its picture, AMD, a card with its own memory under many users, runs longer than 45 minutes. Raw tables and the scripts: <a href="https://github.com/zhoorta/waydesk/tree/main/docs/measure-data"><code>docs/measure-data</code></a>.</p>
 </div>
 </div>
 </section>
@@ -325,8 +342,9 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <div class="bar"><span class="t">known limits</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
 <div class="body">
 <ul class="plain">
-<li>Early software. Tested with FreeRDP and the Windows App on macOS; Microsoft Remote Desktop (Windows) and mstsc were not tested.</li>
-<li>No GPU: applications that insist on one do not start. Zed fails with "Failed to create surface"; VS Code and LibreOffice work.</li>
+<li>Early software. Tested with FreeRDP, the Windows App on macOS and mstsc on Windows 11 (ARM, in a VM, with the GPU encoders); older Windows clients were not tested.</li>
+<li>No GPU: everything runs on the CPU. OpenGL applications start and are slow, a WebGL page in the browser does not animate, and a Vulkan application cannot show its window (it needs a session on a GPU). Zed, Blender, Kdenlive, darktable, VS Code and LibreOffice opened with and without one.</li>
+<li>With a GPU: tried on an Intel HD 630 and an NVIDIA RTX 4000 SFF Ada (NVIDIA needs driver 615 or newer; Debian's 550 cannot draw the desktop); AMD should work through VAAPI and was not tried. The GPU is shared by every session: ten users on full-screen WebGL get about 13 fps each. An integrated GPU takes some system memory for each session.</li>
 <li>Sizing: on an 8 GB, 4-core server count 7 to 8 users with Chromium, Calc and VS Code open if most are idle. A 12-vCPU, 23 GB server (Hetzner CPX52, 123.60 euros a month) held 12 of them before it refused the 13th; memory is the limit, about 1.6 GB per such user. Someone compiling or recalculating needs more, and the server refuses a new session instead of slowing everyone down.</li>
 </ul>
 
@@ -341,7 +359,7 @@ u7        running  1.5 GB   95 MB   4%  3.8 GB  code 862 MB, chrome 793 MB, qs 2
 <div class="body">
 <div class="tw"><table>
 <tr><th>Command</th><th>What it does</th></tr>
-<tr><td><code>waydesk-admin status</code></td><td>memory, swap, load, running sessions and what each account uses</td></tr>
+<tr><td><code>waydesk-admin status [--watch]</code></td><td>memory, swap, load, the GPUs and how busy they are, running sessions, what each account uses and runs (GPU or CPU, the video encoder); <code>--watch</code> keeps refreshing, <code>--json --watch</code> writes a line of JSON each time</td></tr>
 <tr><td><code>waydesk-admin users ...</code></td><td>accounts, passwords, per-account limits; <code>sessions list | end NAME</code></td></tr>
 <tr><td><code>waydesk-admin access | cert | vpn</code></td><td>who can reach the port, the certificate clients check, a WireGuard VPN</td></tr>
 <tr><td><code>waydesk-setup-admin</code></td><td>the first administrator, and how clients connect</td></tr>

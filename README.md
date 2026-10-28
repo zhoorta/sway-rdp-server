@@ -15,7 +15,7 @@
 # Waydesk: a Linux desktop over RDP, out of the box
 
 One `apt install` on Debian 13 or Ubuntu 26.04 gives every account on the server its own desktop (sway, a shell, a dock and apps) over RDP. Sessions are kept
-alive between connections, the picture is H.264 and no GPU is needed. Connect with the Windows App, Remmina or any RDP client: nothing to install on the client.
+alive between connections, the picture is H.264 and no GPU is needed (an Intel, AMD or NVIDIA one is used when there is one). Connect with the Windows App, Remmina or any RDP client: nothing to install on the client.
 
 <p align="center">
   <img src="docs/img/desktop.png" alt="A Waydesk session in the Windows App: the bar, desktop icons, a browser, a terminal showing waydesk-admin status, and the dock" width="860">
