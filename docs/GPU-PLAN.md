@@ -148,4 +148,20 @@ setting on. Two render nodes: `renderD128` the Intel iGPU, `renderD129` the NVID
   20 threads (speed is not what matters, the CPU it takes is).
 - **A machine with both GPUs already works**: sway on the Intel node (`WAYDESK_GPU=/dev/dri/renderD128`), GLES2 and Vulkan, no errors.
 
-Not done: an NVENC encoder (BGRA in, so no converter), zero-copy from NVIDIA, GL and Vulkan apps measured on it, several users on one card.
+### NVENC (`src/encode_nv.rs`, same day)
+
+The encoder takes the BGRA picture as it is (NVENC reads ARGB, so no colour conversion on our side): each frame goes into a CUDA buffer and is encoded
+at a constant quantiser, which `QpControl` (now `src/qp.rs`, shared with the VAAPI encoder) moves with the link. A quantiser change goes to the running encoder
+(`nvEncReconfigureEncoder`) and shows up as a different `slice_qp_delta`, not as new parameter sets. `WAYDESK_ENCODER=auto` tries VAAPI, then NVENC, then
+OpenH264; `nvenc` forces it. The libraries (`libnvidia-encode`, `libcuda`) are loaded when an encoder is created, so the binary starts on a machine without NVIDIA's driver.
+
+- **Bindings:** `nvidia-video-codec-sdk` 0.4 (MIT), vendored with a small patch (`patches/nvidia-video-codec-sdk.diff`): it loads `libnvidia-encode` at run time instead of linking it,
+  needs no CUDA toolkit to build, and gives access to the encoder handle and the picture flags.
+- **Things it taught:** CUDA memory from the stream-ordered pool (what cudarc allocates on devices that have one) cannot be registered as an NVENC input, plain
+  `cuMemAlloc` can; the settle refresh has to be an intra picture (`FORCEINTRA`), not an IDR, or every refresh sends new SPS and PPS.
+- **Measured** (RTX 4000 SFF Ada, driver 615, one user, full-screen WebGL noise at 61 fps): encoder 4 to 9 ms a frame, the card's encoder engine 4 % busy, the session
+  worker 8 % of a core against 13 % with OpenH264 (what is left is the shared-memory capture and the copy to the card). The stream decodes without errors in ffmpeg
+  (High profile, CABAC, one reference frame), three quantiser changes in a session made no new parameter sets.
+
+Not done: zero-copy from NVIDIA (the dmabuf to NVENC), GL and Vulkan apps measured on it, several users on one card, the stream in Windows App and the Windows client
+(this one is CABAC, the VAAPI one CAVLC).

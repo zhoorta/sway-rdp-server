@@ -6,8 +6,9 @@ description = "RDP server for sway: one headless output per connection, H.264 ov
 license = "MIT OR Apache-2.0"
 
 [features]
-default = ["vaapi"]
+default = ["vaapi", "nvenc"]
 vaapi = ["dep:cros-codecs", "dep:gbm", "dep:wayland-protocols"]
+nvenc = ["dep:nvidia-video-codec-sdk", "dep:cudarc"]
 
 [dependencies]
 ironrdp-server = { version = "0.13", features = ["helper", "egfx"] }
@@ -25,6 +26,8 @@ openh264 = { version = "0.9", default-features = false, features = ["libloading"
 openh264-sys2 = { version = "0.9", default-features = false, features = ["libloading"] }
 yuv = "0.8"
 # H.264 on the GPU (VAAPI), for sessions that render on one: the encoder of the ChromiumOS project (BSD-3), linked to libva at run time by the loader.
+nvidia-video-codec-sdk = { path = "patches/nvidia-video-codec-sdk", optional = true }
+cudarc = { version = "0.16", default-features = false, features = ["driver", "std", "dynamic-loading", "cuda-12020"], optional = true }
 cros-codecs = { version = "0.0.6", optional = true, default-features = false, features = ["vaapi"] }
 # GPU buffers for the capture: the compositor renders into a dmabuf (stage 3 of docs/GPU-PLAN.md).
 gbm = { version = "0.15", optional = true, default-features = false }

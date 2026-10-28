@@ -10,6 +10,8 @@ What changed, newest first. The numbered releases are the ones in the apt reposi
 
 **The quantiser moves without a new stream.** A quantiser change (the encoder follows the link) now only changes a number in the next picture's header; before, it sent new parameter sets and a new keyframe, and several in a row left the Windows App on a Mac showing the whole screen washed out until the next keyframe. The output buffer of the GPU encoder is now as large as a raw picture: a keyframe of full-screen noise at a low quantiser (1.8 MB) did not fit the fixed 1.5 MB and ended the connection. `cros-codecs` and `cros-libva` are vendored with small patches (`patches/*.diff`).
 
+**NVIDIA (first version).** On a machine with an NVIDIA card the session can render on it (needs NVIDIA's driver 615 or newer, not Debian's 550, which cannot allocate the compositor's buffers) and encode with NVENC, for which `WAYDESK_ENCODER=auto` falls back when VAAPI has no encoder. Tested on an RTX 4000 SFF Ada; the NVIDIA libraries are loaded only when there is an NVIDIA card, so nothing changes elsewhere. The capture takes the 24-bit pixels NVIDIA's GL renderer reads back. Notes in `docs/GPU-PLAN.md`.
+
 ## 2026-10-26 · 0.3.1
 
 **Through an SSH tunnel.** The flow control looks at the socket's send queue: while more than about 190 kB is queued the next frame waits, and while the queue is deep the capacity is how fast the peer acknowledges (the kernel's delivery rate is the first hop then, the loopback to `sshd`, which says nothing about the real link). Before, an SSH tunnel in front of a slow link let 3 MB build up, which is seconds between a click and its picture, while the encoder aimed for 10 to 40 Mbit/s. The log shows the queue next to the bitrate.

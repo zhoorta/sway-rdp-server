@@ -501,8 +501,6 @@ checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 [[package]]
 name = "cros-codecs"
 version = "0.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80f7441b4f31c17b6b6b7f57f6c202944aad11d0ab23739a9ff88d8d34dec621"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -521,8 +519,6 @@ dependencies = [
 [[package]]
 name = "cros-libva"
 version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "902c9726e953b678595456bd38f95f31aaf1947c56dd9f4a2290f3f1eca4d228"
 dependencies = [
  "bindgen",
  "bitflags 2.13.2",
@@ -654,6 +650,15 @@ checksum = "03bb0e1cc970d482d121d9a1744999169b69a07470b3d644a7894e53fcaf4574"
 dependencies = [
  "cmov",
  "subtle",
+]
+
+[[package]]
+name = "cudarc"
+version = "0.16.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17200eb07e7d85a243aa1bf4569a7aa998385ba98d14833973a817a63cc86e92"
+dependencies = [
+ "libloading",
 ]
 
 [[package]]
@@ -2022,6 +2027,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "nvidia-video-codec-sdk"
+version = "0.4.0"
+dependencies = [
+ "cudarc",
+ "lazy_static",
+ "libloading",
 ]
 
 [[package]]
@@ -3626,6 +3640,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "cros-codecs",
+ "cudarc",
+ "gbm",
  "ironrdp-cliprdr",
  "ironrdp-core",
  "ironrdp-displaycontrol",
@@ -3637,6 +3653,7 @@ dependencies = [
  "ironrdp-svc",
  "libc",
  "memmap2",
+ "nvidia-video-codec-sdk",
  "openh264",
  "openh264-sys2",
  "serde_json",
@@ -3644,6 +3661,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "wayland-client",
+ "wayland-protocols",
  "wayland-protocols-misc",
  "wayland-protocols-wlr",
  "xkbcommon",

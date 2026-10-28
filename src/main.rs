@@ -15,6 +15,8 @@ mod egfx;
 mod encode;
 #[cfg(feature = "vaapi")]
 mod encode_va;
+#[cfg(feature = "nvenc")]
+mod encode_nv;
 mod encoder;
 mod fdpass;
 mod gpu;
@@ -24,6 +26,8 @@ mod input;
 mod link;
 mod memory;
 mod proto;
+#[cfg(any(feature = "vaapi", feature = "nvenc"))]
+mod qp;
 mod session;
 mod sessionaudio;
 mod sessionclip;

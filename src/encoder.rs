@@ -1,5 +1,5 @@
-//! The H.264 encoder of a session: OpenH264 on the CPU (`encode.rs`), or the GPU's fixed-function encoder through VAAPI (`encode_va.rs`) when
-//! the session renders on a GPU (docs/GPU-PLAN.md, stage 2). `WAYDESK_ENCODER=auto|vaapi|software` (`auto` is the default).
+//! The H.264 encoder of a session: OpenH264 on the CPU (`encode.rs`), or the GPU's fixed-function encoder: VAAPI (`encode_va.rs`) when the
+//! session renders on a GPU (docs/GPU-PLAN.md, stage 2), NVENC on NVIDIA (`encode_nv.rs`). `WAYDESK_ENCODER=auto|vaapi|nvenc|software` (`auto` is the default).
 
 use anyhow::Result;
 
@@ -204,12 +204,14 @@ fn maybe_dump(enc: Box<dyn Encode>) -> Box<dyn Encode> {
 enum Choice {
     Auto,
     Vaapi,
+    Nvenc,
     Software,
 }
 
 fn choice(value: Option<&str>) -> Choice {
     match value.map(str::trim) {
         Some("vaapi") => Choice::Vaapi,
+        Some("nvenc") => Choice::Nvenc,
         Some("software") | Some("openh264") | Some("off") => Choice::Software,
         _ => Choice::Auto,
     }
@@ -233,6 +235,21 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
             tracing::warn!("WAYDESK_ENCODER=vaapi, but the session has no usable GPU: OpenH264 on the CPU");
         }
     }
+    // NVIDIA has no VAAPI encoder: its own, NVENC, takes the BGRA picture as it is. Machines without NVIDIA's library skip this without a word.
+    #[cfg(feature = "nvenc")]
+    if matches!(choice, Choice::Auto | Choice::Nvenc) {
+        if nvidia_video_codec_sdk::nvenc_available() {
+            match crate::encode_nv::NvH264::new(width, height, tuning) {
+                Ok(enc) => {
+                    tracing::info!("H.264 encoder: NVENC");
+                    return Ok(maybe_dump(Box::new(Timed::new(Box::new(enc), "nvenc"))));
+                }
+                Err(e) => tracing::warn!("NVENC encoder not available ({e:#}): OpenH264 on the CPU"),
+            }
+        } else if choice == Choice::Nvenc {
+            tracing::warn!("WAYDESK_ENCODER=nvenc, but libnvidia-encode is not installed: OpenH264 on the CPU");
+        }
+    }
     #[cfg(not(feature = "vaapi"))]
     if choice == Choice::Vaapi {
         tracing::warn!("WAYDESK_ENCODER=vaapi, but this build has no VAAPI support: OpenH264 on the CPU");
@@ -249,6 +266,7 @@ mod tests {
         assert_eq!(choice(None), Choice::Auto);
         assert_eq!(choice(Some("auto")), Choice::Auto);
         assert_eq!(choice(Some("vaapi")), Choice::Vaapi);
+        assert_eq!(choice(Some("nvenc")), Choice::Nvenc);
         assert_eq!(choice(Some("software")), Choice::Software);
         assert_eq!(choice(Some("nonsense")), Choice::Auto);
     }
