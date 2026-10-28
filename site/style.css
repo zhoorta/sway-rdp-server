@@ -342,3 +342,4 @@ blockquote { margin: var(--s3) 0; padding: var(--s2) var(--s3); border-left: 3px
 .demo { margin: var(--s3) 0 var(--s5); max-width: 1000px; }
 .demo video { display: block; width: 100%; height: auto; border-radius: var(--r-win); box-shadow: 16px 24px 48px rgba(0, 0, 0, .45); background: #1d1a2e; }
 .demo figcaption { margin-top: var(--s2); }
+#who .grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
