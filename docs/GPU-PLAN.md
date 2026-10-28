@@ -148,6 +148,13 @@ setting on. Two render nodes: `renderD128` the Intel iGPU, `renderD129` the NVID
   20 threads (speed is not what matters, the CPU it takes is).
 - **A machine with both GPUs already works**: sway on the Intel node (`WAYDESK_GPU=/dev/dri/renderD128`), GLES2 and Vulkan, no errors.
 
+### The fallback without a GPU encoder (Intel server, same day)
+
+What a machine looks like to the encoder when the GPU renders but VAAPI has no encoder (NVIDIA before NVENC, or a driver that is missing): `LIBVA_DRIVER_NAME` set to a
+driver that does not exist, one user on a full-screen WebGL page, GPU rendering and the dmabuf capture left on. The session comes up, the client stays connected, the
+page runs at 62 fps, the log has `VAAPI encoder not available (...): OpenH264 on the CPU`, and nothing else changes. The price is the CPU: the session worker takes
+12.3 % of the machine (OpenH264 at about 42 ms a frame, the frames read back from the GPU) against 2.9 % with VAAPI.
+
 ### NVENC (`src/encode_nv.rs`, same day)
 
 The encoder takes the BGRA picture as it is (NVENC reads ARGB, so no colour conversion on our side): each frame goes into a CUDA buffer and is encoded
