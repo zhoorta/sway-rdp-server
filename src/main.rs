@@ -853,6 +853,7 @@ async fn serve(stream: tokio::net::TcpStream, peer: std::net::SocketAddr, common
         _ = login_deadline => Err(anyhow::anyhow!("no login within {} s", PRE_LOGIN_TIMEOUT.as_secs())),
     };
     egfx_state.clear_socket(); // the connection is closed
+    egfx_state.close();
     match &result {
         Ok(()) => info!(%peer, duration = ?started.elapsed(), "client disconnected"),
         Err(e) => info!(%peer, duration = ?started.elapsed(), error = %format!("{e:#}"), "client disconnected"),

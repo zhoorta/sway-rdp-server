@@ -358,6 +358,16 @@ impl EgfxState {
         self.socket.store(0, Ordering::Relaxed);
     }
 
+    /// The connection is over: lets go of everything that points back. The state is held by the graphics server it created (through its
+    /// handler), and that server by the state (`handle`): a cycle that never frees by itself. Left alone, every connection kept its
+    /// state, its two sinks, and through them the session link, the clipboard state, the connection's slot and its connection to the
+    /// root helper alive for as long as the daemon ran (the helper accepts only 64 connections at once).
+    pub fn close(&self) {
+        *self.handle.lock().unwrap() = None;
+        *self.credit_sink.lock().unwrap() = None;
+        *self.bitrate_sink.lock().unwrap() = None;
+    }
+
     /// Sets where the new bitrate goes, and the highest bitrate (the configured one).
     pub fn set_bitrate_sink(&self, max_bitrate: u32, sink: Box<dyn Fn(u32) + Send + Sync>) {
         self.max_bitrate.store(max_bitrate, Ordering::Relaxed);
@@ -553,6 +563,30 @@ impl Out {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The graphics server the factory builds holds the state through its handler, and the state holds the server (`handle`): without `close`
+    /// nothing frees either, and with them the session link and the connection to the root helper that the sinks point at.
+    #[test]
+    fn closing_a_connection_frees_the_state() {
+        let state = Arc::new(EgfxState::default());
+        let weak = Arc::downgrade(&state);
+        let factory = Factory::new(state.clone());
+        let built = factory.build_server_with_handle();
+        assert!(built.is_some());
+        drop(built);
+        drop(factory);
+        let kept = Arc::new(());
+        let sink_owner = kept.clone();
+        state.set_credit_sink(Box::new(move |_| {
+            let _ = &sink_owner;
+        }));
+        let cycle_only = Arc::downgrade(&state);
+        drop(state);
+        assert!(cycle_only.upgrade().is_some(), "the cycle keeps the state alive until the connection is closed");
+        cycle_only.upgrade().unwrap().close();
+        assert!(weak.upgrade().is_none(), "closed: nothing holds the state any more");
+        assert_eq!(Arc::strong_count(&kept), 1, "and what its sinks pointed at is let go");
+    }
 
     /// What the kernel says about a connection with an empty send queue.
     fn link(delivery_rate: f64, app_limited: bool) -> Link {
