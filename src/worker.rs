@@ -605,14 +605,7 @@ impl OwnSway {
 
         // The Wayland socket has an automatic name: ask sway to tell us what its children inherit.
         let note = runtime.join(format!("waydesk-{}.wayland", me.child.id()));
-        let out = std::process::Command::new("swaymsg")
-            .arg("-s")
-            .arg(&ipc)
-            .arg("exec")
-            .arg(format!("printenv WAYLAND_DISPLAY > '{}'", note.display()))
-            .output()
-            .context("cannot run swaymsg")?;
-        anyhow::ensure!(out.status.success(), "swaymsg exec failed: {}", String::from_utf8_lossy(&out.stderr));
+        crate::compositor::sway::exec_on(&ipc, &format!("printenv WAYLAND_DISPLAY > '{}'", note.display()))?;
         let mut socket = String::new();
         for _ in 0..50 {
             socket = std::fs::read_to_string(&note).unwrap_or_default().trim().to_owned();
@@ -775,8 +768,7 @@ mod private_bin_tests {
 /// `cursorimg:...` for a picture an application drew, every time an application or the window manager changes it. Ends when sway does.
 fn watch_cursor(up: &mpsc::UnboundedSender<Up>) {
     use std::io::{BufRead as _, BufReader};
-    use std::process::{Command, Stdio};
-    let Ok(mut child) = Command::new("swaymsg").args(["-r", "-t", "subscribe", "-m", "[\"tick\"]"]).stdout(Stdio::piped()).stderr(Stdio::null()).spawn() else {
+    let Some(mut child) = crate::compositor::sway::subscribe_ticks() else {
         return;
     };
     if let Some(out) = child.stdout.take() {

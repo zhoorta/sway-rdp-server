@@ -8,6 +8,7 @@ mod auth;
 mod capture;
 mod base64;
 mod clipboard;
+mod compositor;
 mod cursors;
 #[cfg(feature = "vaapi")]
 mod dmabuf;

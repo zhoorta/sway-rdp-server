@@ -11,6 +11,7 @@ use anyhow::{bail, Context as _, Result};
 use tracing::{error, info, warn};
 
 use crate::capture::{Capturer, Shared};
+use crate::compositor;
 use crate::input;
 
 /// Counts sessions so a hook can derive a unique port or name from `WAYDESK_INDEX` (0..99, then it wraps).
@@ -57,29 +58,6 @@ pub struct Session {
     pub shared: Arc<Shared>,
     pub input: Sender<input::Cmd>,
     stop: Arc<AtomicBool>,
-}
-
-fn swaymsg(args: &[&str]) -> Result<String> {
-    // Commands go after `--`, or swaymsg parses options such as `--custom` itself.
-    let mut cmd = Command::new("swaymsg");
-    if args.first().is_some_and(|a| !a.starts_with('-')) {
-        cmd.arg("--");
-    }
-    let out = cmd.args(args).output().context("cannot run swaymsg")?;
-    let text = String::from_utf8_lossy(&out.stdout).into_owned();
-    if !out.status.success() || text.contains("\"success\": false") || text.contains("\"success\":false") {
-        bail!("swaymsg {args:?} failed: {text} {}", String::from_utf8_lossy(&out.stderr));
-    }
-    Ok(text)
-}
-
-fn output_names() -> Result<Vec<String>> {
-    let v: serde_json::Value = serde_json::from_str(&swaymsg(&["-t", "get_outputs", "-r"])?)?;
-    Ok(v.as_array()
-        .context("outputs not an array")?
-        .iter()
-        .filter_map(|o| o["name"].as_str().map(str::to_owned))
-        .collect())
 }
 
 /// Starts the session hook in its own process group, so everything it starts can be stopped together.
@@ -185,12 +163,7 @@ impl Session {
     pub fn create(size: (u16, u16), layout: &str, opts: &Options) -> Result<Self> {
         let (w, h) = clamp_size(size.0, size.1);
         let _creating = create_lock()?;
-        let before = output_names()?;
-        swaymsg(&["create_output"])?;
-        let output = output_names()?
-            .into_iter()
-            .find(|n| !before.contains(n))
-            .context("sway created no new output")?;
+        let output = compositor::current().create_output()?;
         // Everything after this point has to remove the output again on failure.
         let index = NEXT_INDEX.fetch_add(1, Ordering::Relaxed) % 100;
         // The caller names the workspace (it is the daemon that keeps concurrent sessions apart).
@@ -198,27 +171,23 @@ impl Session {
         match Self::attach(&output, index, &workspace, (w, h), layout, opts) {
             Ok(s) => Ok(s),
             Err(e) => {
-                let _ = swaymsg(&["output", &output, "unplug"]);
+                let _ = compositor::current().remove_output(&output);
                 Err(e)
             }
         }
     }
 
     fn attach(output: &str, index: u32, workspace: &str, (w, h): (u16, u16), layout: &str, opts: &Options) -> Result<Self> {
-        swaymsg(&["output", output, "mode", "--custom", &format!("{w}x{h}@60Hz"), "scale", "1"])?;
+        let comp = compositor::current();
+        comp.init_output(output, (w, h))?;
         if !crate::capture::cursor_in_picture() && !crate::cursors::sway_reports_cursor() {
             // A headless sway has no hardware cursor, so it draws the cursor into the picture whatever screencopy is asked
             // for: with the client's own pointer that makes two. Give sway a theme whose cursors have nothing in them.
-            let _ = swaymsg(&["seat", "*", "xcursor_theme", "waydesk-blank", "24"]);
+            let _ = comp.hide_cursor();
         }
-        // A workspace is created on the focused output, so focus the session output first.
-        swaymsg(&["focus", "output", output])?;
-        swaymsg(&["workspace", workspace])?;
-        // If a workspace of that name already existed elsewhere, `workspace` jumped to it: bring it here.
-        let _ = swaymsg(&["move", "workspace", "to", "output", output]);
-        swaymsg(&["focus", "output", output])?;
+        comp.show_workspace(output, workspace)?;
         if opts.spawn_terminal {
-            swaymsg(&["exec", "foot -T waydesk-server-session"])?;
+            comp.spawn_terminal()?;
         }
 
         let (shared, stop) = start_capture(output)?;
@@ -234,7 +203,7 @@ impl Session {
         let (w, h) = clamp_size(size.0, size.1);
         // The old capture wakes up on the mode change, sees the flag and ends.
         self.stop.store(true, Ordering::Relaxed);
-        swaymsg(&["output", &self.output, "mode", "--custom", &format!("{w}x{h}@60Hz")])?;
+        compositor::current().set_mode(&self.output, (w, h))?;
         let (shared, stop) = start_capture(&self.output).context("capture after resize")?;
         let _ = self.input.send(input::Cmd::SetExtent { w: shared.width.into(), h: shared.height.into() });
         info!(output = %self.output, width = shared.width, height = shared.height, "session resized");
@@ -246,7 +215,7 @@ impl Session {
     /// Match sway's scale to the client's (200% in the display layout means scale 2).
     pub fn set_scale(&self, percent: u32) {
         let scale = (f64::from(percent.clamp(100, 400)) / 100.0).to_string();
-        if let Err(e) = swaymsg(&["output", &self.output, "scale", &scale]) {
+        if let Err(e) = compositor::current().set_scale(&self.output, &scale) {
             warn!("cannot set scale: {e:#}");
         }
     }
@@ -258,16 +227,11 @@ impl Drop for Session {
         if let Some(h) = self.hook.take() {
             stop_hook(h);
         }
+        let comp = compositor::current();
         // Close what ran in this session so it does not pile up on the console output.
-        let _ = swaymsg(&[&format!("[workspace=\"{}\"]", self.workspace), "kill"]);
-        // Windows minimized from this session sit in the scratchpad, marked with the output they came from.
-        let _ = swaymsg(&[&format!("[con_mark=\"^from:{}$\"]", self.output), "kill"]);
-        // Hand the focus back to another output first: a workspace that is focused when its output goes
-        // away is moved to the remaining output and kept there, empty, under the same name.
-        if let Some(other) = output_names().ok().and_then(|v| v.into_iter().find(|n| *n != self.output)) {
-            let _ = swaymsg(&["focus", "output", &other]);
-        }
-        if let Err(e) = swaymsg(&["output", &self.output, "unplug"]) {
+        comp.close_windows(&self.workspace, &self.output);
+        comp.release_focus(&self.output);
+        if let Err(e) = comp.remove_output(&self.output) {
             warn!("cannot remove output {}: {e:#}", self.output);
         }
         info!(output = %self.output, workspace = %self.workspace, "session removed");
