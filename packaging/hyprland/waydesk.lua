@@ -4,12 +4,25 @@
 -- (Omarchy's, through ~/.config/hypr/hyprland.lua), and afterwards puts /usr/lib/waydesk/bin back in front of PATH for everything Hyprland starts:
 -- Omarchy's own configuration puts $OMARCHY_PATH/bin first, which hid the stand-ins there (logout, reboot, shutdown, the browser policy helper).
 local home = os.getenv("HOME") or ""
-local user_config = home .. "/.config/hypr/hyprland.lua"
+local config_dir = home .. "/.config/hypr"
+local user_config = config_dir .. "/hyprland.lua"
 
+-- Hyprland finds the `require`s of a Lua configuration next to the main configuration file. The main file is this one, in /usr/lib/waydesk, so
+-- without this a configuration with require("monitors") or require("conf.keybinding") (ML4W, and most others) fails at its first require.
+package.path = config_dir .. "/?.lua;" .. config_dir .. "/?/init.lua;" .. package.path
+
+local runtime = os.getenv("XDG_RUNTIME_DIR") or "/tmp"
 local f = io.open(user_config, "r")
 if f then
   f:close()
-  dofile(user_config)
+  -- A configuration that fails must not stop the rest of this file: the session still needs its PATH, its output rule and the marker below, or the
+  -- client would see nothing at all. The error is left in a file for the Waydesk session to log.
+  local ok, err = pcall(dofile, user_config)
+  local ef = io.open(runtime .. "/waydesk-config-error.txt", "w")
+  if ef then
+    ef:write(ok and "" or tostring(err))
+    ef:close()
+  end
 end
 
 local ours = "/usr/lib/waydesk/bin"
@@ -26,7 +39,6 @@ hl.env("PATH", table.concat(parts, ":"))
 -- The size and scale of the session's output. Omarchy's own configuration has a rule for every monitor (output = "", mode = "preferred"), which a
 -- (re)load applies to the session's headless output as well and so puts it back to 1920x1080, whatever the client asked for. The Waydesk session writes the
 -- rule it wants for its output to this file; loading it after the account's configuration makes that rule the one that stays, through reloads too.
-local runtime = os.getenv("XDG_RUNTIME_DIR") or "/tmp"
 local rule = runtime .. "/waydesk-monitor.lua"
 local rf = io.open(rule, "r")
 if rf then

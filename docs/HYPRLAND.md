@@ -135,3 +135,22 @@ Two things the test found, both fixed:
   time starting the helper, which said "needs to be setuid root". Starting the socket brought an idle session from 73 % to 5 % of a core and the GPU from 66 % to 3 % busy. The Arch
   package depends on polkit and starts the socket when it is installed; the socket is started at boot anyway. (A `status` of an account's CPU counts the short-lived processes that
   are gone by the time you look, which is why `top` showed only 30 %.)
+
+## Other people's Hyprland setups: ML4W (tried 2026-10-30)
+
+ML4W (My Linux for Work, dotfiles for Hyprland, version 2.16.1: its configuration is Lua since 2.13) was installed for one account and run as a Waydesk session: its Welcome app, its top
+bar and dock, the wallpaper daemon, the notification daemon and the launcher all came up, with the VAAPI encoder; about 1.0 GB for the session after 75 s (the shell, `qs`, is the
+largest part). Packages: 84 names in ML4W's two lists, 49 already present, 34 installed, none missing from the Arch repositories. Its installer was run as the account with the
+packages already installed (it asks for confirmation, and for `sudo` for its package step).
+
+What it showed about running someone else's configuration:
+
+- **The wrapper broke relative `require`s.** Hyprland looks for the `require`s of a Lua configuration next to the main configuration file; that is the wrapper (`/usr/lib/waydesk`), so
+  ML4W's `require("functions")` failed, the wrapper stopped before it wrote its marker, and the client saw a black screen after 30 s. Omarchy had worked only because it sets its own
+  `package.path`. The wrapper now adds `~/.config/hypr` to `package.path` first, loads the account's configuration with `pcall`, and leaves any error in `waydesk-config-error.txt`, which the
+  session logs as a warning: a broken configuration gives a session without it, not a black screen.
+- **Idle management reaches a remote session.** ML4W's `hypridle` locks the screen after 10 minutes without input, switches the display off after 11 and suspends after 30 (refused by the
+  polkit rule). Measured on the session: **display off turns the client's picture completely black** (brightness 0.24 to 0.00) until it is switched on again; the **lock screen** (`hyprlock`) shows
+  in the RDP picture and **typing the account password through the RDP client unlocks it**. Not measured: how long a reconnecting client has to wait, or whether its first mouse movement
+  wakes a display that was switched off while nobody was connected. An administrator who does not want this edits `~/.config/hypr/hypridle.conf` of the account.
+- Not checked: the rest of ML4W (its settings app, its updater, the browser it expects, the AUR packages it offers), more than one ML4W account at a time.

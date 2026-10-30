@@ -640,6 +640,7 @@ impl OwnCompositor {
         // Nothing of an earlier Hyprland of this account: a stale rule would be loaded into this one, a stale marker would end the wait at once.
         let _ = std::fs::remove_file(runtime.join(hyprland::RULE_FILE));
         let _ = std::fs::remove_file(runtime.join(hyprland::READY_FILE));
+        let _ = std::fs::remove_file(runtime.join("waydesk-config-error.txt"));
         let mut cmd = std::process::Command::new("Hyprland");
         let mut wrapped = false;
         if let Some(config) = hyprland_config(std::env::var_os("HOME").as_deref().map(std::path::Path::new), |p| p.is_file()) {
@@ -708,6 +709,12 @@ impl OwnCompositor {
             }
             if !loaded {
                 warn!("Hyprland did not finish loading its configuration in 30 s: going on");
+            }
+            // The wrapper leaves the error of the account's own configuration here (empty when it loaded).
+            if let Ok(text) = std::fs::read_to_string(runtime.join("waydesk-config-error.txt")) {
+                if !text.trim().is_empty() {
+                    warn!("the account's Hyprland configuration failed to load, the session goes on without it: {}", text.lines().next().unwrap_or(""));
+                }
             }
         }
         // Started without start-hyprland, it puts a warning in the picture: switch it off, and take down the one already there.
