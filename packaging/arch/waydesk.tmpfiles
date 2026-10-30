@@ -1,2 +1,4 @@
 # The certificate directory: the daemon's account reads it, nobody else.
 d /etc/waydesk 0750 root waydesk -
+# Per-account settings (waydesk-admin users set NAME --desktop ...), read by the session unit; world-readable so that `users list` and `status` can show them.
+d /etc/default/waydesk.d 0755 root root -

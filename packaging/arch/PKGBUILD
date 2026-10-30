@@ -6,7 +6,7 @@
 # the account's own Hyprland (docs/HYPRLAND.md).
 pkgname=waydesk-server
 pkgver=0.4.0
-pkgrel=1
+pkgrel=2
 pkgdesc='RDP server giving each account its own headless Wayland desktop (sway; Hyprland experimental)'
 arch=(x86_64 aarch64)
 url='https://waydesk.stackcare.pt'
@@ -93,7 +93,7 @@ package() {
   install -Dm644 packaging/udev/71-waydesk-hyprland-card.rules -t "$pkgdir/usr/share/waydesk/udev"
 
   install -Dm644 README.md docs/MULTIUSER-DESIGN.md docs/WIREGUARD.md docs/ACCESS.md docs/AUDIT-DESIGN.md docs/THREAT-MODEL.md \
-    docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md docs/HYPRLAND.md docs/ARCH.md -t "$pkgdir/usr/share/doc/$pkgname"
+    docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md docs/HYPRLAND.md docs/ARCH.md docs/BRING-YOUR-OWN-CONFIG.md docs/REFERENCE.md -t "$pkgdir/usr/share/doc/$pkgname"
   install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
   install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE"
 }
