@@ -637,6 +637,10 @@ impl OwnCompositor {
         let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);
         let card = hyprland::card_of_render_node(node).with_context(|| format!("no DRM card belongs to {}", node.display()))?;
         let mut cmd = std::process::Command::new("Hyprland");
+        if let Some(config) = hyprland_config(std::env::var_os("HOME").as_deref().map(std::path::Path::new), |p| p.is_file()) {
+            cmd.arg("--config").arg(&config);
+            info!(config = %config.display(), "Hyprland config (the account's own, with Waydesk's directory first on PATH)");
+        }
         if !runtime.join("bus").exists() {
             cmd.env("GSETTINGS_BACKEND", "memory");
         }
@@ -712,6 +716,16 @@ impl Drop for OwnCompositor {
 /// `waydesk-quickshell` packages are installed: the same on every distribution, so that a distribution's own (older, newer, unpatched)
 /// versions never decide what a session runs.
 pub const PRIVATE_BIN: &str = "/usr/lib/waydesk/bin";
+
+/// Waydesk's wrapper for the Hyprland configuration (packaging/hyprland/waydesk.lua): it loads the account's own and then puts `PRIVATE_BIN` back in front of
+/// `PATH`, which Omarchy's configuration moves behind its own `bin`. Only used when the account has a configuration of its own for it to load.
+const HYPRLAND_WRAPPER: &str = "/usr/lib/waydesk/hyprland.lua";
+
+fn hyprland_config(home: Option<&std::path::Path>, is_file: impl Fn(&std::path::Path) -> bool) -> Option<std::path::PathBuf> {
+    let wrapper = std::path::Path::new(HYPRLAND_WRAPPER);
+    let own = home?.join(".config/hypr/hyprland.lua");
+    (is_file(wrapper) && is_file(&own)).then(|| wrapper.to_path_buf())
+}
 
 /// `PATH` with `dir` first, once: everything the session worker starts (sway, swaymsg, and through sway the applications, the scripts
 /// and the shell's user service) then finds Waydesk's copies before the distribution's.
@@ -802,6 +816,17 @@ pub fn prefer_private_bin() {
 
 #[cfg(test)]
 mod private_bin_tests {
+    #[test]
+    fn hyprland_wrapper_is_used_only_with_an_own_config() {
+        let home = Some(Path::new("/home/a"));
+        let has = |files: &'static [&'static str]| move |p: &Path| files.iter().any(|f| p == Path::new(f));
+        let both = has(&[HYPRLAND_WRAPPER, "/home/a/.config/hypr/hyprland.lua"]);
+        assert_eq!(hyprland_config(home, both), Some(HYPRLAND_WRAPPER.into()));
+        assert_eq!(hyprland_config(home, has(&[HYPRLAND_WRAPPER])), None, "nothing of the account's to load: Hyprland keeps its own default");
+        assert_eq!(hyprland_config(home, has(&["/home/a/.config/hypr/hyprland.lua"])), None, "no wrapper installed");
+        assert_eq!(hyprland_config(None, both), None);
+    }
+
     #[test]
     fn sway_config_choice() {
         let has = |files: &'static [&'static str]| move |p: &Path| files.iter().any(|f| p == Path::new(f));

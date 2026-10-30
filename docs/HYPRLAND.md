@@ -39,6 +39,11 @@ What a package has to provide for it:
   a password, anyone else gets a polkit dialog ("Authorize running ...") for a password they do not have, and one account's theme would recolour every account's browser.
   `packaging/hyprland/bin/omarchy-theme-set-browser-policy` does nothing instead; installed in `/usr/lib/waydesk/bin`, which is first on the session's `PATH`, it
   affects Waydesk sessions only (a session that was already running keeps asking until it is restarted). The theme itself (bar, terminal, wallpaper) still changes.
+- **The stand-ins need the right `PATH`.** Omarchy's Hyprland configuration (`default/hypr/envs.lua`) puts `$OMARCHY_PATH/bin` first on `PATH` for everything Hyprland starts, so
+  the stand-ins below, in `/usr/lib/waydesk/bin`, were never reached from the menu (found when logout did nothing; a first test had looked at Hyprland's own `PATH`, not the menu's).
+  Waydesk therefore starts Hyprland with `--config /usr/lib/waydesk/hyprland.lua` (`packaging/hyprland/waydesk.lua`), which loads the account's own configuration unchanged and
+  then puts `/usr/lib/waydesk/bin` back in front. Only used when the account has `~/.config/hypr/hyprland.lua` to load. Checked through the real services: the menu process's
+  `PATH` starts with Waydesk's directory, Omarchy's other commands still come from Omarchy's, and logout ended the session.
 - **Logout.** Omarchy logs out with `uwsm stop`, which stops a session that its session manager started; Waydesk starts Hyprland itself, so the menu entry did
   nothing. `packaging/hyprland/bin/omarchy-system-logout` (also in `/usr/lib/waydesk/bin`) closes the windows as Omarchy's does and then exits Hyprland: the session
   worker sees that, ends the session and the RDP client is disconnected (tried: windows closed, unit stopped, client gone). Disconnecting without logging out still
