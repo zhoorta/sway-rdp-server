@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 [ "$(id -u)" -eq 0 ] || { echo "waydesk-setup-admin: run it as root (sudo waydesk-setup-admin)" >&2; exit 1; }
-command -v waydesk-admin >/dev/null || { echo "waydesk-setup-admin: waydesk-admin is not installed (apt install waydesk-server)" >&2; exit 1; }
+command -v waydesk-admin >/dev/null || { echo "waydesk-setup-admin: waydesk-admin is not installed" >&2; exit 1; }
 
 interactive=""; [ -t 0 ] && [ -z "$use_stdin" ] && interactive=1
 valid_name() { printf '%s' "$1" | grep -Eq '^[a-z_][a-z0-9_-]{0,31}$'; }

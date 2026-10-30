@@ -1,0 +1,2 @@
+# The certificate directory: the daemon's account reads it, nobody else.
+d /etc/waydesk 0750 root waydesk -

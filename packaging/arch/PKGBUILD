@@ -1,0 +1,89 @@
+# Maintainer: José Mendonça <jmendonca@gmail.com>
+#
+# Waydesk for Arch Linux: the RDP server, the root helper, the admin tools and the services. Build it with packaging/arch/build.sh
+# (it makes the source tarball of the committed tree and runs makepkg). The desktop of the Debian packages (waydesk-desktop: shell, launcher,
+# title-bar buttons) is not part of this: a session gets plain sway (/usr/share/waydesk/sway-minimal.conf) or, with WAYDESK_COMPOSITOR=hyprland,
+# the account's own Hyprland (docs/HYPRLAND.md).
+pkgname=waydesk-server
+pkgver=0.4.0
+pkgrel=1
+pkgdesc='RDP server giving each account its own headless Wayland desktop (sway; Hyprland experimental)'
+arch=(x86_64 aarch64)
+url='https://waydesk.stackcare.pt'
+license=(MIT Apache-2.0)
+depends=(acl foot sway pam libva libdrm mesa libxkbcommon openssl logrotate systemd
+         pipewire pipewire-pulse libpulse wireplumber wl-clipboard openh264)
+makedepends=(cargo clang pkgconf)
+optdepends=('hyprland: Hyprland sessions (WAYDESK_COMPOSITOR=hyprland; needs a GPU, see /usr/share/doc/waydesk-server/HYPRLAND.md)'
+            'intel-media-driver: hardware H.264 encoding on Intel GPUs (VA-API)'
+            'libva-mesa-driver: hardware H.264 encoding on AMD GPUs (VA-API)'
+            'zram-generator: compressed swap in RAM, which the memory settings expect'
+            'wireguard-tools: waydesk-admin vpn'
+            'qrencode: waydesk-admin vpn shows a QR code')
+backup=(etc/default/waydesk etc/pam.d/waydesk-server etc/pam.d/waydesk-session etc/logrotate.d/waydesk)
+install=waydesk-server.install
+source=("$pkgname-$pkgver.tar.gz"
+        waydesk.sysusers
+        waydesk.tmpfiles)
+sha256sums=('SKIP'   # made by build.sh from the committed tree; a release would name its tag tarball and checksum here
+            'SKIP'
+            'SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo test --frozen --release
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 target/release/waydesk-server target/release/waydesk-admin target/release/waydesk-passwd -t "$pkgdir/usr/bin"
+  install -Dm755 packaging/bin/waydesk-setup-admin "$pkgdir/usr/bin/waydesk-setup-admin"
+  install -Dm644 packaging/org.waydesk.admin.policy -t "$pkgdir/usr/share/polkit-1/actions"
+
+  # services, and the memory and kernel settings that go with them
+  install -Dm644 packaging/systemd/waydesk.service packaging/systemd/waydesk-helper.service "packaging/systemd/waydesk-session@.service" \
+    packaging/systemd/waydesk-cert-renew.service packaging/systemd/waydesk-cert-renew.timer -t "$pkgdir/usr/lib/systemd/system"
+  install -Dm644 packaging/systemd/user-slice/10-waydesk.conf "$pkgdir/usr/lib/systemd/system/user-.slice.d/10-waydesk.conf"
+  install -Dm644 packaging/systemd/zram/50-waydesk.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/50-waydesk.conf"
+  install -Dm644 packaging/systemd/sysctl/50-waydesk.conf "$pkgdir/usr/lib/sysctl.d/50-waydesk.conf"
+  install -Dm644 packaging/systemd/modules-load/waydesk.conf "$pkgdir/usr/lib/modules-load.d/waydesk.conf"
+  install -Dm644 "$srcdir/waydesk.sysusers" "$pkgdir/usr/lib/sysusers.d/waydesk.conf"
+  install -Dm644 "$srcdir/waydesk.tmpfiles" "$pkgdir/usr/lib/tmpfiles.d/waydesk.conf"
+
+  # waydesk-admin access, cert, vpn
+  install -Dm755 packaging/admin/access packaging/admin/cert packaging/admin/vpn -t "$pkgdir/usr/lib/waydesk/admin"
+  install -Dm644 packaging/admin/common.sh -t "$pkgdir/usr/lib/waydesk/admin"
+
+  # settings and PAM (Arch's own PAM file for the server: Debian's includes common-auth)
+  install -Dm644 packaging/default-waydesk "$pkgdir/etc/default/waydesk"
+  install -Dm644 packaging/arch/pam-waydesk-server "$pkgdir/etc/pam.d/waydesk-server"
+  install -Dm644 packaging/pam-waydesk-session "$pkgdir/etc/pam.d/waydesk-session"
+  install -Dm644 packaging/logrotate-waydesk "$pkgdir/etc/logrotate.d/waydesk"
+
+  # sessions: a minimal sway configuration, the blank cursor theme, the Mac keyboard layout, the GPU rules
+  install -Dm644 packaging/sway-minimal.conf "$pkgdir/usr/share/waydesk/sway-minimal.conf"
+  install -d "$pkgdir/usr/share/icons"
+  cp -a packaging/cursors/waydesk-blank "$pkgdir/usr/share/icons/"
+  install -Dm644 packaging/xkb/waydeskmac "$pkgdir/etc/xkb/symbols/waydeskmac"
+  install -Dm644 packaging/udev/70-waydesk-gpu.rules -t "$pkgdir/usr/lib/udev/rules.d"
+  # the card node for Hyprland sessions is a choice, not a default (docs/HYPRLAND.md, Security notes): shipped as an example
+  install -Dm644 packaging/udev/71-waydesk-hyprland-card.rules -t "$pkgdir/usr/share/waydesk/udev"
+
+  install -Dm644 README.md docs/MULTIUSER-DESIGN.md docs/WIREGUARD.md docs/ACCESS.md docs/AUDIT-DESIGN.md docs/THREAT-MODEL.md \
+    docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md docs/HYPRLAND.md docs/ARCH.md -t "$pkgdir/usr/share/doc/$pkgname"
+  install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
+  install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE"
+}

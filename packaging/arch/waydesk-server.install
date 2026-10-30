@@ -1,0 +1,38 @@
+post_install() {
+  systemd-sysusers waydesk.conf >/dev/null 2>&1 || true
+  systemd-tmpfiles --create waydesk.conf >/dev/null 2>&1 || true
+  if [ ! -f /etc/waydesk/key.pem ]; then
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=$(cat /etc/hostname 2>/dev/null || echo waydesk)" \
+      -keyout /etc/waydesk/key.pem -out /etc/waydesk/cert.pem >/dev/null 2>&1
+    chown waydesk:waydesk /etc/waydesk/key.pem /etc/waydesk/cert.pem
+    chmod 600 /etc/waydesk/key.pem
+    echo "waydesk: made a self-signed certificate. Check this fingerprint in your RDP client on first connect:"
+    openssl x509 -in /etc/waydesk/cert.pem -noout -fingerprint -sha256 | sed 's/^/    /'
+  fi
+  # tcp_bbr first, so that the sysctl file may list it; the compressed swap and the GPU rule need no reboot either
+  modprobe tcp_bbr >/dev/null 2>&1 || true
+  /usr/lib/systemd/systemd-sysctl /usr/lib/sysctl.d/50-waydesk.conf >/dev/null 2>&1 || true
+  udevadm control --reload >/dev/null 2>&1 || true
+  udevadm trigger --subsystem-match=drm --action=change >/dev/null 2>&1 || true
+  cat <<MSG
+waydesk: to start it:
+    sudo systemctl enable --now waydesk-helper.service waydesk.service
+Nobody can log in over RDP yet: members of the group waydesk-users may. Make the first administrator:
+    sudo waydesk-setup-admin
+Sessions run sway. For Hyprland (needs a GPU) read /usr/share/doc/waydesk-server/HYPRLAND.md.
+Each account's sessions need a sound server: systemctl --user enable --now pipewire.socket pipewire-pulse.socket wireplumber.service
+MSG
+}
+
+post_upgrade() {
+  systemd-sysusers waydesk.conf >/dev/null 2>&1 || true
+  systemd-tmpfiles --create waydesk.conf >/dev/null 2>&1 || true
+  udevadm control --reload >/dev/null 2>&1 || true
+  echo "waydesk: restart the services to use the new version: sudo systemctl restart waydesk-helper.service waydesk.service"
+  echo "         (sessions that are running keep the old version until their account logs out of them)"
+}
+
+pre_remove() {
+  systemctl stop waydesk.service waydesk-helper.service >/dev/null 2>&1 || true
+  systemctl disable waydesk.service waydesk-helper.service >/dev/null 2>&1 || true
+}
