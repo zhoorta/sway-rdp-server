@@ -1,0 +1,15 @@
+// Waydesk: the accounts that log in over RDP share the server, so they may not reboot, power off, halt, suspend or hibernate it.
+//
+// Without this an ordinary account is already refused (logind asks for an administrator's authentication, which it cannot give, and says that
+// other users are logged in), but it gets a password dialog that a known administrator password would satisfy. This answers no, at once.
+// Administrators (members of the group wheel) are not affected: they keep whatever logind and polkit allow them. To let another group through,
+// add it to the exceptions below.
+polkit.addRule(function(action, subject) {
+    if (!/^org\.freedesktop\.login1\.(reboot|power-off|halt|suspend|hibernate|hybrid-sleep)/.test(action.id)) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (subject.isInGroup("waydesk-users") && !subject.isInGroup("wheel")) {
+        return polkit.Result.NO;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

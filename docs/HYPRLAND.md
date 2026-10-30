@@ -43,6 +43,14 @@ What a package has to provide for it:
   nothing. `packaging/hyprland/bin/omarchy-system-logout` (also in `/usr/lib/waydesk/bin`) closes the windows as Omarchy's does and then exits Hyprland: the session
   worker sees that, ends the session and the RDP client is disconnected (tried: windows closed, unit stopped, client gone). Disconnecting without logging out still
   leaves the session running, as before.
+- **Reboot, shutdown, suspend.** The server is shared. An ordinary account was already refused (logind answers "challenge": an administrator's authentication, and says that other users are
+  logged in), but got a password dialog that a known administrator password would satisfy, and Omarchy's menu announced "Rebooting" and failed two seconds later.
+  `packaging/polkit/50-waydesk-no-power.rules` now answers no, at once, to reboot, power-off, halt, suspend, hibernate and hybrid-sleep for members of `waydesk-users` who are
+  not in `wheel` (checked: `alice` and `bob` get `no`, an account outside the group and an administrator in `wheel` are unchanged, `systemctl reboot` as `alice` says
+  "Access denied"). It is not Hyprland-specific and is in both packages. The menu entries are still listed; `omarchy-system-reboot` and `omarchy-system-shutdown` in
+  `/usr/lib/waydesk/bin` say "disabled on this server" instead of failing, and hand over to Omarchy's own command for `wheel`. Not run: that last path (it would restart the
+  server). To hide the entries, an account can add `"system.reboot": {"label":"Reboot","when":"false"}` (same for shutdown and suspend) to
+  `~/.config/omarchy/extensions/omarchy-menu.jsonc`; the server does not edit that file.
 - The `waydesk-blank` cursor theme (from `packaging/cursors`), or Hyprland draws its own cursor into the picture.
 
 ## Why a GPU is needed

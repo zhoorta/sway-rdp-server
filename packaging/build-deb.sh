@@ -17,6 +17,7 @@ install -m 755 /tmp/target/release/waydesk-admin $P/usr/bin/waydesk-admin
 install -m 755 /tmp/target/release/waydesk-passwd $P/usr/bin/waydesk-passwd
 mkdir -p $P/usr/sbin && install -m 755 packaging/bin/waydesk-setup-admin $P/usr/sbin/waydesk-setup-admin   # the first administrator (RDP login)
 mkdir -p $P/usr/share/polkit-1/actions && install -m 644 packaging/org.waydesk.admin.policy $P/usr/share/polkit-1/actions/
+mkdir -p $P/usr/share/polkit-1/rules.d && install -m 644 packaging/polkit/50-waydesk-no-power.rules $P/usr/share/polkit-1/rules.d/   # RDP accounts may not reboot, power off or suspend the server
 install -m 644 packaging/systemd/*.service $P/lib/systemd/system/   # includes waydesk-session@.service
 mkdir -p $P/lib/systemd/system/user-.slice.d && install -m 644 packaging/systemd/user-slice/10-waydesk.conf $P/lib/systemd/system/user-.slice.d/
 mkdir -p $P/usr/lib/systemd/zram-generator.conf.d $P/usr/lib/sysctl.d

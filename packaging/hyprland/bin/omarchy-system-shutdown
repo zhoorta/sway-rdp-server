@@ -1,0 +1,10 @@
+#!/bin/sh
+# Waydesk sessions: stand-in for Omarchy's shutdown (found first on the session's PATH, see worker.rs prefer_private_bin).
+#
+# The server is shared: an ordinary account may not shutdown it (packaging/polkit/50-waydesk-no-power.rules refuses it), and Omarchy's menu entry would
+# announce "Shutdown" and then fail two seconds later. This says so at once. An administrator (group wheel) gets Omarchy's own command.
+if id -nG | tr ' ' '\n' | grep -qx wheel; then
+    exec /usr/bin/omarchy-system-shutdown "$@"
+fi
+command -v omarchy-osd >/dev/null 2>&1 && omarchy-osd -i shutdown -m "Shutdown is disabled on this server" -d 4000 >/dev/null 2>&1
+exit 0
