@@ -54,3 +54,16 @@ diff -ru cros-libva.orig/src/display.rs cros-libva/src/display.rs
          self.handle
      }
  
+diff -ru cros-libva.orig/src/buffer/vp9.rs cros-libva/src/buffer/vp9.rs
+--- cros-libva.orig/src/buffer/vp9.rs	2026-10-30 18:26:16
++++ cros-libva/src/buffer/vp9.rs	2026-10-30 18:26:31
+@@ -434,7 +434,8 @@
+             skip_frame_flag,
+             number_skip_frames,
+             skip_frames_size,
+-            va_reserved: Default::default(),
++            // Newer libva adds fields to this structure (seg_id_block_size, va_reserved8): leave the rest zeroed.
++            ..Default::default()
+         }))
+     }
+ 

@@ -190,7 +190,9 @@ fn extract_sps_pps(data: &[u8]) -> Option<Vec<u8>> {
 ///
 /// The crate's own `from_blob_path` only accepts Cisco's binaries (it compares a SHA-256 list), which would reject every
 /// distribution build. The bindings were generated for OpenH264 2.6, so a system library is accepted when the file it
-/// resolves to is a 2.6 release; anything else is refused instead of risking an ABI mismatch.
+/// resolves to is a 2.6 or 2.7 release; anything else is refused instead of risking an ABI mismatch. 2.7.0 is accepted because
+/// its public headers (codec_api.h, codec_app_def.h, codec_def.h) are identical to 2.6.0's and the soname is the same (.8);
+/// Arch ships 2.7. Check the headers again before adding a later release.
 /// `WAYDESK_OPENH264` names a library to use instead (for example a copy downloaded from Cisco); that one keeps the
 /// crate's hash check.
 pub fn load_openh264() -> anyhow::Result<OpenH264API> {
@@ -202,16 +204,16 @@ pub fn load_openh264() -> anyhow::Result<OpenH264API> {
         let link = std::path::Path::new(dir).join("libopenh264.so.8");
         let Ok(real) = std::fs::canonicalize(&link) else { continue };
         let name = real.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_owned();
-        if !name.starts_with("libopenh264.so.2.6.") {
-            problems.push(format!("{}: is {name}, need an OpenH264 2.6 release", link.display()));
+        if !name.starts_with("libopenh264.so.2.6.") && !name.starts_with("libopenh264.so.2.7.") {
+            problems.push(format!("{}: is {name}, need an OpenH264 2.6 or 2.7 release", link.display()));
             continue;
         }
-        // SAFETY: the file is a 2.6 release of the library the bindings were generated for, as checked above.
+        // SAFETY: the file is a 2.6 or 2.7 release, whose API is the one the bindings were generated for, as checked above.
         match unsafe { OpenH264API::from_blob_path_unchecked(&real) } {
             Ok(api) => return Ok(api),
             Err(e) => problems.push(format!("{}: {e}", real.display())),
         }
     }
-    anyhow::bail!("no usable libopenh264 (install the libopenh264-8 package, version 2.6): {}", problems.join("; "))
+    anyhow::bail!("no usable libopenh264 (install the libopenh264-8 package, version 2.6 or 2.7): {}", problems.join("; "))
 }
 

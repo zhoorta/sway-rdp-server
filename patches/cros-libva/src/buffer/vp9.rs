@@ -434,7 +434,8 @@ impl EncPictureParameterBufferVP9 {
             skip_frame_flag,
             number_skip_frames,
             skip_frames_size,
-            va_reserved: Default::default(),
+            // Newer libva adds fields to this structure (seg_id_block_size, va_reserved8): leave the rest zeroed.
+            ..Default::default()
         }))
     }
 
