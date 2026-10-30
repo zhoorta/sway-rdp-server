@@ -28,7 +28,7 @@ pub struct Config {
     pub opts: session::Options,
     /// None: no H.264, bitmaps only.
     pub tuning: Option<Tuning>,
-    /// Start a headless sway of this session's own (see `OwnSway`).
+    /// Start a headless sway of this session's own (see `OwnCompositor`).
     pub own_sway: bool,
     /// Keep the session across clients: register with the root helper at this socket and take the client sockets it
     /// sends. None: one client, on the socket inherited as fd 3, and the session ends with it.
@@ -136,7 +136,7 @@ pub async fn run(cfg: Config) -> Result<()> {
         None => Source::Single(Some(unsafe { std::os::unix::net::UnixStream::from_raw_fd(3) })),
     };
     // Declared before the session so that it is dropped after it: the session's cleanup still needs the sway.
-    let mut sway = if cfg.own_sway { Some(OwnSway::start_preferring_gpu().await?) } else { None };
+    let mut sway = if cfg.own_sway { Some(OwnCompositor::start_preferring_gpu().await?) } else { None };
 
     let mut session: Option<Session> = None;
     let mut pending: Option<std::os::unix::net::UnixStream> = None;
@@ -161,7 +161,7 @@ pub async fn run(cfg: Config) -> Result<()> {
                             info!("no client for {:?}: ending the session", cfg.idle_timeout);
                             break None;
                         }
-                        _ = tick.tick() => if sway.as_mut().is_some_and(OwnSway::exited) {
+                        _ = tick.tick() => if sway.as_mut().is_some_and(OwnCompositor::exited) {
                             info!("sway has ended: ending the session");
                             break None;
                         },
@@ -200,7 +200,7 @@ async fn serve_client(
     session: Option<Session>,
     cfg: &Config,
     source: &mut Source,
-    sway: &mut Option<OwnSway>,
+    sway: &mut Option<OwnCompositor>,
     term: &mut tokio::signal::unix::Signal,
     int: &mut tokio::signal::unix::Signal,
 ) -> (Option<Session>, Outcome) {
@@ -268,7 +268,7 @@ async fn serve_client(
             let created = loop {
                 let (layout, opts) = (layout.clone(), cfg.opts.clone());
                 // `WAYDESK_TEST_GPU_SESSION_FAILS=1` (testing only) makes the first attempt on a GPU fail, to try the fallback where the GPU works.
-                let simulate = attempt == 0 && sway.as_ref().is_some_and(|s| s.on_gpu) && std::env::var_os("WAYDESK_TEST_GPU_SESSION_FAILS").is_some();
+                let simulate = attempt == 0 && sway.as_ref().is_some_and(|s| s.can_retry_in_software) && std::env::var_os("WAYDESK_TEST_GPU_SESSION_FAILS").is_some();
                 let result = if simulate {
                     Ok(Err(anyhow::anyhow!("simulated: the compositor could not hand over a picture")))
                 } else {
@@ -277,13 +277,13 @@ async fn serve_client(
                 match result {
                     // A GPU that sway starts on but cannot allocate for (NVIDIA's driver 550: the first capture fails) would leave the account with no desktop at
                     // all: the same session once more on a sway in software.
-                    Ok(Err(e)) if attempt == 0 && sway.as_ref().is_some_and(|s| s.on_gpu) => {
+                    Ok(Err(e)) if attempt == 0 && sway.as_ref().is_some_and(|s| s.can_retry_in_software) => {
                         warn!("the session could not be made on the GPU ({e:#}): software rendering");
                         attempt += 1;
                         if let Some(old) = sway.take() {
                             let _ = tokio::task::spawn_blocking(move || drop(old)).await;
                         }
-                        match OwnSway::start(None).await {
+                        match OwnCompositor::start(None).await {
                             Ok(new) => *sway = Some(new),
                             Err(e2) => break Ok(Err(e2.context(format!("and sway in software did not start either; the GPU said: {e:#}")))),
                         }
@@ -343,7 +343,7 @@ async fn serve_client(
         tokio::select! {
             _ = term.recv() => break Outcome::Stop,
             _ = int.recv() => break Outcome::Stop,
-            _ = tick.tick() => if sway.as_mut().is_some_and(OwnSway::exited) {
+            _ = tick.tick() => if sway.as_mut().is_some_and(OwnCompositor::exited) {
                 info!("sway has ended");
                 break Outcome::Stop;
             },
@@ -514,22 +514,28 @@ impl Worker {
     }
 }
 
-/// A headless sway that belongs to this session (and so to its account): its Wayland and IPC sockets live in the
-/// account's own runtime directory, which no other account can enter. Stopped when dropped.
-struct OwnSway {
+/// A headless compositor (sway or Hyprland) that belongs to this session (and so to its account): its Wayland and IPC sockets live
+/// in the account's own runtime directory, which no other account can enter. Stopped when dropped.
+struct OwnCompositor {
     child: std::process::Child,
-    /// True when it renders on a GPU: a session that cannot be made on it is made again on a sway that does not.
-    on_gpu: bool,
+    /// True when it renders on a GPU and a sway in software exists to try instead: a session that cannot be made on the GPU is made
+    /// again on that. Never for Hyprland, which has no software renderer.
+    can_retry_in_software: bool,
 }
 
-impl OwnSway {
+impl OwnCompositor {
     /// True when sway has ended (the account logged out of it, or it crashed).
     fn exited(&mut self) -> bool {
         !matches!(self.child.try_wait(), Ok(None))
     }
 
-    /// With a GPU node from the daemon, sway renders on it; if that does not work, once more in software.
+    /// With a GPU node from the daemon, sway renders on it; if that does not work, once more in software. Hyprland has no software
+    /// renderer: without a usable GPU there is no session.
     async fn start_preferring_gpu() -> Result<Self> {
+        if crate::compositor::kind() == crate::compositor::Kind::Hyprland {
+            let node = crate::gpu::usable_node().context("Hyprland needs a GPU, and this account has no usable render node (see WAYDESK_GPU)")?;
+            return Self::start_hyprland(&node).await;
+        }
         if let Some(node) = crate::gpu::usable_node() {
             match Self::start(Some(&node)).await {
                 Ok(sway) => return Ok(sway),
@@ -590,7 +596,7 @@ impl OwnSway {
             .process_group(0)
             .spawn()
             .context("cannot start sway")?;
-        let mut me = Self { child, on_gpu: gpu.is_some() };
+        let mut me = Self { child, can_retry_in_software: gpu.is_some() };
         let ipc = runtime.join(format!("sway-ipc.{uid}.{}.sock", me.child.id()));
         for _ in 0..100 {
             if ipc.exists() {
@@ -621,9 +627,69 @@ impl OwnSway {
         info!(pid = me.child.id(), wayland = %socket, "own headless sway started");
         Ok(me)
     }
+
+    /// A Hyprland on the GPU of `node`, with no output: the session makes its own (a headless one, at the client's size). The GPU's card
+    /// is its only device, so nothing has to be set up as root and several accounts can each have one: with no display connected there
+    /// is no exclusive access to fight over, and `LIBSEAT_BACKEND=noop` opens the card through the account's own permissions.
+    async fn start_hyprland(node: &std::path::Path) -> Result<Self> {
+        use crate::compositor::hyprland;
+        use std::os::unix::process::CommandExt;
+        let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);
+        let card = hyprland::card_of_render_node(node).with_context(|| format!("no DRM card belongs to {}", node.display()))?;
+        let mut cmd = std::process::Command::new("Hyprland");
+        if !runtime.join("bus").exists() {
+            cmd.env("GSETTINGS_BACKEND", "memory");
+        }
+        if !crate::capture::cursor_in_picture() {
+            // The apps load their cursors from this theme: nothing of them in the picture (session.rs also tells Hyprland).
+            cmd.env("XCURSOR_THEME", "waydesk-blank").env("XCURSOR_SIZE", "24");
+        }
+        let child = cmd
+            .env("LIBSEAT_BACKEND", "noop")
+            .env("AQ_DRM_DEVICES", &card)
+            .env("HYPRLAND_NO_CRASHREPORTER", "1")
+            .env("NO_AT_BRIDGE", "1")
+            .env_remove("WAYLAND_DISPLAY")
+            .env_remove("HYPRLAND_INSTANCE_SIGNATURE")
+            .env_remove("DISPLAY")
+            .stdin(std::process::Stdio::null())
+            .process_group(0)
+            .spawn()
+            .context("cannot start Hyprland")?;
+        let mut me = Self { child, can_retry_in_software: false };
+        let mut instance = None;
+        for _ in 0..100 {
+            if let Some(found) = hyprland::instance_of(me.child.id()) {
+                instance = Some(found);
+                break;
+            }
+            if let Ok(Some(status)) = me.child.try_wait() {
+                bail!("Hyprland ended right away ({status})");
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        let (signature, socket) = instance.context("Hyprland did not show up in `hyprctl instances` after 10 s")?;
+        std::env::set_var("HYPRLAND_INSTANCE_SIGNATURE", &signature);
+        std::env::set_var("WAYLAND_DISPLAY", &socket);
+        // It lists itself before it answers: wait for the first answer.
+        for _ in 0..100 {
+            if hyprland::hyprctl(&["-j", "monitors", "all"]).is_ok() {
+                break;
+            }
+            if let Ok(Some(status)) = me.child.try_wait() {
+                bail!("Hyprland ended during start ({status})");
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        // Started without start-hyprland, it puts a warning in the picture.
+        let _ = hyprland::hyprctl(&["dismissnotify"]);
+        crate::sessionstatus::set_render(Some(node));
+        info!(pid = me.child.id(), wayland = %socket, card = %card.display(), "own headless Hyprland started");
+        Ok(me)
+    }
 }
 
-impl Drop for OwnSway {
+impl Drop for OwnCompositor {
     fn drop(&mut self) {
         let pgid = self.child.id() as i32;
         unsafe { libc::kill(-pgid, libc::SIGTERM) };

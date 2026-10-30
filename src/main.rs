@@ -509,6 +509,8 @@ async fn main() -> anyhow::Result<()> {
     // Internal: run as the session process of one connection (started by the daemon, with a socket as fd 3).
     let mut worker = false;
     let mut own_sway = false;
+    // The compositor of the sessions: sway, or hyprland (needs a GPU). WAYDESK_COMPOSITOR in /etc/default/waydesk, or --compositor.
+    let mut compositor_name = std::env::var("WAYDESK_COMPOSITOR").unwrap_or_default();
     // One sway per logged-in account, started as that account (needs --auth pam, and root for other accounts).
     let mut per_user = false;
     let mut allow_users: Option<Vec<String>> = None;
@@ -542,6 +544,7 @@ async fn main() -> anyhow::Result<()> {
             "--no-egfx" => no_egfx = true,
             "--session-worker" => worker = true,
             "--own-sway" => own_sway = true,
+            "--compositor" => compositor_name = args.next().context("--compositor needs sway or hyprland")?,
             "--version" | "-V" => {
                 println!("waydesk-server {}", env!("CARGO_PKG_VERSION"));
                 return Ok(());
@@ -576,6 +579,7 @@ async fn main() -> anyhow::Result<()> {
             other => anyhow::bail!("unknown argument {other}"),
         }
     }
+    let compositor = compositor::select(&compositor_name)?;
     if worker {
         worker::prefer_private_bin();
         let tuning = (!no_egfx).then_some(encode::Tuning { bitrate, max_qp, fps: 30 });
@@ -591,6 +595,7 @@ async fn main() -> anyhow::Result<()> {
     if no_egfx {
         worker_args.push("--no-egfx".into());
     }
+    worker_args.extend(["--compositor".to_string(), compositor::name(compositor).to_string()]);
     worker_args.extend(["--idle-timeout".to_string(), idle_timeout.to_string()]);
     if end_on_disconnect {
         worker_args.push("--end-on-disconnect".into());

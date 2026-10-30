@@ -1,12 +1,12 @@
 //! What a session asks of the compositor, and how sway is asked.
 //!
 //! A session is one output of the client's size with a workspace on it. Creating, sizing, focusing and removing those is
-//! compositor-specific (sway: `swaymsg`; Hyprland: `hyprctl`), so the session code talks to the `Compositor` trait and
-//! `sway` is the implementation. Capture (wlr-screencopy) and input (virtual keyboard and pointer) are Wayland protocols
+//! compositor-specific (sway: `swaymsg`; Hyprland: `hyprctl`), so the session code talks to the `Compositor` trait; `sway` and
+//! `hyprland` are the implementations. Which one is used is chosen once, at start (`select`, `--compositor`). Capture (wlr-screencopy) and input (virtual keyboard and pointer) are Wayland protocols
 //! and need no such layer.
 //!
-//! Starting the compositor itself (the private sway of a session, its sockets, its configuration) is not part of this
-//! yet: see `OwnSway` in worker.rs.
+//! Starting the compositor itself (the private one of a session, its sockets, its configuration) is not part of this: see
+//! `OwnCompositor` in worker.rs.
 
 use std::process::{Command, Stdio};
 
@@ -52,10 +52,48 @@ pub trait Compositor: Send + Sync {
     fn release_focus(&self, output: &str);
 }
 
-/// The compositor of this process. Always sway for now.
+/// Which compositor a session runs on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    Sway,
+    /// Needs a GPU: Hyprland has no software renderer (see docs/HYPRLAND.md).
+    Hyprland,
+}
+
+static KIND: std::sync::OnceLock<Kind> = std::sync::OnceLock::new();
+
+/// Chooses the compositor from its name (`sway`, `hyprland`; empty is sway). Once, before any session is made.
+pub fn select(name: &str) -> Result<Kind> {
+    let kind = match name.trim().to_ascii_lowercase().as_str() {
+        "" | "sway" => Kind::Sway,
+        "hyprland" => Kind::Hyprland,
+        other => bail!("unknown compositor {other:?} (sway or hyprland)"),
+    };
+    let _ = KIND.set(kind);
+    Ok(*KIND.get().unwrap_or(&kind))
+}
+
+/// The compositor of this process: sway unless `select` said otherwise.
+pub fn kind() -> Kind {
+    *KIND.get_or_init(|| Kind::Sway)
+}
+
+/// The command-line name of a compositor (what `select` takes).
+pub fn name(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Sway => "sway",
+        Kind::Hyprland => "hyprland",
+    }
+}
+
+/// The compositor of this process.
 pub fn current() -> &'static dyn Compositor {
     static SWAY: sway::Sway = sway::Sway;
-    &SWAY
+    static HYPRLAND: hyprland::Hyprland = hyprland::Hyprland;
+    match kind() {
+        Kind::Sway => &SWAY,
+        Kind::Hyprland => &HYPRLAND,
+    }
 }
 
 pub mod sway {
@@ -203,6 +241,206 @@ pub mod sway {
             let [a, b] = close_windows_args("Remote", "HEADLESS-2");
             assert_eq!(a, ["[workspace=\"Remote\"]", "kill"]);
             assert_eq!(b, ["[con_mark=\"^from:HEADLESS-2$\"]", "kill"]);
+        }
+    }
+}
+
+pub mod hyprland {
+    use super::*;
+
+    /// Hyprland 0.55 and later: configured and driven with Lua (`hyprctl eval`), outputs made with `hyprctl output create headless`.
+    /// A headless output can have any size and scale, and a capture of it has exactly that size.
+    pub struct Hyprland;
+
+    /// A Lua string literal for `s`.
+    pub(super) fn lua_str(s: &str) -> String {
+        let mut out = String::from("\"");
+        for c in s.chars() {
+            match c {
+                '\\' => out.push_str("\\\\"),
+                '"' => out.push_str("\\\""),
+                '\n' => out.push_str("\\n"),
+                '\r' => out.push_str("\\r"),
+                c if c.is_control() => out.push_str(&format!("\\{:03}", c as u32)),
+                c => out.push(c),
+            }
+        }
+        out.push('"');
+        out
+    }
+
+    // The Lua of each operation, as plain data so that a test can check it without a Hyprland.
+
+    pub(super) fn monitor_lua(output: &str, size: (u32, u32), scale: f64) -> String {
+        format!("hl.monitor({{ output = {}, mode = {}, position = 'auto', scale = {scale} }})", lua_str(output), lua_str(&format!("{}x{}@60", size.0, size.1)))
+    }
+
+    pub(super) fn focus_monitor_lua(output: &str) -> String {
+        format!("hl.dispatch(hl.dsp.focus({{ monitor = {} }}))", lua_str(output))
+    }
+
+    pub(super) fn focus_workspace_lua(workspace: &str) -> String {
+        format!("hl.dispatch(hl.dsp.focus({{ workspace = {} }}))", lua_str(&format!("name:{workspace}")))
+    }
+
+    pub(super) fn move_workspace_lua(workspace: &str, output: &str) -> String {
+        format!("hl.dispatch(hl.dsp.workspace.move({{ workspace = {}, monitor = {} }}))", lua_str(&format!("name:{workspace}")), lua_str(output))
+    }
+
+    pub(super) fn exec_lua(command: &str) -> String {
+        format!("hl.exec_cmd({})", lua_str(command))
+    }
+
+    /// Closes every window on the output, whatever workspace it is on (the account may have used others than ours).
+    pub(super) fn close_windows_lua(output: &str) -> String {
+        format!(
+            "for _, w in ipairs(hl.get_windows()) do if w.monitor and w.monitor.name == {} then hl.dispatch(hl.dsp.window.close({{ window = w }})) end end",
+            lua_str(output)
+        )
+    }
+
+    /// `hyprctl ARGS` on the Hyprland of the environment (`HYPRLAND_INSTANCE_SIGNATURE`), and what it printed.
+    pub fn hyprctl(args: &[&str]) -> Result<String> {
+        let out = Command::new("hyprctl").args(args).output().context("cannot run hyprctl")?;
+        let text = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+        if !out.status.success() {
+            bail!("hyprctl {args:?} failed: {text} {}", String::from_utf8_lossy(&out.stderr));
+        }
+        Ok(text)
+    }
+
+    /// Runs Lua in Hyprland. It answers `ok`, or says what is wrong with the code.
+    fn eval(lua: &str) -> Result<()> {
+        let answer = hyprctl(&["eval", lua])?;
+        anyhow::ensure!(answer == "ok", "hyprctl eval failed: {answer} (in: {lua})");
+        Ok(())
+    }
+
+    /// For `hyprctl output create/remove`, which answer `ok`.
+    fn expect_ok(args: &[&str]) -> Result<()> {
+        let answer = hyprctl(args)?;
+        anyhow::ensure!(answer == "ok", "hyprctl {args:?} failed: {answer}");
+        Ok(())
+    }
+
+    fn monitors() -> Result<Vec<serde_json::Value>> {
+        match serde_json::from_str::<serde_json::Value>(&hyprctl(&["-j", "monitors", "all"])?)? {
+            serde_json::Value::Array(v) => Ok(v),
+            _ => bail!("monitors is not an array"),
+        }
+    }
+
+    fn monitor(output: &str) -> Result<serde_json::Value> {
+        monitors()?.into_iter().find(|m| m["name"].as_str() == Some(output)).with_context(|| format!("Hyprland has no output {output}"))
+    }
+
+    /// The Wayland socket and the instance signature of the Hyprland with this process id: what `hyprctl instances` says.
+    pub fn instance_of(pid: u32) -> Option<(String, String)> {
+        let text = hyprctl(&["instances", "-j"]).ok()?;
+        let list: serde_json::Value = serde_json::from_str(&text).ok()?;
+        let i = list.as_array()?.iter().find(|i| i["pid"].as_u64() == Some(u64::from(pid)))?;
+        Some((i["instance"].as_str()?.to_owned(), i["wl_socket"].as_str()?.to_owned()))
+    }
+
+    /// The DRM card (`/dev/dri/cardN`) of a render node (`/dev/dri/renderDN`): Hyprland is given the card.
+    pub fn card_of_render_node(node: &std::path::Path) -> Option<std::path::PathBuf> {
+        let name = node.file_name()?.to_str()?;
+        let dir = std::fs::read_dir(format!("/sys/class/drm/{name}/device/drm")).ok()?;
+        dir.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.starts_with("card") && n[4..].chars().all(|c| c.is_ascii_digit())).min().map(|n| std::path::PathBuf::from("/dev/dri").join(n))
+    }
+
+    impl Compositor for Hyprland {
+        fn output_names(&self) -> Result<Vec<String>> {
+            Ok(monitors()?.iter().filter_map(|m| m["name"].as_str().map(str::to_owned)).collect())
+        }
+
+        fn create_output(&self) -> Result<String> {
+            let before = self.output_names()?;
+            expect_ok(&["output", "create", "headless"])?;
+            self.output_names()?.into_iter().find(|n| !before.contains(n)).context("Hyprland created no new output")
+        }
+
+        fn remove_output(&self, output: &str) -> Result<()> {
+            expect_ok(&["output", "remove", output])
+        }
+
+        fn init_output(&self, output: &str, size: (u16, u16)) -> Result<()> {
+            eval(&monitor_lua(output, (size.0.into(), size.1.into()), 1.0))
+        }
+
+        fn set_mode(&self, output: &str, size: (u16, u16)) -> Result<()> {
+            let scale = monitor(output)?["scale"].as_f64().unwrap_or(1.0);
+            eval(&monitor_lua(output, (size.0.into(), size.1.into()), scale))
+        }
+
+        fn set_scale(&self, output: &str, scale: &str) -> Result<()> {
+            let m = monitor(output)?;
+            let size = (m["width"].as_u64().unwrap_or(1024) as u32, m["height"].as_u64().unwrap_or(768) as u32);
+            eval(&monitor_lua(output, size, scale.parse().context("scale is not a number")?))
+        }
+
+        fn hide_cursor(&self) -> Result<()> {
+            expect_ok(&["setcursor", "waydesk-blank", "24"])
+        }
+
+        fn show_workspace(&self, output: &str, workspace: &str) -> Result<()> {
+            eval(&focus_monitor_lua(output))?;
+            eval(&focus_workspace_lua(workspace))?;
+            // A workspace of that name that already existed elsewhere was jumped to: bring it here.
+            let _ = eval(&move_workspace_lua(workspace, output));
+            eval(&focus_monitor_lua(output))
+        }
+
+        fn spawn_terminal(&self) -> Result<()> {
+            eval(&exec_lua("foot -T waydesk-server-session"))
+        }
+
+        fn close_windows(&self, _workspace: &str, output: &str) {
+            let _ = eval(&close_windows_lua(output));
+        }
+
+        fn release_focus(&self, output: &str) {
+            if let Some(other) = self.output_names().ok().and_then(|v| v.into_iter().find(|n| n != output)) {
+                let _ = eval(&focus_monitor_lua(&other));
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn lua_strings_are_quoted() {
+            assert_eq!(lua_str("HEADLESS-1"), "\"HEADLESS-1\"");
+            assert_eq!(lua_str("a\"b\\c"), "\"a\\\"b\\\\c\"");
+            assert_eq!(lua_str("x\ny"), "\"x\\ny\"");
+            assert_eq!(lua_str("\u{1}"), "\"\\001\"");
+        }
+
+        #[test]
+        fn lua_of_each_operation() {
+            assert_eq!(monitor_lua("HEADLESS-1", (1280, 720), 1.0), "hl.monitor({ output = \"HEADLESS-1\", mode = \"1280x720@60\", position = 'auto', scale = 1 })");
+            assert_eq!(monitor_lua("HEADLESS-1", (1600, 900), 1.5), "hl.monitor({ output = \"HEADLESS-1\", mode = \"1600x900@60\", position = 'auto', scale = 1.5 })");
+            assert_eq!(focus_monitor_lua("HEADLESS-1"), "hl.dispatch(hl.dsp.focus({ monitor = \"HEADLESS-1\" }))");
+            assert_eq!(focus_workspace_lua("Remote"), "hl.dispatch(hl.dsp.focus({ workspace = \"name:Remote\" }))");
+            assert_eq!(move_workspace_lua("Remote", "HEADLESS-1"), "hl.dispatch(hl.dsp.workspace.move({ workspace = \"name:Remote\", monitor = \"HEADLESS-1\" }))");
+            assert_eq!(exec_lua("foot -T x"), "hl.exec_cmd(\"foot -T x\")");
+            assert!(close_windows_lua("HEADLESS-1").contains("w.monitor.name == \"HEADLESS-1\""));
+        }
+
+        #[test]
+        fn a_hostile_name_cannot_leave_its_string() {
+            let lua = focus_workspace_lua("x\" }))\nos.execute(\"id\")--");
+            assert!(!lua.contains('\n'), "{lua}");
+            assert!(lua.contains("\\\" }))\\nos.execute"), "{lua}");
+        }
+
+        #[test]
+        fn compositor_names() {
+            assert_eq!(select("").unwrap(), Kind::Sway);
+            assert!(select("compiz").is_err());
+            assert_eq!(name(Kind::Hyprland), "hyprland");
         }
     }
 }

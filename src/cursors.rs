@@ -46,7 +46,7 @@ fn shape_of(name: &str) -> Shape {
 /// Whether the sway of the session reports the pointer (waydesk-sway does, a distribution's own sway does not). Then the compositor draws
 /// no pointer, the apps may use a real cursor theme, and the pointer the client draws follows what the apps ask for.
 pub fn sway_reports_cursor() -> bool {
-    std::path::Path::new("/usr/lib/waydesk/bin/sway").is_file()
+    crate::compositor::kind() == crate::compositor::Kind::Sway && std::path::Path::new("/usr/lib/waydesk/bin/sway").is_file()
 }
 
 /// A pointer picture from the session is untrusted: a small one, of the size it says.

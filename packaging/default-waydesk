@@ -77,3 +77,6 @@ WAYDESK_SESSION_ARGS=
 # Takes effect for sessions that start after the change (end the session or log out first).
 #WAYDESK_GPU=auto
 #WAYDESK_ENCODER=auto
+
+# The compositor of the sessions: sway (default), or hyprland, which needs a GPU and Hyprland 0.55 or later. Experimental: see docs/HYPRLAND.md.
+#WAYDESK_COMPOSITOR=sway
