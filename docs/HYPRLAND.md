@@ -128,8 +128,8 @@ Two things the test found, both fixed:
   monitor (`output = ""`, `mode = "preferred"`); when the load finished after the session had made its output, that rule put it back to 1920x1080, the capture saw the change
   and stopped, and the client's picture froze while the server went on. The wrapper configuration now writes `waydesk-hyprland-ready` when it has loaded, the worker waits for it,
   and the output's rule is kept in `waydesk-monitor.lua`, which the wrapper loads after the account's own, so a reload (a theme change runs one) keeps the size. Checked: eight sessions
-  started within eight seconds all came up at 1280x720 with no stopped capture, and `hyprctl reload` left the size alone. A capture that does stop on a size change is still not
-  restarted by itself.
+  started within eight seconds all came up at 1280x720 with no stopped capture, and `hyprctl reload` left the size alone. A capture that stops because the compositor changed the output's size (or fails) is now restarted by the session: it adopts the new size and tells the client, as for a resize the client asked for (checked on
+  Hyprland and on sway by changing the output's size from outside: the client window followed and the picture kept updating); a failed capture is tried three times, then the connection ends and the client reconnects.
 - **70 % of a core per idle session went to a failing helper.** polkit's agent helper is not setuid any more; agents reach it through `polkit-agent-helper.socket`. On a machine
   where that socket is not running (here: polkit installed as a dependency and the machine not restarted since), Omarchy's shell tried to authenticate about 20 times a second, each
   time starting the helper, which said "needs to be setuid root". Starting the socket brought an idle session from 73 % to 5 % of a core and the GPU from 66 % to 3 % busy. The Arch

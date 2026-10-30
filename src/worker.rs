@@ -312,6 +312,19 @@ async fn serve_client(
         }
         Some(mut s) => {
             info!(width, height, "a client reconnects to the session");
+            // Its capture may have stopped while nobody was connected (the compositor changed the size, a restart): start it again first.
+            if s.shared.is_ended() {
+                let (s2, result) = tokio::task::spawn_blocking(move || {
+                    let r = s.restart_capture();
+                    (s, r)
+                })
+                .await
+                .expect("capture restart task");
+                if let Err(e) = result {
+                    error!("the capture of the session cannot be restarted: {e:#}");
+                }
+                s = s2;
+            }
             if session::clamp_size(width, height) != (s.shared.width, s.shared.height) {
                 let (s2, result) = tokio::task::spawn_blocking(move || {
                     let r = s.resize((width, height));
@@ -361,6 +374,12 @@ async fn serve_client(
                 Some(m) => me.handle(m).await,
             },
             _ = tokio::time::sleep_until(me.settle_due()), if me.settle.is_some() && me.credits > 0 && !me.settling => me.start_settle(),
+            // The capture stopped by itself: carry on at the size the output has now, or give up the connection (the client reconnects).
+            why = shared.ended() => {
+                if !me.recover_capture(why).await {
+                    break Outcome::Gone;
+                }
+            }
             // Only take a frame when there is room for it: changes keep merging into the dirty rectangle meanwhile.
             (frame, rect) = shared.next(), if me.credits > 0 => {
                 if let Err(e) = me.send_frame(&frame, rect).await {
@@ -437,6 +456,49 @@ impl Worker {
             Down::AudioOff => self.audio.stop(),
             Down::Resize { width, height, scale_percent } => self.resize(width, height, scale_percent).await,
             Down::Bye => {}
+        }
+    }
+
+    /// The capture stopped by itself (see `CaptureEnd`). A changed size is adopted: the capture starts again at the size the output has and the client is told, as for
+    /// a resize it asked for. A failed capture is tried again a few times. `false`: it cannot be recovered, the connection ends.
+    async fn recover_capture(&mut self, why: crate::capture::CaptureEnd) -> bool {
+        warn!(?why, "the capture of the session stopped");
+        let mut session = self.session.take().expect("session");
+        let before = (session.shared.width, session.shared.height);
+        let (session, result) = tokio::task::spawn_blocking(move || {
+            let mut last = Ok(());
+            for attempt in 0..3 {
+                if attempt > 0 {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+                last = session.restart_capture();
+                if last.is_ok() {
+                    break;
+                }
+            }
+            (session, last)
+        })
+        .await
+        .expect("capture recovery task");
+        let (w, h) = (session.shared.width, session.shared.height);
+        self.session = Some(session);
+        match result {
+            Ok(()) => {
+                self.enc = None;
+                self.credits = 0;
+                if (w, h) != before {
+                    info!(width = w, height = h, "the session follows the new size of its output");
+                    let _ = self.up.send(Up::Resized { width: w, height: h });
+                } else {
+                    // The same size again: the encoder starts afresh, the picture is sent whole.
+                    self.session.as_ref().expect("session").shared.force_full();
+                }
+                true
+            }
+            Err(e) => {
+                error!("the capture of the session cannot be restarted: {e:#}");
+                false
+            }
         }
     }
 

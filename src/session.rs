@@ -10,7 +10,7 @@ use std::sync::Arc;
 use anyhow::{bail, Context as _, Result};
 use tracing::{error, info, warn};
 
-use crate::capture::{Capturer, Shared};
+use crate::capture::{CaptureEnd, Capturer, Shared};
 use crate::compositor;
 use crate::input;
 
@@ -119,12 +119,14 @@ fn start_capture(output: &str) -> Result<(Arc<Shared>, Arc<AtomicBool>)> {
                     std::thread::sleep(std::time::Duration::from_millis(30));
                 }
                 Ok(f) => {
-                    warn!(w = f.width, h = f.height, "capture size changed without a resize; stopping this capture");
+                    warn!(w = f.width, h = f.height, "capture size changed without a resize: the session adopts the new size");
+                    pusher.end(CaptureEnd::SizeChanged { width: f.width, height: f.height });
                     break;
                 }
                 Err(e) => {
                     if !flag.load(Ordering::Relaxed) {
                         error!("capture stopped: {e:#}");
+                        pusher.end(CaptureEnd::Failed(format!("{e:#}")));
                     }
                     break;
                 }
@@ -207,6 +209,18 @@ impl Session {
         let (shared, stop) = start_capture(&self.output).context("capture after resize")?;
         let _ = self.input.send(input::Cmd::SetExtent { w: shared.width.into(), h: shared.height.into() });
         info!(output = %self.output, width = shared.width, height = shared.height, "session resized");
+        self.shared = shared;
+        self.stop = stop;
+        Ok(())
+    }
+
+    /// Starts the capture of the output again, at the size the output has now (after the capture stopped by itself: the compositor changed the size, or the
+    /// capture failed). The caller tells the client when the size is not the one it has.
+    pub fn restart_capture(&mut self) -> Result<()> {
+        self.stop.store(true, Ordering::Relaxed);
+        let (shared, stop) = start_capture(&self.output).context("capture restart")?;
+        let _ = self.input.send(input::Cmd::SetExtent { w: shared.width.into(), h: shared.height.into() });
+        info!(output = %self.output, width = shared.width, height = shared.height, "capture restarted");
         self.shared = shared;
         self.stop = stop;
         Ok(())

@@ -50,6 +50,18 @@ pub struct Shared {
     pub height: u16,
     state: Mutex<Pending>,
     notify: Notify,
+    /// Why the capture stopped, once it has (nothing then makes a frame: without this the session would wait for one for ever).
+    ended: Mutex<Option<CaptureEnd>>,
+    ended_notify: Notify,
+}
+
+/// Why a capture of an output stopped by itself.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CaptureEnd {
+    /// The compositor gave the output another size (a configuration reload, a monitor tool of the account): the pictures no longer fit this capture.
+    SizeChanged { width: u16, height: u16 },
+    /// The capture failed (the output went away, the compositor restarted).
+    Failed(String),
 }
 
 struct Pending {
@@ -71,6 +83,32 @@ impl Shared {
             height,
             state: Mutex::new(Pending { latest: Arc::new(pixels), dirty: Some(full), last_full: std::time::Instant::now() }),
             notify: Notify::new(),
+            ended: Mutex::new(None),
+            ended_notify: Notify::new(),
+        }
+    }
+
+    /// The capture says it has stopped, and why (the first reason stands).
+    pub fn end(&self, why: CaptureEnd) {
+        let mut ended = self.ended.lock().unwrap();
+        if ended.is_none() {
+            *ended = Some(why);
+        }
+        drop(ended);
+        self.ended_notify.notify_one();
+    }
+
+    pub fn is_ended(&self) -> bool {
+        self.ended.lock().unwrap().is_some()
+    }
+
+    /// Resolves when the capture has stopped by itself, with the reason.
+    pub async fn ended(&self) -> CaptureEnd {
+        loop {
+            if let Some(why) = self.ended.lock().unwrap().clone() {
+                return why;
+            }
+            self.ended_notify.notified().await;
         }
     }
 
@@ -550,4 +588,33 @@ impl Dispatch<ZwpLinuxDmabufV1, ()> for State {
 #[cfg(feature = "vaapi")]
 impl Dispatch<ZwpLinuxBufferParamsV1, ()> for State {
     fn event(_: &mut Self, _: &ZwpLinuxBufferParamsV1, _: <ZwpLinuxBufferParamsV1 as Proxy>::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn shared() -> Shared {
+        Shared::new(4, 2, Pixels::Cpu(vec![0; 4 * 2 * 4]))
+    }
+
+    #[tokio::test]
+    async fn a_capture_that_stops_says_why_even_before_anyone_waits() {
+        let s = shared();
+        assert!(!s.is_ended());
+        s.end(CaptureEnd::SizeChanged { width: 1024, height: 768 });
+        s.end(CaptureEnd::Failed("later".into()));
+        assert!(s.is_ended());
+        assert_eq!(s.ended().await, CaptureEnd::SizeChanged { width: 1024, height: 768 }, "the first reason stands");
+    }
+
+    #[tokio::test]
+    async fn waiting_for_the_end_wakes_up_when_it_comes() {
+        let s = Arc::new(shared());
+        let waiter = { let s = s.clone(); tokio::spawn(async move { s.ended().await }) };
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        assert!(!waiter.is_finished());
+        s.end(CaptureEnd::Failed("output gone".into()));
+        assert_eq!(tokio::time::timeout(std::time::Duration::from_secs(2), waiter).await.unwrap().unwrap(), CaptureEnd::Failed("output gone".into()));
+    }
 }
