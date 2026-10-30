@@ -84,7 +84,7 @@ package() {
   # and its logout (`uwsm stop`, which has no uwsm session to stop here) ends the session instead of doing nothing
   # and its reboot and shutdown entries say the server is shared instead of announcing it and failing two seconds later (the polkit rule below is what refuses)
   install -Dm755 packaging/hyprland/bin/omarchy-theme-set-browser-policy packaging/hyprland/bin/omarchy-system-logout \
-    packaging/hyprland/bin/omarchy-system-reboot packaging/hyprland/bin/omarchy-system-shutdown -t "$pkgdir/usr/lib/waydesk/bin"
+    packaging/hyprland/bin/omarchy-system-reboot packaging/hyprland/bin/omarchy-system-shutdown packaging/hyprland/bin/hyprshutdown -t "$pkgdir/usr/lib/waydesk/bin"
   # Omarchy's configuration puts its own bin first on PATH, behind which the stand-ins above would never be found: Hyprland starts with this wrapper
   install -Dm644 packaging/hyprland/waydesk.lua "$pkgdir/usr/lib/waydesk/hyprland.lua"
   install -Dm644 packaging/polkit/50-waydesk-no-power.rules -t "$pkgdir/usr/share/polkit-1/rules.d"

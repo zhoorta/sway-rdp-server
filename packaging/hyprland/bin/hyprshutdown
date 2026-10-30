@@ -1,0 +1,30 @@
+#!/bin/sh
+# Waydesk sessions: stand-in for hyprshutdown (found first on the session's PATH, see worker.rs prefer_private_bin and packaging/hyprland/waydesk.lua).
+#
+# hyprshutdown closes the apps, exits Hyprland, and then runs the command it was given with --post-cmd. ML4W's power menu (and its `shutdown` alias) uses it for
+# Restart and Shutdown: `hyprshutdown -t 'Shutting down...' --post-cmd 'shutdown -P 0'`. On a shared server the second step is refused (packaging/polkit/50-waydesk-no-power.rules),
+# but the first has already ended the account's session. So when the command is one that powers the machine off, say so and do nothing; a plain `hyprshutdown`
+# (logout) and anything else goes to the real one. An administrator (group wheel) always gets the real one.
+real=/usr/bin/hyprshutdown
+if ! id -nG | tr ' ' '\n' | grep -qx wheel; then
+    post=
+    prev=
+    for arg in "$@"; do
+        case "$prev" in
+            --post-cmd|-p) post=$arg ;;
+        esac
+        case "$arg" in
+            --post-cmd=*) post=${arg#--post-cmd=} ;;
+        esac
+        prev=$arg
+    done
+    case " $post " in
+        *[\ \;\&\|]reboot*|*[\ \;\&\|]shutdown*|*[\ \;\&\|]poweroff*|*[\ \;\&\|]halt*|*[\ \;\&\|]systemctl*|*" reboot"*|*" shutdown"*|*" poweroff"*|*" halt"*|*" systemctl"*)
+            if command -v notify-send >/dev/null 2>&1; then
+                notify-send -a Waydesk "Not available on this server" "Restart and shut down are disabled for accounts that share this server. Log out instead." >/dev/null 2>&1
+            fi
+            exit 0
+            ;;
+    esac
+fi
+exec "$real" "$@"

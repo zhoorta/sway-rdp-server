@@ -154,3 +154,10 @@ What it showed about running someone else's configuration:
   in the RDP picture and **typing the account password through the RDP client unlocks it**. Not measured: how long a reconnecting client has to wait, or whether its first mouse movement
   wakes a display that was switched off while nobody was connected. An administrator who does not want this edits `~/.config/hypr/hypridle.conf` of the account.
 - Not checked: the rest of ML4W (its settings app, its updater, the browser it expects, the AUR packages it offers), more than one ML4W account at a time.
+- **ML4W's Restart and Shutdown logged the account out.** Its power menu, its keybind and its `shutdown` alias run `hyprshutdown -t 'Shutting down...' --post-cmd 'shutdown -P 0'` (or `reboot`): that
+  closes the apps and exits Hyprland, which ends the Waydesk session, and only then asks the system to power off, which the polkit rule refuses. The server stayed up (checked: up since
+  the boot of that day, `CanPowerOff` and `CanReboot` answer `no` for the account) but the session was gone. `packaging/hyprland/bin/hyprshutdown`, first on the session's `PATH`, says
+  "Not available on this server" and leaves the session alone when the `--post-cmd` is a power-off, reboot, halt or `systemctl` command; a plain `hyprshutdown` (logout) and any other
+  command go to the real one, and so does everything for an administrator (`wheel`). Checked with ML4W's own `ml4w-power`: poweroff and reboot left the same Hyprland running, logout still
+  ended the session. The suspend entry (`systemctl suspend`) is refused by polkit without touching the session. It is generic: any Hyprland setup that shuts down through `hyprshutdown`
+  gets the same behaviour.
