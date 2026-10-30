@@ -66,7 +66,29 @@ Nesting it in a wlroots compositor fails too (it wants `xdg_wm_base` version 6, 
 - The Waydesk desktop (shell, launcher, title-bar buttons) is sway-specific and is not part of a Hyprland session: the account gets
   whatever its own Hyprland configuration (`~/.config/hypr/hyprland.lua`) gives it.
 - Minimizing: the patched sway's scratchpad minimize does not exist here.
-- Security: `LIBSEAT_BACKEND=noop` means no seat management; the GPU's card is opened with the account's own permissions (groups `video` and
-  `render`), so every account with a session has direct access to the GPU. That needs a review before it is used for accounts that do not trust
-  each other (see `docs/THREAT-MODEL.md`).
 - Hyprland is started without `start-hyprland` (its watchdog), so a crash is not restarted by it; the worker ends and the client reconnects.
+
+## Security notes (reviewed 2026-10-30, Intel GPU, kernel 7.2)
+
+`LIBSEAT_BACKEND=noop` means no seat management: nothing hands out or takes back devices, and a session opens the GPU's card with the account's own
+permissions (here an ACL for `waydesk-users`, `packaging/udev/71-waydesk-hyprland-card.rules`). For a headless server that is what is wanted (there is no
+VT or login screen to switch to). What it costs, with what was measured and what was only reasoned:
+
+**Measured**
+
+- Hyprland cannot start on the render node alone (`CBackend::create() failed`), so the card node cannot be left out.
+- Two accounts opened the card at once. The first opener became DRM master. The second could not open one of the first's GPU buffers by its global name
+  (`GEM_OPEN` and `GEM_FLINK` both gave `Permission denied`: they need the master's authentication), in either order. The old trick of reading another
+  client's buffer through a primary node by guessing its name therefore does not work between accounts. (Test: a small program using the i915 ioctls.)
+- Both Hyprlands ran side by side with only the first one master: with no display connected the second does not need it.
+
+**Reasoned, not tested**
+
+- The first account to open the card holds DRM master: it could change the mode of, or blank, a display attached to that GPU, and read its connector and
+  EDID data. With no display attached to the GPU (a headless server, or a display on the BMC's own chip) there is nothing to change. A server with a monitor on
+  the iGPU should not use this rule.
+- GPU command submission and buffer sharing through file descriptors are the same as through the render node that sessions already get, so the card node
+  adds the master's abilities, not new ways to reach another account's data. A GPU hang or heavy load by one account affects all (as with the render node).
+- Accounts of one session group trust each other no more than before; nothing here changes the Unix permissions between accounts.
+
+Use it on a GPU server without displays, install the card rule only there, and keep sway for everything else.
