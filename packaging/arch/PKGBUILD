@@ -20,6 +20,8 @@ optdepends=('hyprland: Hyprland sessions (WAYDESK_COMPOSITOR=hyprland; needs a G
             'zram-generator: compressed swap in RAM, which the memory settings expect'
             'wireguard-tools: waydesk-admin vpn'
             'qrencode: waydesk-admin vpn shows a QR code')
+# makepkg's default LTO breaks the link of Rust crates that build C code (aws-lc-sys, under rustls): undefined aws_lc_* symbols
+options=(!lto)
 backup=(etc/default/waydesk etc/pam.d/waydesk-server etc/pam.d/waydesk-session etc/logrotate.d/waydesk)
 install=waydesk-server.install
 source=("$pkgname-$pkgver.tar.gz"
