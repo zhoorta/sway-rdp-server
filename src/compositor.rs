@@ -299,6 +299,10 @@ pub mod hyprland {
         )
     }
 
+    /// Hyprland started without its `start-hyprland` wrapper shows a warning in the picture, on every start and again later. Waydesk starts it itself
+    /// (it needs the process, not a supervisor), so the warning is switched off. Run once Hyprland answers.
+    pub const QUIET_WATCHDOG_LUA: &str = "hl.config({ misc = { disable_watchdog_warning = true } })";
+
     /// `hyprctl ARGS` on the Hyprland of the environment (`HYPRLAND_INSTANCE_SIGNATURE`), and what it printed.
     pub fn hyprctl(args: &[&str]) -> Result<String> {
         let out = Command::new("hyprctl").args(args).output().context("cannot run hyprctl")?;
@@ -450,6 +454,11 @@ pub mod hyprland {
             let lua = focus_workspace_lua("x\" }))\nos.execute(\"id\")--");
             assert!(!lua.contains('\n'), "{lua}");
             assert!(lua.contains("\\\" }))\\nos.execute"), "{lua}");
+        }
+
+        #[test]
+        fn the_start_warning_is_switched_off_by_a_misc_option() {
+            assert!(QUIET_WATCHDOG_LUA.contains("misc") && QUIET_WATCHDOG_LUA.contains("disable_watchdog_warning = true"));
         }
 
         #[test]

@@ -681,7 +681,10 @@ impl OwnCompositor {
             }
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
-        // Started without start-hyprland, it puts a warning in the picture.
+        // Started without start-hyprland, it puts a warning in the picture: switch it off, and take down the one already there.
+        if let Err(e) = hyprland::hyprctl(&["eval", hyprland::QUIET_WATCHDOG_LUA]) {
+            warn!("cannot switch off Hyprland's start warning: {e:#}");
+        }
         let _ = hyprland::hyprctl(&["dismissnotify"]);
         crate::sessionstatus::set_render(Some(node));
         info!(pid = me.child.id(), wayland = %socket, card = %card.display(), "own headless Hyprland started");
