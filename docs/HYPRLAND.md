@@ -34,13 +34,18 @@ Nesting it in a wlroots compositor fails too (it wants `xdg_wm_base` version 6, 
 - Size and scale of a headless output set through `hl.monitor` (1280x720, 1600x900 at 1.5, 1024x768), and a capture has exactly that size.
 - Workspace focus and move, `hl.exec_cmd`, closing the windows of an output, `hyprctl setcursor`, `output remove`.
 - Two accounts, each with their own Hyprland and output, at the same time.
+- Pointer: a click reaches the window under the pointer (4 of 4), and a drag across a word in the terminal selects exactly that word. Clipboard text goes both
+  ways (client to session and back). Testing trap: FreeRDP under Xvfb, driven with `xdotool`, reports a pointer move one step late (the server receives the
+  position from before); nothing is wrong with the compositor. Follow a move with `mousemove_relative -- 1 0` and back to get the true position.
 - Live resize and scale from a client (FreeRDP with dynamic resolution, 1280x720 to 1600x900, 1024x700, 1400x800, at 100% and 200%): the output and the
   client's picture follow every size, as on sway. `hyprctl eval` answers before the mode is in force, so `init_output` and `set_mode` wait until Hyprland
   reports the size; without that the capture started on the old size and the session ended up with a picture that did not match the output.
 
 ## Not verified
 
-- Pointer clicks and drags, clipboard, audio, three or more accounts, real applications, the systemd units (`waydesk-session@`).
+- Audio (the per-user daemon mode has none; it needs the root helper), the mouse wheel, three or more accounts, real applications, the systemd units
+  (`waydesk-session@`).
+- The pointer: without the `waydesk-blank` cursor theme (the Waydesk package installs it) Hyprland draws its own cursor into the picture; the Arch package needs it too.
 - The Waydesk desktop (shell, launcher, title-bar buttons) is sway-specific and is not part of a Hyprland session: the account gets
   whatever its own Hyprland configuration (`~/.config/hypr/hyprland.lua`) gives it.
 - Minimizing: the patched sway's scratchpad minimize does not exist here.
