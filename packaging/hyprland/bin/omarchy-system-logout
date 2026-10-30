@@ -1,0 +1,10 @@
+#!/bin/sh
+# Waydesk sessions: stand-in for Omarchy's logout (found first on the session's PATH, see worker.rs prefer_private_bin).
+#
+# Omarchy logs out with `uwsm stop`, which stops a session that uwsm (its session manager) started. Waydesk starts Hyprland itself, so there is no
+# uwsm session and the menu entry did nothing. Here logging out means what it means anywhere else: the windows are closed so that apps shut down properly,
+# then Hyprland exits. The session worker sees that and ends the session, and the RDP client is disconnected.
+command -v omarchy-osd >/dev/null 2>&1 && omarchy-osd -i logout -m "Logging out" -d 3000 >/dev/null 2>&1 &
+omarchy-hyprland-window-close-all
+sleep 1 # lets apps like Chromium finish writing their state
+exec hyprctl dispatch 'hl.dsp.exit()'

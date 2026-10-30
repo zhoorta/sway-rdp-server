@@ -81,7 +81,8 @@ package() {
   cp -a packaging/cursors/waydesk-blank "$pkgdir/usr/share/icons/"
   install -Dm644 packaging/xkb/waydeskmac "$pkgdir/etc/xkb/symbols/waydeskmac"
   # Hyprland sessions (Omarchy): its theme switch writes a system-wide browser policy as root and asks for an administrator's password; this does nothing instead
-  install -Dm755 packaging/hyprland/bin/omarchy-theme-set-browser-policy -t "$pkgdir/usr/lib/waydesk/bin"
+  # and its logout (`uwsm stop`, which has no uwsm session to stop here) ends the session instead of doing nothing
+  install -Dm755 packaging/hyprland/bin/omarchy-theme-set-browser-policy packaging/hyprland/bin/omarchy-system-logout -t "$pkgdir/usr/lib/waydesk/bin"
   install -Dm644 packaging/udev/70-waydesk-gpu.rules -t "$pkgdir/usr/lib/udev/rules.d"
   # the card node for Hyprland sessions is a choice, not a default (docs/HYPRLAND.md, Security notes): shipped as an example
   install -Dm644 packaging/udev/71-waydesk-hyprland-card.rules -t "$pkgdir/usr/share/waydesk/udev"

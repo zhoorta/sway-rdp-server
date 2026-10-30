@@ -39,6 +39,10 @@ What a package has to provide for it:
   a password, anyone else gets a polkit dialog ("Authorize running ...") for a password they do not have, and one account's theme would recolour every account's browser.
   `packaging/hyprland/bin/omarchy-theme-set-browser-policy` does nothing instead; installed in `/usr/lib/waydesk/bin`, which is first on the session's `PATH`, it
   affects Waydesk sessions only (a session that was already running keeps asking until it is restarted). The theme itself (bar, terminal, wallpaper) still changes.
+- **Logout.** Omarchy logs out with `uwsm stop`, which stops a session that its session manager started; Waydesk starts Hyprland itself, so the menu entry did
+  nothing. `packaging/hyprland/bin/omarchy-system-logout` (also in `/usr/lib/waydesk/bin`) closes the windows as Omarchy's does and then exits Hyprland: the session
+  worker sees that, ends the session and the RDP client is disconnected (tried: windows closed, unit stopped, client gone). Disconnecting without logging out still
+  leaves the session running, as before.
 - The `waydesk-blank` cursor theme (from `packaging/cursors`), or Hyprland draws its own cursor into the picture.
 
 ## Why a GPU is needed
