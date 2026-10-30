@@ -1,0 +1,8 @@
+#!/bin/sh
+# Waydesk sessions: stand-in for Omarchy's helper of the same name (found first on the session's PATH, see worker.rs prefer_private_bin).
+#
+# The real one writes the theme colour into the SYSTEM-WIDE managed policy of Chromium, Chrome, Edge and Brave (/etc/chromium/policies/managed/color.json
+# and the like) as root. Only members of `wheel` get that without a password; everybody else gets a polkit dialog ("Authorize running ...") asking for an
+# administrator's password they do not have. And on a server with many accounts one account's theme would recolour every account's browser. So a session
+# does nothing here and reports success: the theme itself (Hyprland, the bar, the terminal, the wallpaper) is per account and still changes.
+exit 0

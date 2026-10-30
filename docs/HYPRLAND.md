@@ -35,6 +35,10 @@ What a package has to provide for it:
 - **A sound server in the account's session.** `pipewire`, `pipewire-pulse` and `wireplumber` enabled as user units (`systemctl --user enable --now
   pipewire.socket pipewire-pulse.socket wireplumber.service`, or a preset), and `libpulse` for `parec` and `pactl`. A session that starts without it has no sound
   until the next one.
+- **Omarchy's theme switch.** It writes the theme colour into the system-wide managed policy of Chromium, Chrome, Edge and Brave as root; only `wheel` gets that without
+  a password, anyone else gets a polkit dialog ("Authorize running ...") for a password they do not have, and one account's theme would recolour every account's browser.
+  `packaging/hyprland/bin/omarchy-theme-set-browser-policy` does nothing instead; installed in `/usr/lib/waydesk/bin`, which is first on the session's `PATH`, it
+  affects Waydesk sessions only (a session that was already running keeps asking until it is restarted). The theme itself (bar, terminal, wallpaper) still changes.
 - The `waydesk-blank` cursor theme (from `packaging/cursors`), or Hyprland draws its own cursor into the picture.
 
 ## Why a GPU is needed
