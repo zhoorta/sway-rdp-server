@@ -14,6 +14,9 @@ post_install() {
   /usr/lib/systemd/systemd-sysctl /usr/lib/sysctl.d/50-waydesk.conf >/dev/null 2>&1 || true
   udevadm control --reload >/dev/null 2>&1 || true
   udevadm trigger --subsystem-match=drm --action=change >/dev/null 2>&1 || true
+  # polkit's agent helper is no longer setuid: agents (Omarchy's shell has one) reach it through this socket, which pacman does not start, and without it every
+  # authentication attempt fails at once and is retried about twenty times a second: 70 % of a core in an idle session. It is started at boot from then on.
+  systemctl start polkit-agent-helper.socket >/dev/null 2>&1 || true
   cat <<MSG
 waydesk: to start it:
     sudo systemctl enable --now waydesk-helper.service waydesk.service

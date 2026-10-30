@@ -22,3 +22,22 @@ for entry in (os.getenv("PATH") or "/usr/local/bin:/usr/bin"):gmatch("[^:]+") do
   end
 end
 hl.env("PATH", table.concat(parts, ":"))
+
+-- The size and scale of the session's output. Omarchy's own configuration has a rule for every monitor (output = "", mode = "preferred"), which a
+-- (re)load applies to the session's headless output as well and so puts it back to 1920x1080, whatever the client asked for. The Waydesk session writes the
+-- rule it wants for its output to this file; loading it after the account's configuration makes that rule the one that stays, through reloads too.
+local runtime = os.getenv("XDG_RUNTIME_DIR") or "/tmp"
+local rule = runtime .. "/waydesk-monitor.lua"
+local rf = io.open(rule, "r")
+if rf then
+  rf:close()
+  pcall(dofile, rule)
+end
+
+-- The configuration is loaded. Hyprland answers hyprctl before it gets here; the session waits for this file before it makes its output, or the
+-- rule of its output could be overwritten by the load that was still running (seen with eight sessions starting at once).
+local marker = io.open(runtime .. "/waydesk-hyprland-ready", "w")
+if marker then
+  marker:write("1")
+  marker:close()
+end

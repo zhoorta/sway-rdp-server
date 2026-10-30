@@ -303,6 +303,33 @@ pub mod hyprland {
     /// (it needs the process, not a supervisor), so the warning is switched off. Run once Hyprland answers.
     pub const QUIET_WATCHDOG_LUA: &str = "hl.config({ misc = { disable_watchdog_warning = true } })";
 
+    /// Where the rule of the session's output is kept for the wrapper configuration (packaging/hyprland/waydesk.lua) to load after the account's own.
+    pub const RULE_FILE: &str = "waydesk-monitor.lua";
+    /// The file the wrapper writes when it has loaded the configuration.
+    pub const READY_FILE: &str = "waydesk-hyprland-ready";
+
+    /// Keeps `lua` (the `hl.monitor` call for the session's output) where the wrapper configuration finds it on the next load.
+    pub(super) fn persist_rule(runtime: &std::path::Path, lua: &str) {
+        let tmp = runtime.join(format!("{RULE_FILE}.tmp"));
+        if std::fs::write(&tmp, format!("{lua}\n")).is_ok() {
+            let _ = std::fs::rename(&tmp, runtime.join(RULE_FILE));
+        }
+    }
+
+    fn runtime_dir() -> Option<std::path::PathBuf> {
+        std::env::var_os("XDG_RUNTIME_DIR").map(std::path::PathBuf::from)
+    }
+
+    /// Sets the output's rule in Hyprland, remembers it for reloads, and waits until the compositor reports the size.
+    fn apply_monitor(output: &str, size: (u16, u16), scale: f64) -> Result<()> {
+        let lua = monitor_lua(output, (size.0.into(), size.1.into()), scale);
+        eval(&lua)?;
+        if let Some(dir) = runtime_dir() {
+            persist_rule(&dir, &lua);
+        }
+        wait_for_size(output, size)
+    }
+
     /// `hyprctl ARGS` on the Hyprland of the environment (`HYPRLAND_INSTANCE_SIGNATURE`), and what it printed.
     pub fn hyprctl(args: &[&str]) -> Result<String> {
         let out = Command::new("hyprctl").args(args).output().context("cannot run hyprctl")?;
@@ -383,20 +410,18 @@ pub mod hyprland {
         }
 
         fn init_output(&self, output: &str, size: (u16, u16)) -> Result<()> {
-            eval(&monitor_lua(output, (size.0.into(), size.1.into()), 1.0))?;
-            wait_for_size(output, size)
+            apply_monitor(output, size, 1.0)
         }
 
         fn set_mode(&self, output: &str, size: (u16, u16)) -> Result<()> {
             let scale = monitor(output)?["scale"].as_f64().unwrap_or(1.0);
-            eval(&monitor_lua(output, (size.0.into(), size.1.into()), scale))?;
-            wait_for_size(output, size)
+            apply_monitor(output, size, scale)
         }
 
         fn set_scale(&self, output: &str, scale: &str) -> Result<()> {
             let m = monitor(output)?;
-            let size = (m["width"].as_u64().unwrap_or(1024) as u32, m["height"].as_u64().unwrap_or(768) as u32);
-            eval(&monitor_lua(output, size, scale.parse().context("scale is not a number")?))
+            let size = (m["width"].as_u64().unwrap_or(1024) as u16, m["height"].as_u64().unwrap_or(768) as u16);
+            apply_monitor(output, size, scale.parse().context("scale is not a number")?)
         }
 
         fn hide_cursor(&self) -> Result<()> {
@@ -459,6 +484,18 @@ pub mod hyprland {
         #[test]
         fn the_start_warning_is_switched_off_by_a_misc_option() {
             assert!(QUIET_WATCHDOG_LUA.contains("misc") && QUIET_WATCHDOG_LUA.contains("disable_watchdog_warning = true"));
+        }
+
+        #[test]
+        fn the_rule_of_the_output_is_kept_for_the_next_load() {
+            let dir = std::env::temp_dir().join(format!("waydesk-rule-test-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            persist_rule(&dir, "hl.monitor({ output = \"HEADLESS-1\" })");
+            persist_rule(&dir, &monitor_lua("HEADLESS-1", (1280, 720), 2.0));
+            let text = std::fs::read_to_string(dir.join(RULE_FILE)).unwrap();
+            assert_eq!(text, "hl.monitor({ output = \"HEADLESS-1\", mode = \"1280x720@60\", position = 'auto', scale = 2 })\n", "the latest rule replaces the earlier one");
+            assert!(!dir.join(format!("{RULE_FILE}.tmp")).exists());
+            let _ = std::fs::remove_dir_all(&dir);
         }
 
         #[test]

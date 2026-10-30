@@ -651,6 +651,36 @@ fn gpu_setting() -> String {
         .unwrap_or_else(|| "auto".to_owned())
 }
 
+/// `WAYDESK_COMPOSITOR` as `/etc/default/waydesk` sets it (what the sessions that start next will run on): `sway` unless it says `hyprland`.
+fn compositor_setting() -> String {
+    let text = std::fs::read_to_string("/etc/default/waydesk").unwrap_or_default();
+    text.lines()
+        .filter_map(|l| l.trim().strip_prefix("WAYDESK_COMPOSITOR="))
+        .map(|v| v.trim().trim_matches(|c| c == '"' || c == '\'').to_ascii_lowercase())
+        .last()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "sway".to_owned())
+}
+
+/// The pretty name of the distribution out of an os-release file ("Arch Linux", "Debian GNU/Linux 13 (trixie)").
+fn os_pretty_name(os_release: &str) -> Option<String> {
+    os_release
+        .lines()
+        .find_map(|l| l.strip_prefix("PRETTY_NAME="))
+        .map(|v| v.trim().trim_matches(|c| c == '"' || c == '\'').to_owned())
+        .filter(|v| !v.is_empty())
+}
+
+/// "Arch Linux, kernel 7.2.11-arch1-1".
+fn system_line() -> String {
+    let os = os_pretty_name(&std::fs::read_to_string("/etc/os-release").unwrap_or_default()).unwrap_or_else(|| "unknown distribution".into());
+    let kernel = std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default();
+    match kernel.trim() {
+        "" => os,
+        k => format!("{os}, kernel {k}"),
+    }
+}
+
 /// What a session runs, for the table: "gpu" or "cpu" for the renderer, "nvenc q25 17fps" for the encoder.
 fn video_cells(v: Option<&sessionstatus::Status>) -> (String, String) {
     let Some(v) = v else { return ("-".into(), "-".into()) };
@@ -716,7 +746,7 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
             "cpu_percent": round(u.cpu_percent), "cap_mb": u.cap_mb,
             "top": u.top.iter().map(|(n, mb)| json!({ "name": n, "mb": mb })).collect::<Vec<_>>(),
             "video": u.video.as_ref().map(|v| json!({
-                "render": v.render, "encoder": v.encoder, "qp": v.qp, "fps": v.fps.map(round), "kbps": v.kbps, "current": sessionstatus::is_fresh(v),
+                "render": v.render, "encoder": v.encoder, "compositor": v.compositor, "qp": v.qp, "fps": v.fps.map(round), "kbps": v.kbps, "current": sessionstatus::is_fresh(v),
             })),
         })).collect();
         let gpu_list: Vec<_> = gpus.iter().map(|g| json!({
@@ -730,7 +760,10 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
                 "swap_total_mb": info.swap_total_kb / 1024, "swap_used_mb": (info.swap_total_kb - info.swap_free_kb.min(info.swap_total_kb)) / 1024,
                 "swap_devices": swaps.iter().map(|(n, size, used)| json!({ "name": n, "size_mb": size / 1024, "used_mb": used / 1024 })).collect::<Vec<_>>(),
                 "load": load, "cores": cores,
+                "os": os_pretty_name(&std::fs::read_to_string("/etc/os-release").unwrap_or_default()),
+                "kernel": std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default().trim(),
             },
+            "compositor_setting": compositor_setting(),
             "gpus": gpu_list,
             "gpu_setting": setting,
             "admission": { "open": open, "reason": reason, "min_available_mb": needed_mb, "max_active_users": max_users, "sessions": running },
@@ -747,6 +780,7 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
         println!("Swap      {}", list.join(", "));
     }
     println!("Load      {} ({cores} cores)", load.join(" "));
+    println!("System    {}", system_line());
     if gpus.is_empty() {
         println!("GPU       none (no render node: sessions render and encode on the CPU)");
     } else {
@@ -755,6 +789,7 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
         }
         println!("          new sessions use: {setting}");
     }
+    println!("Desktop   {} for new sessions (WAYDESK_COMPOSITOR: sway, or hyprland, which needs a GPU)", compositor_setting());
     let limit = if max_users > 0 { format!(", at most {max_users} active users") } else { String::new() };
     if open {
         println!("Sessions  {running} running; a new one would be accepted (needs {} available{limit})", human_mb(needed_mb));
@@ -765,12 +800,12 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
         println!("\nNobody is logged in.");
         return Ok(());
     }
-    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8} {:<6} {:<17}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT", "RENDER", "ENCODER");
+    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8} {:<6} {:<17} {:<9}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT", "RENDER", "ENCODER", "DESKTOP");
     for u in &usage {
         let top: Vec<String> = u.top.iter().map(|(n, mb)| format!("{n} {mb} MB")).collect();
         let (render, encoder) = video_cells(u.video.as_ref());
         println!(
-            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8} {:<6} {:<17}  {}",
+            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8} {:<6} {:<17} {:<9}  {}",
             u.name,
             if u.session { "running" } else { "-" },
             human_mb(u.mem_mb),
@@ -779,6 +814,7 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
             u.cap_mb.map(human_mb).unwrap_or_else(|| "none".into()),
             render,
             encoder,
+            u.video.as_ref().and_then(|v| v.compositor.clone()).unwrap_or_else(|| "-".into()),
             top.join(", ")
         );
     }
@@ -881,9 +917,9 @@ mod tests {
         use crate::sessionstatus::Status;
         assert_eq!(video_cells(None), ("-".to_string(), "-".to_string()));
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-        let gpu = Status { render: Some("/dev/dri/renderD129".into()), encoder: Some("nvenc".into()), qp: Some(25), fps: Some(17.4), kbps: Some(9000), stats_at: now };
+        let gpu = Status { render: Some("/dev/dri/renderD129".into()), encoder: Some("nvenc".into()), compositor: None, qp: Some(25), fps: Some(17.4), kbps: Some(9000), stats_at: now };
         assert_eq!(video_cells(Some(&gpu)), ("gpu".to_string(), "nvenc q25 17fps".to_string()));
-        let soft = Status { render: None, encoder: Some("openh264".into()), qp: None, fps: Some(9.0), kbps: None, stats_at: now };
+        let soft = Status { render: None, encoder: Some("openh264".into()), compositor: None, qp: None, fps: Some(9.0), kbps: None, stats_at: now };
         assert_eq!(video_cells(Some(&soft)), ("cpu".to_string(), "openh264 9fps".to_string()));
         let idle = Status { stats_at: now - 600, ..gpu };
         assert_eq!(video_cells(Some(&idle)).1, "nvenc", "old statistics are not shown as current");
@@ -937,6 +973,14 @@ mod tests {
         assert_eq!((a.name.as_str(), a.uid, a.gid, a.shell.as_str()), ("rdptest2", 1002, 1002, "/bin/bash"));
         assert!(parse_passwd("broken:line").is_none());
         assert!(parse_passwd("x:x:notanumber:1:::/bin/sh").is_none());
+    }
+
+    #[test]
+    fn the_distribution_name_comes_out_of_os_release() {
+        assert_eq!(os_pretty_name("NAME=\"Arch Linux\"\nPRETTY_NAME=\"Arch Linux\"\nID=arch\n"), Some("Arch Linux".into()));
+        assert_eq!(os_pretty_name("PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\n"), Some("Debian GNU/Linux 13 (trixie)".into()));
+        assert_eq!(os_pretty_name("NAME=Foo\n"), None);
+        assert_eq!(os_pretty_name("PRETTY_NAME=\"\"\n"), None);
     }
 
     #[test]

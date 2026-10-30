@@ -113,3 +113,25 @@ VT or login screen to switch to). What it costs, with what was measured and what
 - Accounts of one session group trust each other no more than before; nothing here changes the Unix permissions between accounts.
 
 Use it on a GPU server without displays, install the card rule only there, and keep sway for everything else.
+
+## Several accounts (measured 2026-10-30, Intel HD 630, 4 cores / 8 threads, 62 GB, Arch, Hyprland 0.57)
+
+Nine sessions at once (eight test accounts and one in real use), all on the one GPU with the VAAPI encoder. Memory: about 0.9 GB for an idle Omarchy session (Quickshell
+480 MB, Hyprland 260 MB, the portals 190 MB), 1.1 to 1.4 GB with a busy terminal, 2.4 GB for the account in real use with a browser; 14 GB in all. Idle CPU, about 5 % of a core each;
+a terminal printing text as fast as it can, about 30 %. Four such terminals gave about 20 fps and 1.7 Mbit/s each at 1280x720 and the GPU 82 % busy. The RDP clients ran on the same
+machine (eight H.264 decoders), so the load average (14 on 8 threads) overstates what the server needs. Not found: the limit. The admission rule (a new session needs 9.4 GB
+available) did not come into play.
+
+Two things the test found, both fixed:
+
+- **A session could stall for good when many started together.** Hyprland answers `hyprctl` before it has loaded its configuration. Omarchy's configuration has a rule for every
+  monitor (`output = ""`, `mode = "preferred"`); when the load finished after the session had made its output, that rule put it back to 1920x1080, the capture saw the change
+  and stopped, and the client's picture froze while the server went on. The wrapper configuration now writes `waydesk-hyprland-ready` when it has loaded, the worker waits for it,
+  and the output's rule is kept in `waydesk-monitor.lua`, which the wrapper loads after the account's own, so a reload (a theme change runs one) keeps the size. Checked: eight sessions
+  started within eight seconds all came up at 1280x720 with no stopped capture, and `hyprctl reload` left the size alone. A capture that does stop on a size change is still not
+  restarted by itself.
+- **70 % of a core per idle session went to a failing helper.** polkit's agent helper is not setuid any more; agents reach it through `polkit-agent-helper.socket`. On a machine
+  where that socket is not running (here: polkit installed as a dependency and the machine not restarted since), Omarchy's shell tried to authenticate about 20 times a second, each
+  time starting the helper, which said "needs to be setuid root". Starting the socket brought an idle session from 73 % to 5 % of a core and the GPU from 66 % to 3 % busy. The Arch
+  package depends on polkit and starts the socket when it is installed; the socket is started at boot anyway. (A `status` of an account's CPU counts the short-lived processes that
+  are gone by the time you look, which is why `top` showed only 30 %.)

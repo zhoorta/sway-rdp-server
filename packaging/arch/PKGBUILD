@@ -11,7 +11,7 @@ pkgdesc='RDP server giving each account its own headless Wayland desktop (sway; 
 arch=(x86_64 aarch64)
 url='https://waydesk.stackcare.pt'
 license=(MIT Apache-2.0)
-depends=(acl foot sway pam libva libdrm mesa libxkbcommon openssl logrotate systemd
+depends=(acl foot sway pam polkit libva libdrm mesa libxkbcommon openssl logrotate systemd
          pipewire pipewire-pulse libpulse wireplumber wl-clipboard openh264)
 makedepends=(cargo clang pkgconf)
 optdepends=('hyprland: Hyprland sessions (WAYDESK_COMPOSITOR=hyprland; needs a GPU, see /usr/share/doc/waydesk-server/HYPRLAND.md)'

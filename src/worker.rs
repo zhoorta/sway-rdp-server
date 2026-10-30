@@ -137,6 +137,7 @@ pub async fn run(cfg: Config) -> Result<()> {
     };
     // Declared before the session so that it is dropped after it: the session's cleanup still needs the sway.
     let mut sway = if cfg.own_sway { Some(OwnCompositor::start_preferring_gpu().await?) } else { None };
+    crate::sessionstatus::set_compositor(crate::compositor::name(crate::compositor::kind()));
 
     let mut session: Option<Session> = None;
     let mut pending: Option<std::os::unix::net::UnixStream> = None;
@@ -636,9 +637,14 @@ impl OwnCompositor {
         use std::os::unix::process::CommandExt;
         let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);
         let card = hyprland::card_of_render_node(node).with_context(|| format!("no DRM card belongs to {}", node.display()))?;
+        // Nothing of an earlier Hyprland of this account: a stale rule would be loaded into this one, a stale marker would end the wait at once.
+        let _ = std::fs::remove_file(runtime.join(hyprland::RULE_FILE));
+        let _ = std::fs::remove_file(runtime.join(hyprland::READY_FILE));
         let mut cmd = std::process::Command::new("Hyprland");
+        let mut wrapped = false;
         if let Some(config) = hyprland_config(std::env::var_os("HOME").as_deref().map(std::path::Path::new), |p| p.is_file()) {
             cmd.arg("--config").arg(&config);
+            wrapped = true;
             info!(config = %config.display(), "Hyprland config (the account's own, with Waydesk's directory first on PATH)");
         }
         if !runtime.join("bus").exists() {
@@ -684,6 +690,25 @@ impl OwnCompositor {
                 bail!("Hyprland ended during start ({status})");
             }
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        // Hyprland answers before it has loaded its configuration; the wrapper says when it has. The session's output must not be made earlier: the
+        // load would put it back to the monitor rule of the configuration (1920x1080), and the capture would stop at the change.
+        if wrapped {
+            let ready = runtime.join(hyprland::READY_FILE);
+            let mut loaded = false;
+            for _ in 0..300 {
+                if ready.exists() {
+                    loaded = true;
+                    break;
+                }
+                if let Ok(Some(status)) = me.child.try_wait() {
+                    bail!("Hyprland ended while loading its configuration ({status})");
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+            if !loaded {
+                warn!("Hyprland did not finish loading its configuration in 30 s: going on");
+            }
         }
         // Started without start-hyprland, it puts a warning in the picture: switch it off, and take down the one already there.
         if let Err(e) = hyprland::hyprctl(&["eval", hyprland::QUIET_WATCHDOG_LUA]) {
