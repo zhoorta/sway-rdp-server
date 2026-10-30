@@ -12,6 +12,8 @@
 //!   waydesk-admin status [--json] [--watch [SECONDS]]   (memory, swap, load, the GPUs and how busy they are, whether a new session would be accepted, and what each
 //!                                                account uses and runs: renderer and video encoder; `--watch` repeats it, `--json --watch` prints one line of JSON each time)
 //!   waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
+//!   waydesk-admin users set NAME --desktop sway|hyprland|default     the compositor of one account's sessions (default: the server's setting)
+//!   waydesk-admin config check NAME [--json]     whether the account's own compositor setup will work as a Waydesk session (docs/BRING-YOUR-OWN-CONFIG.md)
 //!   waydesk-admin access [show | local | lan | vpn | custom ...]     who can reach the RDP port (scripts in /usr/lib/waydesk/admin)
 //!   waydesk-admin cert [status | local-ca | reissue | export-ca | install | self-signed]     the certificate clients check
 //!   waydesk-admin vpn [status | init | add NAME | show NAME | list | remove NAME]     a WireGuard VPN for the port
@@ -32,6 +34,8 @@ use std::process::{Command, Stdio};
 use anyhow::{bail, ensure, Context as _, Result};
 use serde_json::json;
 
+#[path = "../configcheck.rs"]
+mod configcheck;
 #[path = "../gpuinfo.rs"]
 mod gpuinfo;
 #[path = "../memory.rs"]
@@ -234,6 +238,8 @@ fn run() -> Result<()> {
         ["users", "disable", name, rest @ ..] => users_disable(name, rest),
         ["users", "admin", name, onoff] => set_group(name, ADMIN_GROUP, parse_onoff(onoff)?),
         ["users", "sudo", name, onoff] => users_sudo(name, parse_onoff(onoff)?),
+        ["users", "set", name, rest @ ..] => users_set(name, rest),
+        ["config", "check", name] => config_check(name, json_out),
         ["sessions", "list"] => sessions_list(json_out),
         ["status", rest @ ..] => status(json_out, parse_watch(rest)?),
         ["--version"] | ["-V"] => {
@@ -269,6 +275,8 @@ usage: waydesk-admin users list [--json]
        waydesk-admin sessions list [--json] | end NAME
        waydesk-admin status [--json] [--watch [SECONDS]]
        waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
+       waydesk-admin users set NAME --desktop sway|hyprland|default
+       waydesk-admin config check NAME [--json]
        waydesk-admin access [show | local | lan [--address IP] [--allow LIST] | vpn | custom --bind ADDR:PORT [--allow LIST]]
        waydesk-admin cert [status | local-ca [--san NAME] | reissue | export-ca | install --cert FILE --key FILE | self-signed]
        waydesk-admin vpn [status | init [--endpoint HOST] | add NAME | show NAME | list | remove NAME]
@@ -305,22 +313,33 @@ fn users_list(json_out: bool) -> Result<()> {
     let mut rows = Vec::new();
     for a in visible_accounts()? {
         let (session, since) = session_state(a.uid);
-        rows.push((a.name.clone(), a.uid, in_group(&a, RDP_GROUP), in_group(&a, ADMIN_GROUP), in_group(&a, SUDO_GROUP), login_shell(&a.shell, &shells), session, since));
+        let (desktop, source) = desktop_of(a.uid);
+        let running = sessionstatus::read(Path::new(sessionstatus::DIR), a.uid).and_then(|s| s.compositor);
+        rows.push((a.name.clone(), a.uid, in_group(&a, RDP_GROUP), in_group(&a, ADMIN_GROUP), in_group(&a, SUDO_GROUP), login_shell(&a.shell, &shells), session, since, desktop, source, running));
     }
     if json_out {
         let list: Vec<_> = rows
             .iter()
-            .map(|(name, uid, rdp, admin, sudo, shell, session, since)| {
-                json!({ "name": name, "uid": uid, "rdp": rdp, "flatpak_admin": admin, "sudo": sudo, "login_shell": shell, "session": session, "session_since": since })
+            .map(|(name, uid, rdp, admin, sudo, shell, session, since, desktop, source, running)| {
+                json!({ "name": name, "uid": uid, "rdp": rdp, "flatpak_admin": admin, "sudo": sudo, "login_shell": shell, "session": session, "session_since": since,
+                        "desktop": desktop, "desktop_from": source, "desktop_running": running })
             })
             .collect();
         println!("{}", serde_json::to_string_pretty(&list)?);
         return Ok(());
     }
     let yes = |v: bool| if v { "yes" } else { "-" };
-    println!("{:<20} {:>5}  {:<4} {:<8} {:<5} {:<7} SESSION", "ACCOUNT", "UID", "RDP", "FLATPAK", "SUDO", "SHELL");
-    for (name, uid, rdp, admin, sudo, shell, session, _) in &rows {
-        println!("{:<20} {:>5}  {:<4} {:<8} {:<5} {:<7} {}", name, uid, yes(*rdp), yes(*admin), yes(*sudo), yes(*shell), session);
+    println!("{:<20} {:>5}  {:<4} {:<8} {:<5} {:<7} {:<10} SESSION", "ACCOUNT", "UID", "RDP", "FLATPAK", "SUDO", "SHELL", "DESKTOP");
+    for (name, uid, rdp, admin, sudo, shell, session, _, desktop, source, running) in &rows {
+        // A star: the account has a setting of its own. A running session keeps the desktop it started with, whatever is set now.
+        let mut cell = format!("{desktop}{}", if *source == "account" { "*" } else { "" });
+        let session_cell = match running {
+            Some(r) if r != desktop => format!("{session} on {r} (restart to get {desktop})"),
+            Some(r) => format!("{session} on {r}"),
+            None => session.clone(),
+        };
+        cell.truncate(10);
+        println!("{:<20} {:>5}  {:<4} {:<8} {:<5} {:<7} {:<10} {}", name, uid, yes(*rdp), yes(*admin), yes(*sudo), yes(*shell), cell, session_cell);
     }
     Ok(())
 }
@@ -817,6 +836,274 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
             u.video.as_ref().and_then(|v| v.compositor.clone()).unwrap_or_else(|| "-".into()),
             top.join(", ")
         );
+    }
+    Ok(())
+}
+
+// ---- the desktop of one account, and a check of its configuration ----
+
+fn account_settings_path(uid: u32) -> PathBuf {
+    Path::new(configcheck::ACCOUNT_SETTINGS_DIR).join(format!("{uid}.env"))
+}
+
+/// The desktop an account's sessions start with, and where that comes from: `account` (its settings file) or `server` (/etc/default/waydesk).
+fn desktop_of(uid: u32) -> (String, &'static str) {
+    let own = std::fs::read_to_string(account_settings_path(uid)).ok().and_then(|t| configcheck::parse_account_env(&t));
+    match own.as_deref().and_then(configcheck::normalize_desktop) {
+        Some(d) if d != "default" => (d.to_owned(), "account"),
+        _ => (compositor_setting(), "server"),
+    }
+}
+
+/// `users set NAME --desktop sway|hyprland|default`: which compositor this account's sessions start with. The session unit reads the file after
+/// /etc/default/waydesk, so it wins there; a running session keeps what it has until it is restarted.
+fn users_set(name: &str, opts: &[&str]) -> Result<()> {
+    require_root()?;
+    let a = account(name)?;
+    let mut wanted = None;
+    let mut it = opts.iter();
+    while let Some(flag) = it.next() {
+        match *flag {
+            "--desktop" => wanted = Some(*it.next().context("--desktop needs sway, hyprland or default")?),
+            other => bail!("unknown option {other}"),
+        }
+    }
+    let wanted = wanted.context("nothing to set: --desktop sway|hyprland|default")?;
+    let desktop = configcheck::normalize_desktop(wanted).with_context(|| format!("{wanted:?} is not a desktop Waydesk can start (sway, hyprland, or default for the server's setting)"))?;
+    let path = account_settings_path(a.uid);
+    if desktop == "default" {
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => bail!("cannot remove {}: {e}", path.display()),
+        }
+    } else {
+        let dir = Path::new(configcheck::ACCOUNT_SETTINGS_DIR);
+        std::fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
+        let tmp = dir.join(format!("{}.env.tmp", a.uid));
+        std::fs::write(&tmp, configcheck::render_account_env(&a.name, desktop)).with_context(|| format!("cannot write {}", tmp.display()))?;
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o644))?;
+        }
+        std::fs::rename(&tmp, &path).with_context(|| format!("cannot write {}", path.display()))?;
+    }
+    let (now, source) = desktop_of(a.uid);
+    println!("{}: sessions start with {now} ({})", a.name, if source == "account" { "set for this account" } else { "the server's setting" });
+    if now == "hyprland" && gpuinfo::list().is_empty() {
+        eprintln!("note: this server has no GPU (no render node), and Hyprland has no software renderer: the session will not start");
+    }
+    match sessionstatus::read(Path::new(sessionstatus::DIR), a.uid).and_then(|s| s.compositor) {
+        Some(r) if r != now => println!("{} has a session running on {r}; it changes when that session is restarted (waydesk-admin sessions end {})", a.name, a.name),
+        _ => {}
+    }
+    println!("check the account's own configuration with: waydesk-admin config check {}", a.name);
+    Ok(())
+}
+
+/// Runs a program as the account (never as root, so that nothing the account controls is read or run with more rights than its own), at most 20 s.
+fn run_as(a: &Account, home: &str, program: &str, args: &[&str]) -> Result<(bool, String)> {
+    let runuser = ["/usr/sbin/runuser", "/usr/bin/runuser"].into_iter().find(|p| Path::new(p).exists()).context("runuser is not installed")?;
+    let out = Command::new("/usr/bin/timeout")
+        .args(["20", runuser, "-u", &a.name, "--", "/usr/bin/env"])
+        .arg(format!("HOME={home}"))
+        .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", a.uid))
+        .arg(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .output()
+        .context("cannot run runuser")?;
+    let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
+    text.push_str(&String::from_utf8_lossy(&out.stderr));
+    Ok((out.status.success(), text))
+}
+
+/// A text file of the account, read as the account (at most 512 KB).
+fn read_as(a: &Account, home: &str, path: &str) -> Option<String> {
+    let (ok, text) = run_as(a, home, "/usr/bin/head", &["-c", "524288", "--", path]).ok()?;
+    ok.then_some(text)
+}
+
+fn exists_as(a: &Account, home: &str, path: &str, flag: &str) -> bool {
+    run_as(a, home, "/usr/bin/test", &[flag, path]).map(|(ok, _)| ok).unwrap_or(false)
+}
+
+fn home_of(a: &Account) -> Result<String> {
+    let line = run_tool("/usr/bin/getent", &["passwd", &a.name])?;
+    line.trim().split(':').nth(5).filter(|h| h.starts_with('/')).map(str::to_owned).with_context(|| format!("no home directory for {}", a.name))
+}
+
+/// Whether a program the configuration starts exists: on the PATH sessions get (Waydesk's own directory first), or at the path given.
+fn program_exists(a: &Account, home: &str, program: &str) -> bool {
+    if let Some(rest) = program.strip_prefix("~/") {
+        return exists_as(a, home, &format!("{home}/{rest}"), "-e");
+    }
+    if program.starts_with('/') {
+        return exists_as(a, home, program, "-e");
+    }
+    if program.contains('$') || program.contains('`') {
+        return true; // not a name to look up
+    }
+    if ["/usr/lib/waydesk/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/local/sbin", "/usr/sbin", "/sbin"].iter().any(|d| Path::new(d).join(program).exists()) {
+        return true;
+    }
+    // The account's own folders (ML4W puts its programs in ~/.local/bin, which its configuration adds to the PATH).
+    [".local/bin", "bin", ".cargo/bin"].iter().any(|d| exists_as(a, home, &format!("{home}/{d}/{program}"), "-x"))
+}
+
+/// `waydesk-admin config check NAME`: whether the account's own compositor setup will work as a Waydesk session, from what the account has and what the server has.
+/// Reads only; files of the account are read as the account.
+fn config_check(name: &str, json_out: bool) -> Result<()> {
+    use configcheck::{Finding, Level};
+    require_root()?;
+    let a = account(name)?;
+    let home = home_of(&a)?;
+    let mut f: Vec<Finding> = Vec::new();
+
+    // The account and the server
+    if in_group(&a, RDP_GROUP) {
+        f.push(Finding::new(Level::Ok, "account.rdp", format!("{} may log in over RDP (group {RDP_GROUP})", a.name)));
+    } else {
+        f.push(Finding::new(Level::Fail, "account.rdp", format!("{} is not in the group {RDP_GROUP}, so it cannot log in over RDP", a.name)).hint(format!("waydesk-admin users enable {}", a.name)));
+    }
+    if Path::new(&format!("/run/user/{}", a.uid)).is_dir() {
+        f.push(Finding::new(Level::Ok, "account.runtime-dir", "the account has a runtime directory (its user manager is running)"));
+    } else {
+        f.push(Finding::new(Level::Warn, "account.runtime-dir", "the account has no runtime directory yet: its sessions need one").hint(format!("loginctl enable-linger {}", a.name)));
+    }
+    let (desktop, source) = desktop_of(a.uid);
+    f.push(Finding::new(Level::Info, "desktop", format!("sessions start with {desktop} ({})", if source == "account" { "set for this account" } else { "the server's setting" })));
+    if !["/usr/bin/foot", "/usr/local/bin/foot"].iter().any(|p| Path::new(p).exists()) {
+        f.push(Finding::new(Level::Warn, "server.foot", "foot is not installed: the first terminal of a session does not open").hint("install foot, or start the sessions with --no-terminal"));
+    }
+
+    if desktop == "hyprland" {
+        // Hyprland: version, format, the configuration itself, the GPU
+        let version = Command::new("Hyprland").arg("--version").stdin(Stdio::null()).output().ok().and_then(|o| configcheck::parse_hyprland_version(&String::from_utf8_lossy(&o.stdout)));
+        f.push(configcheck::hyprland_version_finding(version));
+        let lua = format!("{home}/.config/hypr/hyprland.lua");
+        let has_lua = exists_as(&a, &home, &lua, "-e");
+        f.push(configcheck::hyprland_format_finding(has_lua, exists_as(&a, &home, &format!("{home}/.config/hypr/hyprland.conf"), "-e")));
+        if has_lua {
+            match run_as(&a, &home, "Hyprland", &["--verify-config", "--config", &lua]) {
+                Ok((ok, out)) => f.push(configcheck::verify_config_finding(&out, ok)),
+                Err(e) => f.push(Finding::new(Level::Warn, "hyprland.config-valid", format!("could not run Hyprland's own check: {e:#}"))),
+            }
+            // What the configuration does: the Lua files of its folder (symlinks followed), read as the account
+            let listing = run_as(&a, &home, "/usr/bin/find", &["-L", &format!("{home}/.config/hypr"), "-maxdepth", "5", "-name", "*.lua", "-type", "f"]).map(|(_, t)| t).unwrap_or_default();
+            let mut programs: Vec<String> = Vec::new();
+            let mut power = Vec::new();
+            for file in listing.lines().filter(|l| l.starts_with('/')).take(400) {
+                let Some(text) = read_as(&a, &home, file) else { continue };
+                let short = file.strip_prefix(&format!("{home}/.config/hypr/")).unwrap_or(file);
+                power.extend(configcheck::power_command_lines(&text, 3).into_iter().map(|(n, l)| (short.to_owned(), n, l)));
+                for p in configcheck::hypr_exec_programs(&text) {
+                    if !programs.contains(&p) {
+                        programs.push(p);
+                    }
+                }
+            }
+            let lines: Vec<(usize, String)> = power.iter().take(4).map(|(file, n, l)| (*n, format!("{file}: {l}"))).collect();
+            f.extend(configcheck::power_findings(&lines, "hypr"));
+            let missing: Vec<&String> = programs.iter().filter(|p| !configcheck::is_common_program(p) && !program_exists(&a, &home, p)).collect();
+            if missing.is_empty() {
+                if !programs.is_empty() {
+                    f.push(Finding::new(Level::Ok, "hyprland.autostart-programs", format!("the {} programs the configuration starts are installed", programs.len())));
+                }
+            } else {
+                f.push(Finding::new(Level::Warn, "hyprland.autostart-programs", format!("the configuration starts programs that are not installed: {}", missing.iter().take(8).map(|s| s.as_str()).collect::<Vec<_>>().join(", "))).hint("install them; the session starts without them"));
+            }
+            if let Some(idle) = read_as(&a, &home, &format!("{home}/.config/hypr/hypridle.conf")) {
+                f.extend(configcheck::idle_findings(&configcheck::parse_hypridle(&idle), "hypridle.conf"));
+            }
+        }
+        // The GPU: the render node and the display node the account must open
+        let gpus = gpuinfo::list();
+        if gpus.is_empty() {
+            f.push(Finding::new(Level::Fail, "hyprland.gpu", "this server has no GPU, and Hyprland has no software renderer: the session cannot start").hint("use sway for this account"));
+        } else {
+            for g in &gpus {
+                let card = format!("/dev/dri/{}", g.card);
+                let usable = |path: &str| exists_as(&a, &home, path, "-r") && exists_as(&a, &home, path, "-w");
+                let (render_ok, card_ok) = (usable(&g.node), !g.card.is_empty() && usable(&card));
+                if render_ok && card_ok {
+                    f.push(Finding::new(Level::Ok, "hyprland.gpu", format!("the account can open {} and {card} ({})", g.node, g.model)));
+                } else if render_ok {
+                    f.push(Finding::new(Level::Fail, "hyprland.gpu", format!("the account can open {} but not {card}: Hyprland needs the display node as well", g.node))
+                        .hint("give the account that node: the group video, or the rule in /usr/share/waydesk/udev/71-waydesk-hyprland-card.rules for the group waydesk-users (a choice, with security notes: docs/HYPRLAND.md)"));
+                } else {
+                    f.push(Finding::new(Level::Fail, "hyprland.gpu", format!("the account cannot open {} ({})", g.node, g.model)).hint(format!("it must be in the group waydesk-users (the udev rule gives that group the render node), or {RDP_GROUP} is missing")));
+                }
+            }
+        }
+    } else {
+        // sway: which configuration is used, what is in it
+        let home_path = Path::new(&home);
+        let exists = |p: &Path| exists_as(&a, &home, &p.to_string_lossy(), "-f");
+        if !["/usr/lib/waydesk/bin/sway", "/usr/bin/sway", "/usr/local/bin/sway"].iter().any(|p| Path::new(p).exists()) {
+            f.push(Finding::new(Level::Fail, "sway.binary", "sway is not installed").hint("install sway (or waydesk-sway)"));
+        }
+        let source = configcheck::sway_source(Some(home_path), exists);
+        let (path, why) = match &source {
+            configcheck::SwaySource::AccountWaydesk(p) => (Some(p.clone()), "the account's own file for Waydesk sessions".to_owned()),
+            configcheck::SwaySource::SystemWaydesk(p) => (Some(p.clone()), "the Waydesk desktop package's configuration".to_owned()),
+            configcheck::SwaySource::SwayLookup(p) => (Some(p.clone()), "sway's own lookup (the account's ~/.config/sway/config, else the system's)".to_owned()),
+            configcheck::SwaySource::Minimal(p) => (Some(p.clone()), "the minimal configuration of the package (nothing else was found)".to_owned()),
+            configcheck::SwaySource::Nothing => (None, String::new()),
+        };
+        match &path {
+            Some(p) => f.push(Finding::new(Level::Info, "sway.config", format!("sessions start sway with {} ({why})", p.display()))),
+            None => f.push(Finding::new(Level::Fail, "sway.config", "no sway configuration was found and the minimal one is not installed: sway would not start")),
+        }
+        if let Some(ignored) = configcheck::ignored_account_sway_config(Some(home_path), |p| exists_as(&a, &home, &p.to_string_lossy(), "-f")) {
+            f.push(Finding::new(Level::Warn, "sway.own-config-ignored", format!("{} is not used: the Waydesk desktop package's configuration takes priority", ignored.display()))
+                .hint(format!("to use it, put it (or a link to it) at {home}/.config/waydesk/config, or leave the desktop package out")));
+            // What it would do if it were used: that is the next thing the administrator will want to know.
+            if let Some(text) = read_as(&a, &home, &ignored.to_string_lossy()) {
+                let label = format!("{} (not in use)", ignored.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+                f.extend(configcheck::sway_config_findings(&text, &label));
+                f.extend(configcheck::power_findings(&configcheck::power_command_lines(&text, 3), &label));
+            }
+        }
+        if let Some(p) = path {
+            let mut texts = Vec::new();
+            if let Some(main) = read_as(&a, &home, &p.to_string_lossy()) {
+                for inc in configcheck::sway_includes(&main).into_iter().take(6) {
+                    let inc = inc.replacen('~', &home, 1);
+                    let inc = if inc.starts_with('/') { inc } else { format!("{}/{inc}", p.parent().map(|d| d.display().to_string()).unwrap_or_default()) };
+                    if let Some(t) = read_as(&a, &home, &inc) {
+                        texts.push((inc, t));
+                    }
+                }
+                texts.insert(0, (p.to_string_lossy().into_owned(), main));
+            } else {
+                f.push(Finding::new(Level::Warn, "sway.config-unreadable", format!("{} cannot be read by the account", p.display())));
+            }
+            for (file, text) in &texts {
+                f.extend(configcheck::sway_config_findings(text, file.rsplit('/').next().unwrap_or(file)));
+                f.extend(configcheck::power_findings(&configcheck::power_command_lines(text, 3), file.rsplit('/').next().unwrap_or(file)));
+            }
+        }
+    }
+
+    f.sort_by_key(|x| std::cmp::Reverse(x.level));
+    let worst = f.iter().map(|x| x.level).max().unwrap_or(Level::Ok);
+    if json_out {
+        let list: Vec<_> = f.iter().map(|x| json!({ "level": x.level.word(), "id": x.id, "message": x.message, "hint": x.hint })).collect();
+        println!("{}", serde_json::to_string_pretty(&json!({ "account": a.name, "desktop": desktop, "result": worst.word(), "findings": list }))?);
+    } else {
+        println!("waydesk config check for {} ({desktop})\n", a.name);
+        for x in &f {
+            println!("{:<5} {}", x.level.word(), x.message);
+            if let Some(h) = &x.hint {
+                println!("      -> {h}");
+            }
+        }
+        let count = |l: Level| f.iter().filter(|x| x.level == l).count();
+        println!("\n{} problems, {} warnings", count(Level::Fail), count(Level::Warn));
+    }
+    if worst == Level::Fail {
+        std::process::exit(1);
     }
     Ok(())
 }

@@ -11,6 +11,8 @@ PAMName=waydesk-session
 # Part of the account's own slice: resource limits set on user-<uid>.slice (or user-.slice.d/) apply to the session.
 Slice=user-%i.slice
 EnvironmentFile=-/etc/default/waydesk
+# One account's own settings (waydesk-admin users set NAME --desktop ...): read after the server's, so they win.
+EnvironmentFile=-/etc/default/waydesk.d/%i.env
 Environment=XDG_RUNTIME_DIR=/run/user/%i DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%i/bus LANG=C.UTF-8 XDG_SESSION_TYPE=wayland XDG_SESSION_CLASS=user XDG_SESSION_DESKTOP=sway
 ExecStart=/usr/bin/waydesk-server --session-worker --own-sway --register /run/waydesk/sessions.sock $WAYDESK_SESSION_ARGS
 Restart=no

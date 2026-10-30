@@ -10,6 +10,7 @@ use anyhow::{bail, Context as _, Result};
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
+use crate::configcheck::sway_config;
 use crate::capture::Rect;
 use crate::encode::Tuning;
 use crate::encoder::Encode;
@@ -773,10 +774,6 @@ pub fn path_with_private_first(current: Option<&std::ffi::OsStr>, dir: &std::pat
 pub const PRIVATE_QML: &str = "/usr/lib/waydesk/qml";
 
 /// Called once when a session worker starts, before any thread runs sway.
-/// Configs sway looks for itself (`/usr/lib/waydesk/etc` is where our private sway is built to look instead of `/etc`).
-const SWAY_OWN_CONFIGS: [&str; 2] = ["/etc/sway/config", "/usr/lib/waydesk/etc/sway/config"];
-/// Used when nothing else exists, so that a server without the desktop package still gets a session (sway refuses to start without a config).
-const MINIMAL_CONFIG: &str = "/usr/share/waydesk/sway-minimal.conf";
 
 /// The layout of a session: the one this account asked for, else the one of the client's locale (`default` when the client reports none).
 fn keyboard_layout(klid: u32, default: &str) -> String {
@@ -822,19 +819,6 @@ fn account_keyboard() -> Option<String> {
     Some(name.to_owned())
 }
 
-/// The config to start sway with (`-c`), or None to let sway look. The account's own config for these sessions wins, then the system's;
-/// then sway's usual lookup, and if that would find nothing, the minimal one.
-fn sway_config(home: Option<&std::path::Path>, is_file: impl Fn(&std::path::Path) -> bool) -> Option<std::path::PathBuf> {
-    use std::path::{Path, PathBuf};
-    let user = |rel: &str| home.map(|h| h.join(rel)).filter(|p| is_file(p));
-    user(".config/waydesk/config")
-        .or_else(|| Some(PathBuf::from("/etc/xdg/waydesk/sway.conf")).filter(|p| is_file(p)))
-        .or_else(|| {
-            let sway_finds = user(".sway/config").is_some() || user(".config/sway/config").is_some() || SWAY_OWN_CONFIGS.iter().any(|c| is_file(Path::new(c)));
-            (!sway_finds).then(|| PathBuf::from(MINIMAL_CONFIG)).filter(|p| is_file(p))
-        })
-}
-
 pub fn prefer_private_bin() {
     let dir = std::path::Path::new(PRIVATE_BIN);
     if dir.is_dir() {
@@ -873,6 +857,7 @@ mod private_bin_tests {
     }
 
     use super::*;
+    use crate::configcheck::MINIMAL_CONFIG;
     use std::ffi::OsStr;
     use std::path::Path;
 
