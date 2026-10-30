@@ -2,3 +2,6 @@
 # logind session, so polkit agents, loginctl and the like see it. No authentication here, the helper already did that.
 session required pam_limits.so
 session optional pam_systemd.so
+# systemd also runs the account stack for PAMName=. Debian lets an empty one through; Arch's default for a missing stack is to refuse (pam_warn, pam_deny),
+# which stopped every session unit. The login was checked by the helper (service waydesk-server); this service is only used by waydesk-session@.service.
+account  required   pam_permit.so

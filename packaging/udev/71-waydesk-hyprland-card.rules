@@ -1,0 +1,4 @@
+# Waydesk with WAYDESK_COMPOSITOR=hyprland (docs/HYPRLAND.md): Hyprland opens the GPU's display node (card*), not only the render node that
+# 70-waydesk-gpu.rules gives to waydesk-users. This rule gives the group that node too, by an ACL, as that rule does. NOT installed by default:
+# it lets every account of the group open the display node (no display needs to be connected; see the security notes in docs/HYPRLAND.md).
+ACTION=="add|change", SUBSYSTEM=="drm", KERNEL=="card[0-9]*", RUN+="/usr/bin/setfacl -m g:waydesk-users:rw $env{DEVNAME}"

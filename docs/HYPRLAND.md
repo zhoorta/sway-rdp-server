@@ -20,6 +20,23 @@ compositor-specific calls are in `src/compositor.rs` (the `Compositor` trait; `h
 Nothing is set up as root per account: with no display connected to the GPU there is no exclusive access to fight over, so several accounts
 run side by side on one GPU (two were tried at once, each with its own output size).
 
+## As a service (checked on Arch, 2026-10-30)
+
+With `WAYDESK_COMPOSITOR=hyprland` in `/etc/default/waydesk` the packaged units work unchanged (`waydesk-helper`, `waydesk`, `waydesk-session@UID`; the
+session unit's `--own-sway` only means "start the compositor of this session"). A login through the real helper and daemon started the session unit,
+Hyprland ran inside it, a terminal opened on the `Remote` workspace, and the session speaker reached the client as PCM blocks over the sound channel.
+What a package has to provide for it:
+
+- **The GPU's display node.** `packaging/udev/70-waydesk-gpu.rules` gives `waydesk-users` only the render node, on purpose. Hyprland opens `card*` too:
+  `packaging/udev/71-waydesk-hyprland-card.rules` does that, and is not installed by default (see Security below).
+- **PAM.** Debian's `packaging/pam-waydesk-server` includes `common-auth`, which Arch lacks: use `packaging/arch/pam-waydesk-server`. The session unit's
+  `waydesk-session` service needs an `account` line (added: `pam_permit`), or Arch refuses it (`status=224/PAM`, session never starts). It still logs a
+  `pam_warn` for `setcred`; that is harmless and left alone (an `auth` line with `pam_permit` could let anything authenticate against that service).
+- **A sound server in the account's session.** `pipewire`, `pipewire-pulse` and `wireplumber` enabled as user units (`systemctl --user enable --now
+  pipewire.socket pipewire-pulse.socket wireplumber.service`, or a preset), and `libpulse` for `parec` and `pactl`. A session that starts without it has no sound
+  until the next one.
+- The `waydesk-blank` cursor theme (from `packaging/cursors`), or Hyprland draws its own cursor into the picture.
+
 ## Why a GPU is needed
 
 Hyprland has no software renderer and no headless-only mode: on a machine without a GPU its backend does not start (`CBackend::create()

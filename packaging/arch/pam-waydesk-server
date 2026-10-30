@@ -1,0 +1,4 @@
+# PAM service of waydesk on Arch: the password of the account that logs in over RDP. It follows the system's own login rules
+# (Debian's packaging/pam-waydesk-server includes common-auth and common-account, which Arch does not have).
+auth     include    system-auth
+account  include    system-auth
