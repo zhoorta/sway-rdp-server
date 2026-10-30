@@ -342,6 +342,20 @@ pub mod hyprland {
         Some((i["instance"].as_str()?.to_owned(), i["wl_socket"].as_str()?.to_owned()))
     }
 
+    /// `hyprctl eval` answers before the new mode is in force, and a capture started in between gets a picture of the old size (the session
+    /// then reports the old size to the client and stops the capture when the real one shows up). So wait until Hyprland says the output has it.
+    fn wait_for_size(output: &str, size: (u16, u16)) -> Result<()> {
+        let want = (u64::from(size.0), u64::from(size.1));
+        for _ in 0..100 {
+            let m = monitor(output)?;
+            if (m["width"].as_u64(), m["height"].as_u64()) == (Some(want.0), Some(want.1)) {
+                return Ok(());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        bail!("Hyprland did not give {output} the size {}x{} within 2 s", size.0, size.1)
+    }
+
     /// The DRM card (`/dev/dri/cardN`) of a render node (`/dev/dri/renderDN`): Hyprland is given the card.
     pub fn card_of_render_node(node: &std::path::Path) -> Option<std::path::PathBuf> {
         let name = node.file_name()?.to_str()?;
@@ -365,12 +379,14 @@ pub mod hyprland {
         }
 
         fn init_output(&self, output: &str, size: (u16, u16)) -> Result<()> {
-            eval(&monitor_lua(output, (size.0.into(), size.1.into()), 1.0))
+            eval(&monitor_lua(output, (size.0.into(), size.1.into()), 1.0))?;
+            wait_for_size(output, size)
         }
 
         fn set_mode(&self, output: &str, size: (u16, u16)) -> Result<()> {
             let scale = monitor(output)?["scale"].as_f64().unwrap_or(1.0);
-            eval(&monitor_lua(output, (size.0.into(), size.1.into()), scale))
+            eval(&monitor_lua(output, (size.0.into(), size.1.into()), scale))?;
+            wait_for_size(output, size)
         }
 
         fn set_scale(&self, output: &str, scale: &str) -> Result<()> {

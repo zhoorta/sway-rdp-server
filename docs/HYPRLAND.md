@@ -34,10 +34,12 @@ Nesting it in a wlroots compositor fails too (it wants `xdg_wm_base` version 6, 
 - Size and scale of a headless output set through `hl.monitor` (1280x720, 1600x900 at 1.5, 1024x768), and a capture has exactly that size.
 - Workspace focus and move, `hl.exec_cmd`, closing the windows of an output, `hyprctl setcursor`, `output remove`.
 - Two accounts, each with their own Hyprland and output, at the same time.
+- Live resize and scale from a client (FreeRDP with dynamic resolution, 1280x720 to 1600x900, 1024x700, 1400x800, at 100% and 200%): the output and the
+  client's picture follow every size, as on sway. `hyprctl eval` answers before the mode is in force, so `init_output` and `set_mode` wait until Hyprland
+  reports the size; without that the capture started on the old size and the session ended up with a picture that did not match the output.
 
 ## Not verified
 
-- Resizing a live session and changing its scale from the client (the Lua is tested as text, not against the running compositor from a client).
 - Pointer clicks and drags, clipboard, audio, three or more accounts, real applications, the systemd units (`waydesk-session@`).
 - The Waydesk desktop (shell, launcher, title-bar buttons) is sway-specific and is not part of a Hyprland session: the account gets
   whatever its own Hyprland configuration (`~/.config/hypr/hyprland.lua`) gives it.
