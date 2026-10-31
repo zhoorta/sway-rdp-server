@@ -30,6 +30,7 @@ mkdir -p $P/usr/lib/udev/rules.d && install -m 644 packaging/udev/70-waydesk-gpu
 mkdir -p $P/usr/lib/modules-load.d && install -m 644 packaging/systemd/modules-load/waydesk.conf $P/usr/lib/modules-load.d/waydesk.conf   # tcp_bbr
 install -m 644 packaging/default-waydesk $P/etc/default/waydesk
 mkdir -p $P/usr/share/waydesk && install -m 644 packaging/sway-minimal.conf $P/usr/share/waydesk/sway-minimal.conf   # a server without waydesk-desktop still gets a session
+install -m 644 packaging/sway-cosmic.conf $P/usr/share/waydesk/sway-cosmic.conf   # the cosmic desktop (COSMIC inside the session's sway)
 install -m 644 packaging/pam-waydesk-server $P/etc/pam.d/waydesk-server
 install -m 644 packaging/pam-waydesk-session $P/etc/pam.d/waydesk-session
 mkdir -p $P/usr/share/icons && cp -a packaging/cursors/waydesk-blank $P/usr/share/icons/   # cursors with nothing in them

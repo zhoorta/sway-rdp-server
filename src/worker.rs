@@ -10,6 +10,7 @@ use anyhow::{bail, Context as _, Result};
 use tokio::sync::mpsc;
 use tracing::{error, info, warn};
 
+#[cfg(test)]
 use crate::configcheck::sway_config;
 use crate::capture::Rect;
 use crate::encode::Tuning;
@@ -613,7 +614,8 @@ impl OwnCompositor {
         use std::os::unix::process::CommandExt;
         let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);
         let uid = unsafe { libc::getuid() };
-        let config = sway_config(std::env::var_os("HOME").as_deref().map(std::path::Path::new), |p| p.is_file());
+        let desktop = if crate::compositor::is_cosmic() { "cosmic" } else { "sway" };
+        let config = crate::configcheck::sway_config_for(std::env::var_os("HOME").as_deref().map(std::path::Path::new), desktop, |p| p.is_file());
         let mut cmd = std::process::Command::new("sway");
         if let Some(path) = &config {
             cmd.arg("-c").arg(path);

@@ -62,12 +62,23 @@ pub enum Kind {
 
 static KIND: std::sync::OnceLock<Kind> = std::sync::OnceLock::new();
 
-/// Chooses the compositor from its name (`sway`, `hyprland`; empty is sway). Once, before any session is made.
+static COSMIC: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether the desktop is COSMIC: the compositor is a sway all the same, and its configuration starts COSMIC inside it (docs/COSMIC.md).
+pub fn is_cosmic() -> bool {
+    COSMIC.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Chooses the compositor from its name (`sway`, `cosmic`, `hyprland`; empty is sway). Once, before any session is made.
 pub fn select(name: &str) -> Result<Kind> {
     let kind = match name.trim().to_ascii_lowercase().as_str() {
         "" | "sway" => Kind::Sway,
+        "cosmic" => {
+            COSMIC.store(true, std::sync::atomic::Ordering::Relaxed);
+            Kind::Sway
+        }
         "hyprland" => Kind::Hyprland,
-        other => bail!("unknown compositor {other:?} (sway or hyprland)"),
+        other => bail!("unknown compositor {other:?} (sway, cosmic or hyprland)"),
     };
     let _ = KIND.set(kind);
     Ok(*KIND.get().unwrap_or(&kind))

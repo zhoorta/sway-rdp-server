@@ -9,6 +9,8 @@ use std::path::{Path, PathBuf};
 pub const SWAY_OWN_CONFIGS: [&str; 2] = ["/etc/sway/config", "/usr/lib/waydesk/etc/sway/config"];
 /// Used when nothing else exists, so that a server without the desktop package still gets a session (sway refuses to start without a config).
 pub const MINIMAL_CONFIG: &str = "/usr/share/waydesk/sway-minimal.conf";
+/// The configuration of the `cosmic` desktop: sway starts COSMIC (`start-cosmic`) as one fullscreen window of its own headless output.
+pub const COSMIC_CONFIG: &str = "/usr/share/waydesk/sway-cosmic.conf";
 /// The configuration of the Waydesk desktop package.
 pub const SYSTEM_SWAY_CONFIG: &str = "/etc/xdg/waydesk/sway.conf";
 /// Where an administrator's per-account settings are kept (read by the session unit after /etc/default/waydesk): `UID.env`. Next to that file, not under /etc/waydesk
@@ -33,9 +35,18 @@ pub enum SwaySource {
 /// Which configuration a session starts sway with. The account's own file for these sessions wins, then the system's Waydesk one; then sway's usual lookup,
 /// and if that would find nothing, the minimal one.
 pub fn sway_source(home: Option<&Path>, is_file: impl Fn(&Path) -> bool) -> SwaySource {
+    sway_source_for(home, "sway", is_file)
+}
+
+/// The same for an account's desktop: `cosmic` has the package's COSMIC configuration where `sway` has the Waydesk desktop's one (the account's own file still wins).
+pub fn sway_source_for(home: Option<&Path>, desktop: &str, is_file: impl Fn(&Path) -> bool) -> SwaySource {
     let user = |rel: &str| home.map(|h| h.join(rel)).filter(|p| is_file(p));
     if let Some(p) = user(".config/waydesk/config") {
         return SwaySource::AccountWaydesk(p);
+    }
+    let cosmic = PathBuf::from(COSMIC_CONFIG);
+    if desktop == "cosmic" && is_file(&cosmic) {
+        return SwaySource::SystemWaydesk(cosmic);
     }
     let system = PathBuf::from(SYSTEM_SWAY_CONFIG);
     if is_file(&system) {
@@ -54,7 +65,11 @@ pub fn sway_source(home: Option<&Path>, is_file: impl Fn(&Path) -> bool) -> Sway
 
 /// The config to start sway with (`-c`), or None to let sway look.
 pub fn sway_config(home: Option<&Path>, is_file: impl Fn(&Path) -> bool) -> Option<PathBuf> {
-    match sway_source(home, is_file) {
+    sway_config_for(home, "sway", is_file)
+}
+
+pub fn sway_config_for(home: Option<&Path>, desktop: &str, is_file: impl Fn(&Path) -> bool) -> Option<PathBuf> {
+    match sway_source_for(home, desktop, is_file) {
         SwaySource::AccountWaydesk(p) | SwaySource::SystemWaydesk(p) | SwaySource::Minimal(p) => Some(p),
         SwaySource::SwayLookup(_) | SwaySource::Nothing => None,
     }
@@ -427,10 +442,11 @@ pub fn is_common_program(name: &str) -> bool {
 
 // ---- the per-account settings file ----
 
-/// `sway`, `hyprland` or `default` (the server-wide setting), whatever the case.
+/// `sway`, `cosmic`, `hyprland` or `default` (the server-wide setting), whatever the case.
 pub fn normalize_desktop(s: &str) -> Option<&'static str> {
     match s.trim().to_ascii_lowercase().as_str() {
         "sway" => Some("sway"),
+        "cosmic" => Some("cosmic"),
         "hyprland" => Some("hyprland"),
         "default" | "server" => Some("default"),
         _ => None,
@@ -515,6 +531,16 @@ mod tests {
         assert_eq!(sway_source(home, has(&[MINIMAL_CONFIG])), SwaySource::Minimal(MINIMAL_CONFIG.into()));
         assert_eq!(sway_source(home, has(&[])), SwaySource::Nothing);
         assert_eq!(sway_source(None, has(&["/etc/sway/config"])), SwaySource::SwayLookup("/etc/sway/config".into()));
+    }
+
+    #[test]
+    fn the_cosmic_desktop_has_its_own_system_config() {
+        let home = Some(Path::new("/home/a"));
+        let has = |l: &'static [&'static str]| move |p: &Path| l.iter().any(|x| Path::new(x) == p);
+        assert_eq!(sway_source_for(home, "cosmic", has(&[COSMIC_CONFIG, SYSTEM_SWAY_CONFIG])), SwaySource::SystemWaydesk(COSMIC_CONFIG.into()));
+        assert_eq!(sway_source_for(home, "sway", has(&[COSMIC_CONFIG, SYSTEM_SWAY_CONFIG])), SwaySource::SystemWaydesk(SYSTEM_SWAY_CONFIG.into()));
+        assert_eq!(sway_source_for(home, "cosmic", has(&[COSMIC_CONFIG, "/home/a/.config/waydesk/config"])), SwaySource::AccountWaydesk("/home/a/.config/waydesk/config".into()));
+        assert_eq!(sway_source_for(home, "cosmic", has(&[SYSTEM_SWAY_CONFIG])), SwaySource::SystemWaydesk(SYSTEM_SWAY_CONFIG.into()), "without the COSMIC file: as for sway");
     }
 
     #[test]
@@ -618,6 +644,7 @@ mod tests {
     fn the_account_settings_file() {
         assert_eq!(normalize_desktop(" Hyprland "), Some("hyprland"));
         assert_eq!(normalize_desktop("SWAY"), Some("sway"));
+        assert_eq!(normalize_desktop("COSMIC"), Some("cosmic"));
         assert_eq!(normalize_desktop("default"), Some("default"));
         assert_eq!(normalize_desktop("gnome"), None);
         let both = AccountSettings { desktop: Some("hyprland".into()), gpu: Some("/dev/dri/renderD129".into()) };
