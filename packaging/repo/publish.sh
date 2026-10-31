@@ -2,7 +2,9 @@
 # Uploads a repository made by make-repo.sh to the web server (the folder behind https://waydesk.dev/apt).
 #
 #   packaging/repo/publish.sh REPO-DIR                       dry run: reads from the server and says what it would do
-#   packaging/repo/publish.sh REPO-DIR --really --key FINGERPRINT
+#   packaging/repo/publish.sh REPO-DIR --really --key FINGERPRINT [--allow-removal]
+#
+# --allow-removal: lets the run delete a package that has no version left in the new pool (otherwise it refuses, and the dry run warns).
 #
 # Publishing needs the fingerprint of the key you mean to publish, typed by you: it must be the key in the repository's keyring, the repository's
 # InRelease must verify with it, and the waydesk-repo package inside must carry the same key. This is so that a test key can never be published by
@@ -19,11 +21,12 @@ set -eu
 SRC=${1:?usage: publish.sh REPO-DIR [--really]}
 HOST=${WAYDESK_PUBLISH_HOST:?set WAYDESK_PUBLISH_HOST to the ssh host (or alias) of the web server}
 DIR=${WAYDESK_PUBLISH_DIR:-waydesk-apt}
-REAL=""; WANT=""
+REAL=""; WANT=""; ALLOW_REMOVAL=""
 shift
 while [ $# -gt 0 ]; do
     case "$1" in
         --really) REAL=1; shift ;;
+        --allow-removal) ALLOW_REMOVAL=1; shift ;;
         --key) WANT=$(printf '%s' "${2:?--key needs a fingerprint}" | tr -d ' ' | tr a-f A-F); shift 2 ;;
         *) echo "publish.sh: unknown option $1" >&2; exit 2 ;;
     esac
@@ -54,6 +57,17 @@ notin "$tmp/local.txt" "$tmp/remote.txt" | cut -d' ' -f2- > "$tmp/upload.txt"
 notin "$tmp/remote.txt" "$tmp/local.txt" | cut -d' ' -f2- > "$tmp/delete.txt"
 echo "packages to upload: $(wc -l < "$tmp/upload.txt" | tr -d ' ')   to remove from the server: $(wc -l < "$tmp/delete.txt" | tr -d ' ')"
 sed 's/^/  + /' "$tmp/upload.txt"; sed 's/^/  - /' "$tmp/delete.txt"
+# A package that disappears from the repository altogether (no version of it left in the new pool) breaks every package that depends on it: 2026-10-31, the
+# helper packages of the desktop were left out of a repository made from a folder that had been emptied. That needs --allow-removal, said on purpose.
+pkgnames() { sed 's|.*/||; s/_.*//' "$1" | sort -u; }
+pkgnames "$tmp/delete.txt" > "$tmp/del-names.txt"; (cd "$SRC" && find pool -type f) > "$tmp/new-pool.txt"; pkgnames "$tmp/new-pool.txt" > "$tmp/new-names.txt"
+notin "$tmp/del-names.txt" "$tmp/new-names.txt" > "$tmp/vanishing.txt"
+if [ -s "$tmp/vanishing.txt" ]; then
+    echo "WARNING: these packages would disappear from the repository altogether (no version of them is in $SRC/pool):" >&2
+    sed 's/^/  !! /' "$tmp/vanishing.txt" >&2
+    if [ -n "$REAL" ] && [ -z "$ALLOW_REMOVAL" ]; then echo "publish.sh: refusing. If you mean it, add --allow-removal." >&2; exit 1; fi
+    [ -n "$REAL" ] || echo "(a real run will refuse unless you add --allow-removal)" >&2
+fi
 if [ -z "$REAL" ]; then
     echo "indexes: $(cd "$SRC" && find dists -type f | wc -l | tr -d ' ') files would be replaced; plus waydesk-archive-keyring.gpg and waydesk-repo.deb"
     echo "dry run only. Add --really to publish."; exit 0
