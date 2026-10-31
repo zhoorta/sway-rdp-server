@@ -35,6 +35,7 @@ On the client machine: `apt install freerdp3-sdl`.
 | File | What it does |
 |---|---|
 | `ramp-remote.sh MAX LABEL` | adds one active heavy user at a time (account, an RDP client on `$CLIENT`, the workload in the session), measures after each, stops at MAX, a refusal, 97 % CPU or low memory; writes `out-LABEL.tsv` |
+| `ramp-desktops.sh MAX LABEL DESKTOP [PROFILE]` | the same ramp for comparing desktops (sway-minimal, waydesk-desktop, omarchy, hyprland), with stop criteria stated in the header, raw `status --json` per step, fps/bitrate columns, client-machine CPU; plan: `CAPACITY-PLAN.md` |
 | `ramp.sh MAX LABEL` | the same with the clients on the server itself (the first, lighter run; run it on the server) |
 | `work.sh PROFILE` | the workload of one user, inside its session: `worker`, `video`, `videoaudio`; `HEAVY=1` adds Calc, VS Code and keystrokes, `GIMP=1` adds GIMP |
 | `sample.py SECONDS` | CPU by group of programs, GPU engines (`intel_gpu_top`), clock and power, as one line of JSON |

@@ -2,7 +2,10 @@
 # work.sh PROFILE : runs as the account, inside its session.
 # PROFILE: worker (light: a document that scrolls, a terminal that types), video (+ a muted 720p loop), videoaudio (+ the loop with sound).
 # HEAVY=1 adds LibreOffice Calc (300,000 rows), VS Code on a source tree and keystrokes into them (wtype); GIMP=1 adds GIMP on a 4000x3000 image (zoom in and out).
-P=${1:-worker}; SM=swaymsg
+P=${1:-worker}
+# COMPOSITOR=hyprland (a session that is not sway): windows are started as plain Wayland clients, focus and key handling are skipped (the profiles without HEAVY need neither).
+wd_sm() { if [ "$COMPOSITOR" = hyprland ]; then [ "$1" = exec ] && (setsid sh -c "$2" >/dev/null 2>&1 < /dev/null &); else swaymsg "$@"; fi; }
+SM=wd_sm
 CH="chromium --ozone-platform=wayland --no-first-run --password-store=basic"
 $SM exec "$CH --user-data-dir=/tmp/cr-$USER --new-window file:///srv/load/page.html" >/dev/null; sleep 6
 $SM exec "foot -a work -T work /srv/load/term.sh" >/dev/null; sleep 3
