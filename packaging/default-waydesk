@@ -80,6 +80,8 @@ WAYDESK_SESSION_ARGS=
 #                                        what each card is for: render = sessions only; inference = a model only (`auto` never picks it, and no other card's session
 #                                        encodes on it; an account pinned there by hand still can); both = sessions and a model. Cards not listed are render.
 #                                        `waydesk-admin status` prints the CUDA_VISIBLE_DEVICES for the inference and both cards; point the model service at those.
+#                                        A role starts nothing and moves nothing: it tells Waydesk which cards to keep sessions off, and which NVIDIA cards to name for a model. Point the model
+#                                        service at its card yourself; `inference` on an Intel or AMD card only keeps sessions off it.
 #WAYDESK_AI_ENDPOINT=127.0.0.1:11434    a local inference service (Ollama, vLLM, llama.cpp). `waydesk-admin status` then shows an AI line (the model it holds and its video
 #                                        memory, if it is Ollama; how many connections are open) and an AI column with each account's open connections to it
 #WAYDESK_ENCODER=auto

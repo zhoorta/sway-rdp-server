@@ -81,7 +81,7 @@ All of these go in `/etc/default/waydesk` and take effect for sessions that star
 | setting | meaning |
 |---|---|
 | `WAYDESK_GPU=off` | software rendering, as without a GPU. Another value: the render node to use, for example `/dev/dri/renderD129` |
-| `WAYDESK_GPU_ROLES=renderD128=render,renderD129=inference` | what each card is for, by render node: `render` (sessions only), `inference` (a local model only: `auto` never picks it and no other card's session encodes on it; an account pinned there by hand still can) or `both`. Cards not listed are `render`. `waydesk-admin status` then prints the `CUDA_VISIBLE_DEVICES` to give the model service |
+| `WAYDESK_GPU_ROLES=renderD128=render,renderD129=inference` | what each card is for, by render node: `render` (sessions only), `inference` (a local model only: `auto` never picks it and no other card's session encodes on it; an account pinned there by hand still can) or `both`. Cards not listed are `render`. `waydesk-admin status` then prints the `CUDA_VISIBLE_DEVICES` to give the model service. A role starts nothing and moves nothing: you point the model service at its card yourself, and `inference` on an Intel or AMD card only keeps sessions off it |
 | `WAYDESK_ENCODER=software` | keep the GPU for drawing but encode on the CPU. `auto` (the default: VAAPI, then NVENC), `vaapi` and `nvenc` are the others |
 | `WAYDESK_NVENC_DEVICE=1` | the NVIDIA card (CUDA number) that encodes; by default the card the session draws on, else the first |
 | `WAYDESK_DMABUF=0` | go back to copying the picture through shared memory instead of the zero-copy capture |

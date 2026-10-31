@@ -100,7 +100,7 @@ pub fn encoder_card_warning(name: &str, render: Option<&str>, encoder_node: Opti
 /// A session drawing on a card whose role is inference only.
 pub fn role_warning(name: &str, render: Option<&str>, roles: &HashMap<String, Role>) -> Option<String> {
     let r = render?;
-    (roles.get(short_name(r)) == Some(&Role::Inference)).then(|| format!("{name} renders on {}, which is kept for inference (pinned there by hand?)", short_name(r)))
+    (roles.get(short_name(r)) == Some(&Role::Inference)).then(|| format!("{name} renders on {}, which is kept for inference (the session started before the roles changed, or the account is pinned there)", short_name(r)))
 }
 
 #[cfg(test)]
