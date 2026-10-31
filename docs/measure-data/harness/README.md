@@ -39,6 +39,10 @@ On the client machine: `apt install freerdp3-sdl`.
 | `ramp.sh MAX LABEL` | the same with the clients on the server itself (the first, lighter run; run it on the server) |
 | `work.sh PROFILE` | the workload of one user, inside its session: `worker`, `video`, `videoaudio`; `HEAVY=1` adds Calc, VS Code and keystrokes, `GIMP=1` adds GIMP |
 | `sample.py SECONDS` | CPU by group of programs, GPU engines (`intel_gpu_top`), clock and power, as one line of JSON |
+| `ai-load.sh LABEL GPUMODE ["N.."] ["C.."]` | desktops and a local model together: per number of sessions (N) a window with the sessions only and one per number of concurrent requests (C) with the model on top; tokens/s, time to first token, the sessions' fps and bitrate, both cards, video memory; plan: `AI-LOAD-PLAN.md` |
+| `ai-setup-server.sh` | the model side, once: Ollama pinned to the NVIDIA card by UUID, localhost only, models pulled, the load scripts copied to `/srv/load` |
+| `llm-bench.py C SECONDS MODEL`, `ai-sample.py SECONDS` | what `ai-load.sh` runs on the server: the model load (tokens/s, time to first token) and the sampler (sessions, cards, video memory, warnings); one line of JSON each |
+| `ai-summary.py out-LABEL.tsv` | what the model did to the sessions and the sessions to the model, and the video memory of a session |
 | `run-webgl.sh` | one full-screen WebGL page per user, 1 to 12 users, GPU on, then GPU off; reads each page's own frame rate (`fps.sh`) |
 | `run-fallback.sh` | one WebGL user with the GPU on, then with VAAPI made unavailable (`LIBVA_DRIVER_NAME`) |
 | `run-apptests.sh`, `apptest.sh` | starts Zed, Blender, Kdenlive, darktable, `vkcube` and `glxgears` in a session, GPU on and off |
