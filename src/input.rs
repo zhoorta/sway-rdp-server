@@ -155,6 +155,7 @@ fn setup(want_output: Option<&str>, layout: &str) -> Result<Injector> {
     queue.roundtrip(&mut state).context("roundtrip after creating virtual devices")?;
     let xkb_state = xkb::State::new(&keymap);
     crate::compositor::set_nested_layout(layout);
+    crate::compositor::set_nested_defaults();
     let scroll_scale = std::env::var("WAYDESK_SCROLL_SCALE").ok().and_then(|v| v.parse::<f64>().ok()).filter(|v| *v > 0.0).unwrap_or(1.0);
     Ok(Injector { conn, seat, vk_mgr, qh, xkb_state, mods: (0, 0, 0, 0), vk, ptr, start: Instant::now(), scroll: [0.0; 2], scroll_scale })
 }

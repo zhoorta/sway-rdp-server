@@ -83,6 +83,38 @@ pub fn desktop_name() -> &'static str {
     }
 }
 
+/// `kwriteconfig6 --notify` of one key of a KDE settings file, with the session bus found from the environment (the notification is what makes a running KWin or screen
+/// locker read the change). `false` when it failed or when `kwriteconfig6` is not installed.
+fn kwrite(file: &str, group: &str, key: &str, value: &str) -> bool {
+    let bus = std::env::var_os("DBUS_SESSION_BUS_ADDRESS")
+        .or_else(|| std::env::var_os("XDG_RUNTIME_DIR").map(|r| format!("unix:path={}/bus", std::path::Path::new(&r).display()).into()));
+    let mut cmd = std::process::Command::new("kwriteconfig6");
+    cmd.args(["--file", file, "--group", group, "--key", key, "--notify", value]);
+    if let Some(b) = &bus {
+        cmd.env("DBUS_SESSION_BUS_ADDRESS", b);
+    }
+    cmd.stdin(std::process::Stdio::null()).status().is_ok_and(|s| s.success())
+}
+
+/// Plasma in a session of ours is not a screen with someone in front of it: the RDP login is the lock, and a lock screen that appears after five minutes without input asks
+/// for a password a remote user did not expect (with a "Switch User" button that means nothing here). So the screen locker's automatic locking is switched off (the
+/// user can switch it on again in System Settings: it is only written while the file does not say anything about it, so that choice stays). No-op for any other desktop.
+pub fn set_nested_defaults() {
+    if nested() != 2 {
+        return;
+    }
+    let file = std::env::var_os("HOME").map(|h| std::path::Path::new(&h).join(".config/kscreenlockerrc"));
+    if file.and_then(|f| std::fs::read_to_string(f).ok()).is_some_and(|t| t.contains("Autolock")) {
+        return;
+    }
+    let ok = kwrite("kscreenlockerrc", "Daemon", "Autolock", "false") && kwrite("kscreenlockerrc", "Daemon", "LockOnResume", "false");
+    if ok {
+        tracing::info!("Plasma: automatic screen locking switched off");
+    } else {
+        tracing::warn!("cannot switch off Plasma's automatic screen locking (kwriteconfig6 failed or is not installed)");
+    }
+}
+
 /// The keyboard layout of a desktop that runs inside the session's sway. The session's virtual keyboard has the layout's keymap, but a nested desktop gets raw key
 /// codes from sway and reads them with the layout of its own settings: so they are made the same (both watch their file and apply it at once). No-op otherwise.
 pub fn set_nested_layout(layout: &str) {
@@ -95,16 +127,7 @@ pub fn set_nested_layout(layout: &str) {
     let layout = layout.replace(['"', '\\', '\n', '='], "");
     if kind == 2 {
         // KWin applies a change of kxkbrc when it is told about it (KConfig's notification on the session bus), which a plain write does not do: kwriteconfig6 --notify does.
-        let bus = std::env::var_os("DBUS_SESSION_BUS_ADDRESS")
-            .or_else(|| std::env::var_os("XDG_RUNTIME_DIR").map(|r| format!("unix:path={}/bus", std::path::Path::new(&r).display()).into()));
-        let set = |key: &str, value: &str| {
-            let mut cmd = std::process::Command::new("kwriteconfig6");
-            cmd.args(["--file", "kxkbrc", "--group", "Layout", "--key", key, "--notify", value]);
-            if let Some(b) = &bus {
-                cmd.env("DBUS_SESSION_BUS_ADDRESS", b);
-            }
-            cmd.stdin(std::process::Stdio::null()).status().is_ok_and(|s| s.success())
-        };
+        let set = |key: &str, value: &str| kwrite("kxkbrc", "Layout", key, value);
         let ok = set("Use", "true") && set("VariantList", "") && set("LayoutList", &layout);
         if ok {
             tracing::info!(%layout, "the nested desktop's keyboard layout set");
