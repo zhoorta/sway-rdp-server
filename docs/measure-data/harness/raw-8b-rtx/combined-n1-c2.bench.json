@@ -1,0 +1,1 @@
+{"conc": 2, "seconds": 90.0, "model": "llama3.1:8b-instruct-q4_K_M", "load_s": 0.0, "requests": 34, "errors": 0, "tps_med": 48.4, "tps_min": 47.8, "tps_total": 96.1, "ttft_med": 0.04, "ttft_p95": 0.04}
