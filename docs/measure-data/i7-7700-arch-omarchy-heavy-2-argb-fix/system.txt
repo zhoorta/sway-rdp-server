@@ -27,7 +27,7 @@ Nobody is logged in.
 
 # Where the RDP port listens. Loopback by default: reach it through an SSH tunnel or a VPN. Put a VPN or private
 # address here to serve a network; do not publish it to the internet without reading docs/MULTIUSER-DESIGN.md.
-WAYDESK_BIND="95.216.66.172:3389"
+WAYDESK_BIND="SERVER-IP:3389"
 
 # Which source addresses may connect: checked when a connection is accepted, before TLS and before any login (a daemon on loopback needs none).
 # Without a line here a daemon on any other address allows only local networks (10/8, 172.16/12, 192.168/16, 100.64/10, link-local, fc00::/7).
@@ -110,7 +110,7 @@ WAYDESK_SESSION_ARGS=
 # The compositor of the sessions: sway (default), or hyprland, which needs a GPU and Hyprland 0.55 or later. Experimental: see docs/HYPRLAND.md.
 #WAYDESK_COMPOSITOR=sway
 WAYDESK_COMPOSITOR=hyprland
-WAYDESK_ALLOW_FROM="77.42.21.31"
+WAYDESK_ALLOW_FROM="CLIENT-IP"
 error: package 'waydesk' was not found
 sway 1:1.12-4
 hyprland 0.57.0-1
