@@ -2,6 +2,12 @@
 
 What changed, newest first. The numbered releases are the ones in the apt repository.
 
+## Unreleased
+
+**Other desktops.** `waydesk-admin users set NAME --desktop cosmic|plasma|hyprland` (experimental). COSMIC and KDE Plasma run as one fullscreen window of the session's headless sway (their own compositors cannot make a headless output, and KDE's RDP server shares an existing session only); Waydesk bridges the clipboard to the inner desktop and sets its keyboard layout. An idle session takes about 940 MB with COSMIC and 750 MB with Plasma 6.8. Hyprland (0.55 and later, needs a GPU) is a compositor of its own (`docs/HYPRLAND.md`); on an i7-7700 with an HD 630, Omarchy's Hyprland held 20 heavy users before the memory rule refused the 21st with the render engine saturated from about 8, the Waydesk desktop (sway) held 21 with the render engine at 59 % (`docs/measure-data/`). Notes in `docs/COSMIC.md` and `docs/PLASMA.md`.
+
+**Arch Linux.** A package for Arch (`packaging/arch`, `docs/ARCH.md`); Hyprland offers its capture buffers as ARGB8888, which the capture now takes (before, Hyprland sessions fell back to shared memory and cost about 9 times the CPU). The capture also speaks `ext-image-copy-capture` where a compositor has no `wlr-screencopy` (`WAYDESK_CAPTURE=ext` forces it; shared memory only so far).
+
 ## 2026-10-28 · 0.4.0
 
 **A GPU, when there is one.** A session draws its desktop on the machine's GPU (a render node in `/dev/dri`) and encodes the H.264 picture with the chip's encoder through VAAPI; without a GPU, or when anything about it fails, it is software as before. On an Intel HD 630 (i7-7700, Debian 13): the OpenGL benchmark goes from 167 to 2840 points, the session's CPU for a full-screen animation from 107 % of a core to 21 %, and Chromium gets WebGL (it ran with `--disable-gpu` before, which also meant no WebGL at all). `WAYDESK_GPU=off` and `WAYDESK_ENCODER=software` in `/etc/default/waydesk` switch it off; the accounts get the render node through a udev rule for `waydesk-users` (`acl` is a new dependency, as are `libva2` and `libva-drm2`). The VAAPI encoder is `cros-codecs` (BSD-3, ChromiumOS). Notes and numbers in `docs/GPU-PLAN.md`.
