@@ -1,10 +1,10 @@
 # AI-load test: desktops and a local model on one server (plan, 2026-10-31)
 
 Question: with a model served from the server's GPU, what does it do to the desktops, and what do the desktops do to the model? Driver: `ai-load.sh`; read the results with `ai-summary.py`.
-Companion design: `docs/GPU-PLACEMENT-DESIGN.md` (which GPU a session gets, and a GPU kept for the model). Not run yet: written while waiting for the RTX server.
+Not run yet: written while waiting for the RTX server. (The `balance` mode below is the placement of the commercial edition; the open edition has `igpu` and `rtx`.)
 
 ## Machine
-Hetzner auction i5-13500 with Intel UHD 770 and RTX 4000 SFF Ada (20 GB), Debian 13, Waydesk 0.4.0 plus the `enterprise` branch (`users set --gpu`, `gpu place`, `status` per card). NVIDIA driver 615 or newer from NVIDIA's `debian13` repository
+Hetzner auction i5-13500 with Intel UHD 770 and RTX 4000 SFF Ada (20 GB), Debian 13, Waydesk 0.4.0 plus the per-account GPU setting (`users set --gpu`) and `status` per card. NVIDIA driver 615 or newer from NVIDIA's `debian13` repository
 (`nvidia-open`), the udev rule for the render nodes, and the GPU-aware `/etc/chromium.d/waydesk` (see `docs/GPU-PLAN.md`). Sway desktops only (Hyprland on NVIDIA is untested). Client machine and driver as in `README.md`
 (client on a separate cloud server, 8 dedicated vCPU; the Mac plugged in with `caffeinate -dis`).
 
