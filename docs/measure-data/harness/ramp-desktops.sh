@@ -4,7 +4,8 @@
 #            waydesk-desktop sway with the Waydesk desktop (the system configuration of the waydesk-desktop package; needs it installed)
 #            omarchy         Hyprland with the configuration Omarchy puts in /etc/skel (needs omarchy-settings and a GPU)
 #            hyprland        Hyprland with the account's own configuration (no skel change; for ML4W and the like, prepare the home yourself)
-#   PROFILE: mixed (default: as ramp-remote.sh: browser page that scrolls, typing terminal, every 4th user a 720p video loop, 3, 7, 11 with sound)
+#   PROFILE: mixed (default: browser page that scrolls, typing terminal, every 4th user a 720p video loop, 3, 7, 11 with sound)
+#            heavy  (mixed + the 10-28 heavy workload: Calc on 300,000 rows, VS Code on a 28 MB tree, keystrokes into them, window switches; every 4th (n%4=2) also GIMP)
 #            video  (every user loops a 720p video: the worst case for the encoder; phase 2, run it after a mixed run, with N chosen from it)
 # One active user at a time, measured after each. The criteria are stated BEFORE the run and recorded in the header of the output:
 #   STOP_AVAIL_MB  (1500)  memory: available memory under this = stop "memory"
@@ -35,6 +36,7 @@ stop() { echo -e "stop: $1" | tee -a $OUT; STOPPED=1; }
 STOPPED=0
 for i in $(seq 1 $MAX); do
   name=lt$i; prof=worker; snd=''; gimp=0
+  hv=0; [ "$PROFILE" = heavy ] && { hv=1; [ $((i % 4)) = 2 ] && gimp=1; }
   if [ "$PROFILE" = video ]; then prof=video; else
     [ $((i % 4)) = 0 ] && prof=video; case $i in 3|7|11) prof=videoaudio; snd=/sound;; esac
   fi
@@ -52,8 +54,8 @@ for i in $(seq 1 $MAX); do
   if [ $ok = 0 ]; then echo -e "$i\t$name\t$prof\t$(T "free -m | awk '/^Mem:/ {print \$7}'")\tREFUSED or failed (client log on the VPS: client-$LABEL-$i.log)" >> $OUT; stop refused; break; fi
   sleep 25
   # the session's sockets: sway has its own IPC socket, Hyprland an instance directory; the Wayland display is the same search for both
-  T "wl=\$(ls /run/user/$uid | grep -E '^wayland-[0-9]+\$' | head -1); sock=\$(ls /run/user/$uid/sway-ipc.*.sock 2>/dev/null | head -1); sig=\$(ls /run/user/$uid/hypr 2>/dev/null | head -1); setsid nohup runuser -u $name -- env XDG_RUNTIME_DIR=/run/user/$uid WAYLAND_DISPLAY=\${wl:-wayland-1} DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus SWAYSOCK=\$sock HYPRLAND_INSTANCE_SIGNATURE=\$sig COMPOSITOR=$COMP PATH=/usr/lib/waydesk/bin:/usr/bin:/bin HOME=/home/$name USER=$name HEAVY=0 GIMP=$gimp /srv/load/work.sh $prof > /root/load/work-$LABEL-$i.log 2>&1 < /dev/null &"
-  sleep 100
+  T "wl=\$(ls /run/user/$uid | grep -E '^wayland-[0-9]+\$' | head -1); sock=\$(ls /run/user/$uid/sway-ipc.*.sock 2>/dev/null | head -1); sig=\$(ls /run/user/$uid/hypr 2>/dev/null | head -1); setsid nohup runuser -u $name -- env XDG_RUNTIME_DIR=/run/user/$uid WAYLAND_DISPLAY=\${wl:-wayland-1} DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus SWAYSOCK=\$sock HYPRLAND_INSTANCE_SIGNATURE=\$sig COMPOSITOR=$COMP PATH=/usr/lib/waydesk/bin:/usr/bin:/bin HOME=/home/$name USER=$name HEAVY=$hv GIMP=$gimp /srv/load/work.sh $prof > /root/load/work-$LABEL-$i.log 2>&1 < /dev/null &"
+  sleep $([ $hv = 1 ] && echo 160 || echo 100)
   S=$(date +%s)
   ( C "python3 -c \"
 import time

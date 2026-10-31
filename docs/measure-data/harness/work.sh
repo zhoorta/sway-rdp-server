@@ -3,8 +3,23 @@
 # PROFILE: worker (light: a document that scrolls, a terminal that types), video (+ a muted 720p loop), videoaudio (+ the loop with sound).
 # HEAVY=1 adds LibreOffice Calc (300,000 rows), VS Code on a source tree and keystrokes into them (wtype); GIMP=1 adds GIMP on a 4000x3000 image (zoom in and out).
 P=${1:-worker}
-# COMPOSITOR=hyprland (a session that is not sway): windows are started as plain Wayland clients, focus and key handling are skipped (the profiles without HEAVY need neither).
-wd_sm() { if [ "$COMPOSITOR" = hyprland ]; then [ "$1" = exec ] && (setsid sh -c "$2" >/dev/null 2>&1 < /dev/null &); else swaymsg "$@"; fi; }
+# COMPOSITOR=hyprland (a session that is not sway): the few swaymsg forms used below are translated: exec = a plain Wayland client, [app_id|class|title="X"] focus|kill = Lua through
+# hyprctl eval (windows matched by a lower-case part of the class or title; verified on Hyprland 0.57: hl.get_windows() + hl.dsp.focus({ window = w })), -t get_tree = the client list.
+wd_hl() { hyprctl eval "$1" >/dev/null 2>&1; }
+wd_sm() {
+  [ "$COMPOSITOR" = hyprland ] || { swaymsg "$@"; return; }
+  case "$1" in
+    exec) (setsid sh -c "$2" >/dev/null 2>&1 < /dev/null &) ;;
+    -t) hyprctl clients -j ;;
+    \[*)
+      local f=class; case "$1" in \[title=*) f=title;; esac
+      local key; key=$(printf '%s' "$1" | sed -E 's/^\[[a-z_]+="([^"]*)"\]$/\1/; s/\.\*$//' | tr 'A-Z' 'a-z')
+      case "$2" in
+        focus) wd_hl "for _, w in ipairs(hl.get_windows()) do if string.find(string.lower(w.$f or ''), '$key', 1, true) then hl.dispatch(hl.dsp.focus({ window = w })) break end end" ;;
+        kill)  wd_hl "for _, w in ipairs(hl.get_windows()) do if string.find(string.lower(w.$f or ''), '$key', 1, true) then hl.dispatch(hl.dsp.window.close({ window = w })) end end" ;;
+      esac ;;
+  esac
+}
 SM=wd_sm
 CH="chromium --ozone-platform=wayland --no-first-run --password-store=basic"
 $SM exec "$CH --user-data-dir=/tmp/cr-$USER --new-window file:///srv/load/page.html" >/dev/null; sleep 6
