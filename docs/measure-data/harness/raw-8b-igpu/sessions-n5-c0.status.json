@@ -1,0 +1,253 @@
+{
+  "admission": {
+    "max_active_users": 0,
+    "min_available_mb": 9613,
+    "open": true,
+    "reason": "",
+    "sessions": 5
+  },
+  "compositor_setting": "sway",
+  "gpu_roles": {},
+  "gpu_setting": "auto",
+  "gpus": [
+    {
+      "busy_percent": 36.0,
+      "driver": "i915",
+      "encoder_percent": null,
+      "mem_total_mb": null,
+      "mem_used_mb": null,
+      "mhz": null,
+      "model": "Intel AlderLake-S GT1",
+      "node": "/dev/dri/renderD128",
+      "pci": "0000:00:02.0",
+      "reserved": false,
+      "role": null,
+      "sessions": [
+        "lt1",
+        "lt2",
+        "lt3",
+        "lt4",
+        "lt5"
+      ],
+      "uuid": null,
+      "vendor": "intel",
+      "watts": null
+    },
+    {
+      "busy_percent": 0.0,
+      "driver": "nvidia",
+      "encoder_percent": 0.0,
+      "mem_total_mb": 20475,
+      "mem_used_mb": 7266,
+      "mhz": 210,
+      "model": "NVIDIA RTX 4000 SFF Ada Generation",
+      "node": "/dev/dri/renderD129",
+      "pci": "0000:01:00.0",
+      "reserved": false,
+      "role": null,
+      "sessions": [],
+      "uuid": "GPU-135bf55a-cdf3-d072-c499-bdc16464ecca",
+      "vendor": "nvidia",
+      "watts": 12.7
+    }
+  ],
+  "machine": {
+    "cores": 20,
+    "kernel": "6.12.113+deb13-amd64",
+    "load": [
+      "1.24",
+      "1.69",
+      "1.35"
+    ],
+    "mem_available_mb": 55858,
+    "mem_total_mb": 64087,
+    "os": "Debian GNU/Linux 13 (trixie)",
+    "swap_devices": [
+      {
+        "name": "/dev/nvme0n1p2",
+        "size_mb": 8191,
+        "used_mb": 0
+      },
+      {
+        "name": "/dev/zram0",
+        "size_mb": 16383,
+        "used_mb": 0
+      }
+    ],
+    "swap_total_mb": 24575,
+    "swap_used_mb": 0
+  },
+  "users": [
+    {
+      "cap_mb": 32043,
+      "cpu_percent": 5.7,
+      "mem_mb": 1010,
+      "name": "lt1",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 326,
+      "top": [
+        {
+          "mb": 1135,
+          "name": "chromium"
+        },
+        {
+          "mb": 333,
+          "name": "qs"
+        },
+        {
+          "mb": 143,
+          "name": "sway"
+        }
+      ],
+      "uid": 1000,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "encoder_node": "/dev/dri/renderD128",
+        "fps": 5.3,
+        "kbps": 2407,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32043,
+      "cpu_percent": 8.1,
+      "mem_mb": 1077,
+      "name": "lt2",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 334,
+      "top": [
+        {
+          "mb": 1135,
+          "name": "chromium"
+        },
+        {
+          "mb": 332,
+          "name": "qs"
+        },
+        {
+          "mb": 141,
+          "name": "sway"
+        }
+      ],
+      "uid": 1001,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "encoder_node": "/dev/dri/renderD128",
+        "fps": 3.8,
+        "kbps": 2107,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32043,
+      "cpu_percent": 49.5,
+      "mem_mb": 1517,
+      "name": "lt3",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 516,
+      "top": [
+        {
+          "mb": 2336,
+          "name": "chromium"
+        },
+        {
+          "mb": 335,
+          "name": "qs"
+        },
+        {
+          "mb": 142,
+          "name": "sway"
+        }
+      ],
+      "uid": 1002,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "encoder_node": "/dev/dri/renderD128",
+        "fps": 19.7,
+        "kbps": 308,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32043,
+      "cpu_percent": 47.5,
+      "mem_mb": 1518,
+      "name": "lt4",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 511,
+      "top": [
+        {
+          "mb": 2263,
+          "name": "chromium"
+        },
+        {
+          "mb": 324,
+          "name": "qs"
+        },
+        {
+          "mb": 148,
+          "name": "sway"
+        }
+      ],
+      "uid": 1003,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "encoder_node": "/dev/dri/renderD128",
+        "fps": 20.1,
+        "kbps": 491,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32043,
+      "cpu_percent": 8.4,
+      "mem_mb": 1074,
+      "name": "lt5",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 335,
+      "top": [
+        {
+          "mb": 1128,
+          "name": "chromium"
+        },
+        {
+          "mb": 326,
+          "name": "qs"
+        },
+        {
+          "mb": 142,
+          "name": "sway"
+        }
+      ],
+      "uid": 1004,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "encoder_node": "/dev/dri/renderD128",
+        "fps": 5.5,
+        "kbps": 2747,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    }
+  ],
+  "warnings": []
+}

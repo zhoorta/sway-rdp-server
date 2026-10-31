@@ -1,0 +1,31 @@
+
+== docs/measure-data/harness/out-8b-igpu.tsv
+
+Sessions with the model against the same sessions without it
+  N conc |  fps med  (alone)  change |  fps p10  change |    kbps  change |  cpu % (alone)
+  1    1 |      5.2      6.5    -20% |      4.2    -19% |  1902.0    -10% |   17.8     1.0
+  1    2 |      5.6      6.5    -14% |      4.0    -23% |  1868.5    -12% |   17.8     1.0
+  1    4 |      5.7      6.5    -12% |      4.3    -17% |  2003.5     -5% |   17.9     1.0
+  5    1 |      7.5      7.1     +6% |      4.0     +0% |  9170.0     +6% |   19.9     6.0
+  5    2 |      7.5      7.1     +6% |      4.2     +5% |  9741.0    +12% |   20.0     6.0
+  5    4 |      7.7      7.1     +8% |      4.6    +15% | 10043.0    +16% |   20.0     6.0
+ 10    1 |      8.1      7.7     +5% |      4.0     +8% | 16504.0     -8% |   21.8    11.0
+ 10    2 |      8.0      7.7     +4% |      4.1    +11% | 16431.5     -9% |   22.0    11.0
+ 10    4 |      7.7      7.7     +0% |      3.8     +3% | 16420.5     -9% |   22.0    11.0
+
+The model with sessions against the model alone
+  N conc | tok/s one  (alone)  change | tok/s all  change | ttft med  (alone) | ttft p95 | nv busy nv enc
+  1    1 |      52.0     52.2     -0% |      51.8     -0% |     0.02     0.02 |     0.02 |    98.0    0.0
+  1    2 |      49.5     49.6     -0% |      98.2     -0% |     0.04     0.04 |     0.04 |    98.0    0.0
+  1    4 |      36.2     36.3     -0% |     143.9     -0% |     0.05     0.05 |     0.05 |    97.0    0.0
+  5    1 |      52.1     52.2     -0% |      51.9     +0% |     0.02     0.02 |     0.02 |    99.0    0.0
+  5    2 |      49.4     49.6     -0% |      98.1     -0% |     0.04     0.04 |     0.04 |    97.0    0.0
+  5    4 |      36.2     36.3     -0% |     143.7     -0% |     0.05     0.05 |     0.05 |    96.0    0.0
+ 10    1 |      51.9     52.2     -1% |      51.7     -0% |     0.02     0.02 |     0.02 |    98.0    0.0
+ 10    2 |      49.2     49.6     -1% |      97.6     -1% |     0.04     0.04 |     0.04 |    97.0    0.0
+ 10    4 |      36.3     36.3     +0% |     144.3     +0% |     0.05     0.05 |     0.05 |    96.0    0.0
+
+Video memory of a session on the NVIDIA card (model loaded, no requests)
+  N= 1: card 7266.0 MB, model alone 7266 MB -> 0 MB a session
+  N= 5: card 7266.0 MB, model alone 7266 MB -> 0 MB a session
+  N=10: card 7266 MB, model alone 7266 MB -> 0 MB a session
