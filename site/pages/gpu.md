@@ -73,6 +73,23 @@ ACCOUNT            SESSION     MEMORY    SWAP    CPU    LIMIT RENDER ENCODER    
 lt0                running     657 MB       -     48%  31.3 GB gpu    nvenc q40 20fps    chromium 1121 MB, qs 356 MB, waydesk-server 231 MB
 ```
 
+Those two readings are older captures: the current `status` also prints, under each card, its role and the sessions on it, and, for a server with roles and a local model, an `Inference` line, an `AI` line and an `AI` column with the connections each account has open (see [Settings](#settings) and the [recipe for a shared model](/docs/recipes/#a-gpu-server-that-also-runs-a-shared-model)). The same layout, with the values of an example (the card kept for the model, two sessions on the Intel card, one of them using the model), as the format the command prints now:
+
+```console
+$ waydesk-admin status
+GPU       Intel AlderLake-S GT1 (i915, renderD128): 12 % busy
+            sessions only; 2 sessions: lt1, lt2
+          NVIDIA RTX 4000 SFF Ada Generation (nvidia, renderD129): 98 % busy, 7.1 GB of 20 GB
+            inference only (new sessions do not pick it); no sessions; for a model: CUDA_VISIBLE_DEVICES=GPU-135bf55a-cdf3-d072-c499-bdc16464ecca
+          new sessions use: auto
+Inference CUDA_VISIBLE_DEVICES=GPU-135bf55a-cdf3-d072-c499-bdc16464ecca (renderD129)
+AI        http://127.0.0.1:11434: llama3.1:8b-instruct-q4_K_M 6.7 GB in video memory; 1 connection open
+
+ACCOUNT            SESSION     MEMORY    SWAP    CPU    LIMIT RENDER     ENCODER                      AI  DESKTOP    PROGRAMS (resident)
+lt1                running     860 MB       -     29%  31.3 GB renderD128 vaapi@renderD128 q40 20fps  1   sway       chromium 1066 MB, qs 329 MB
+lt2                running     736 MB       -     10%  31.3 GB renderD128 vaapi@renderD128 q40 20fps  -   sway       code 1109 MB, qs 399 MB
+```
+
 How busy a card is comes from NVIDIA's management library for NVIDIA, from `gpu_busy_percent` for AMD, and, on Intel, from the share of time the card is out of its idle state (not the split between its render and video engines). `--watch` keeps it on the screen.
 
 ## Settings {bar: terminal}
