@@ -1,0 +1,83 @@
+{
+  "admission": {
+    "max_active_users": 0,
+    "min_available_mb": 9611,
+    "open": true,
+    "reason": "",
+    "sessions": 1
+  },
+  "compositor_setting": "hyprland",
+  "gpu_reserve": [],
+  "gpu_setting": "auto",
+  "gpus": [
+    {
+      "busy_percent": 59.2,
+      "driver": "i915",
+      "encoder_percent": null,
+      "mem_total_mb": null,
+      "mem_used_mb": null,
+      "mhz": 917,
+      "model": "Intel Kaby Lake-S GT2 [HD Graphics 630]",
+      "node": "/dev/dri/renderD128",
+      "pci": "0000:00:02.0",
+      "reserved": false,
+      "sessions": [
+        "lt1"
+      ],
+      "uuid": null,
+      "vendor": "intel",
+      "watts": null
+    }
+  ],
+  "machine": {
+    "cores": 8,
+    "kernel": "7.2.11-arch1-1",
+    "load": [
+      "0.59",
+      "0.90",
+      "1.41"
+    ],
+    "mem_available_mb": 52818,
+    "mem_total_mb": 64079,
+    "os": "Omarchy",
+    "swap_devices": [],
+    "swap_total_mb": 0,
+    "swap_used_mb": 0
+  },
+  "users": [
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 59.0,
+      "mem_mb": 4589,
+      "name": "lt1",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 529,
+      "top": [
+        {
+          "mb": 1633,
+          "name": "code"
+        },
+        {
+          "mb": 1046,
+          "name": "chromium"
+        },
+        {
+          "mb": 512,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1003,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 19.2,
+        "kbps": 498,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    }
+  ],
+  "warnings": []
+}

@@ -1,0 +1,27 @@
+# ramp-desktops.sh label=waydesk-heavy desktop=waydesk-desktop profile=heavy max=40 date=2026-10-31T13:14:06Z
+# criteria: STOP_AVAIL_MB=1500 STOP_CPU=90 STOP_FPS=0 STOP_CLIENT_CPU=60 (plus admission refusal)
+n	account	profile	avail_MB	swap_MB	user_slice_MB	load1	cpu_busy_pct	cpu_waydesk	cpu_sway	cpu_chromium	cpu_shell	cpu_foot	cpu_sshd	cpu_harness	cpu_other	cpu_CLIENTS	server_side_pct	gpu_Render	gpu_Video	gpu_VideoEnhance	gpu_Blitter	gpu_MHz	pkg_W	errors	probe_ms	fps_min	fps_med	kbps_total	sessions_current	client_vps_cpu_pct	gpu_top_clients	note
+1	lt1	worker	53037	0	10868	0.94	9.3	0.7	1.3	0.6	0.0	0.0	0.0	0.1	5.3	-	9.2	39.4	4.3	0.0	0.0	386	6.2	0	125	19.2	19.2	498	1	7.5	code:24.0,sway:11.1,waydesk-server:1.0,chromium:0.6	ok
+2	lt2	worker	50564	0	13614	0.55	13.0	1.1	1.7	1.4	0.0	0.0	0.0	0.3	6.7	-	12.7	45.9	5.7	0.0	0.0	481	8.3	0	108	1.8	10.8	635	2	9.8	code:26.9,sway:13.4,waydesk-server:1.4,chromium:1.3	ok
+3	lt3	videoaudio	48328	0	16176	2.16	16.7	1.3	2.0	3.1	0.1	0.0	0.0	0.5	7.9	-	16.2	47.3	7.9	0.0	0.0	516	9.3	0	83	0.5	0.6	487	3	11.2	code:28.5,sway:12.7,chromium:1.8,waydesk-server:1.4	ok
+4	lt4	video	45979	0	18628	2.28	19.4	1.5	2.2	4.3	0.1	0.1	0.0	0.6	8.0	-	18.8	44.9	10.0	0.0	0.0	489	9.4	0	79	5.0	12.3	655	2	10.6	code:25.6,sway:12.7,chromium:2.4,waydesk-server:1.3	ok
+5	lt5	worker	43995	0	20761	2.53	21.7	1.8	2.5	4.9	0.1	0.1	0.0	0.7	8.1	-	21.0	45.2	10.5	0.0	0.0	499	9.6	0	110	0.0	3.9	936	5	10.2	code:24.8,sway:13.0,chromium:3.0,waydesk-server:1.4	ok
+6	lt6	worker	41769	0	23240	2.42	21.3	1.8	2.4	4.8	0.1	0.1	0.0	0.8	7.5	-	20.5	45.1	10.1	0.0	0.0	479	10.2	0	95	0.0	0.4	923	6	11.0	code:24.8,sway:12.4,chromium:3.7,waydesk-server:1.2	ok
+7	lt7	videoaudio	39454	0	25752	2.89	27.9	2.2	3.0	6.6	0.1	0.1	0.0	1.0	9.9	-	26.9	50.8	13.3	0.0	0.0	598	12.7	0	121	3.2	5.2	794	3	12.6	code:27.6,sway:14.6,chromium:3.8,waydesk-server:1.7	ok
+8	lt8	video	37041	0	28319	4.35	31.0	2.4	3.4	8.0	0.1	0.1	0.0	1.3	10.2	-	29.7	48.0	14.8	0.0	0.0	570	12.7	0	90	1.1	5.3	1591	5	12.3	code:25.1,sway:13.7,chromium:4.6,waydesk-server:1.6	ok
+9	lt9	worker	35077	0	30489	3.78	34.2	2.7	3.8	8.8	0.2	0.1	0.0	1.4	11.0	-	32.8	49.1	15.6	0.0	0.0	598	13.4	0	129	0.2	1.5	2741	9	13.2	code:24.5,sway:14.8,chromium:5.0,waydesk-server:1.8	ok
+10	lt10	worker	32745	0	33020	3.17	26.0	2.0	2.7	6.2	0.5	0.1	0.0	0.9	7.9	-	25.1	48.7	15.9	0.0	0.0	602	17.5	0	77	0.1	4.3	2379	8	12.5	code:22.9,sway:14.8,chromium:5.9,waydesk-server:1.9	ok
+11	lt11	videoaudio	30399	0	35572	4.39	38.8	2.9	4.3	9.5	0.2	0.1	0.0	3.3	13.4	-	35.5	66.9	21.1	0.0	0.0	871	22.7	0	99	0.2	3.1	1944	6	18.8	code:35.5,sway:19.5,chromium:5.9,waydesk-server:2.9	ok
+12	lt12	video	28083	0	38027	4.54	39.5	3.0	4.4	11.2	0.2	0.2	0.0	1.7	11.6	-	37.8	50.7	20.9	0.0	0.0	655	16.9	0	74	0.0	0.4	2278	12	14.4	code:23.9,sway:14.9,chromium:6.9,waydesk-server:2.0	ok
+13	lt13	worker	26204	0	40212	3.35	40.4	3.1	4.4	11.1	0.2	0.1	0.0	1.8	12.2	-	38.6	52.4	21.1	0.0	0.0	671	18.1	0	124	0.3	3.5	1381	6	14.2	code:24.5,sway:15.4,chromium:7.4,waydesk-server:2.1	ok
+14	lt14	worker	23605	0	42941	4.71	34.6	2.7	3.7	9.1	0.5	0.1	0.0	1.4	10.2	-	33.2	52.8	20.9	0.0	0.0	688	22.2	0	110	0.0	0.6	2295	14	15.4	code:24.0,sway:15.4,chromium:7.8,waydesk-server:2.3	ok
+15	lt15	worker	21688	0	44994	5.66	41.2	3.2	4.4	9.9	0.7	0.1	0.0	1.5	13.8	-	39.7	68.9	24.2	0.0	0.0	899	31.1	0	106	0.1	2.7	3317	10	19.3	code:35.0,sway:19.8,chromium:7.9,waydesk-server:3.2	ok
+16	lt16	video	19387	0	47583	5.27	43.4	3.4	4.8	11.0	0.2	0.2	0.0	1.7	14.3	-	41.7	69.3	25.6	0.0	0.0	909	29.1	0	72	0.2	1.9	2736	8	20.0	code:36.0,sway:19.1,chromium:8.2,waydesk-server:2.9	ok
+17	lt17	worker	17319	0	49771	4.14	36.1	2.9	3.9	9.6	0.2	0.1	0.0	1.5	10.8	-	34.6	54.8	23.8	0.0	0.0	739	26.1	0	78	0.0	0.5	2591	17	17.3	code:23.5,sway:16.6,chromium:9.1,waydesk-server:2.5	ok
+18	lt18	worker	14954	0	52345	3.77	37.6	3.1	4.2	9.9	0.2	0.1	0.0	1.6	11.2	-	36.0	56.7	25.0	0.0	0.0	775	28.4	0	75	0.1	1.8	3152	13	18.5	code:23.6,sway:17.8,chromium:9.3,waydesk-server:2.8	ok
+19	lt19	worker	13026	0	54399	4.09	42.9	3.3	4.5	10.8	0.8	0.2	0.0	1.8	13.3	-	41.1	60.8	24.3	0.0	0.0	798	32.2	0	74	0.0	1.2	2200	11	19.1	code:27.8,sway:17.1,chromium:10.2,waydesk-server:2.7	ok
+20	lt20	video	10624	0	57003	4.28	46.3	3.8	5.2	12.0	0.3	0.2	0.0	1.8	14.9	-	44.5	77.0	31.7	0.0	0.0	977	38.6	0	94	0.1	1.6	3719	20	22.5	code:36.0,sway:23.7,chromium:10.3,waydesk-server:4.1	ok
+21	lt21	worker	8621	0	59342	7.02	38.1	3.1	4.1	10.2	0.3	0.1	0.0	1.6	11.4	-	36.5	58.7	26.9	0.0	0.0	794	33.7	0	79	0.3	2.6	4168	17	19.9	code:24.6,sway:17.6,chromium:10.8,waydesk-server:2.8	ok
+22	lt22	worker	8332	REFUSED or failed (client log on the VPS: client-waydesk-heavy-22.log)
+stop: refused
+done 14:50:51

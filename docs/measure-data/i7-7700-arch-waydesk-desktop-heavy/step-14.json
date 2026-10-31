@@ -1,0 +1,525 @@
+{
+  "admission": {
+    "max_active_users": 0,
+    "min_available_mb": 9611,
+    "open": true,
+    "reason": "",
+    "sessions": 14
+  },
+  "compositor_setting": "hyprland",
+  "gpu_reserve": [],
+  "gpu_setting": "auto",
+  "gpus": [
+    {
+      "busy_percent": 81.4,
+      "driver": "i915",
+      "encoder_percent": null,
+      "mem_total_mb": null,
+      "mem_used_mb": null,
+      "mhz": 1100,
+      "model": "Intel Kaby Lake-S GT2 [HD Graphics 630]",
+      "node": "/dev/dri/renderD128",
+      "pci": "0000:00:02.0",
+      "reserved": false,
+      "sessions": [
+        "lt1",
+        "lt2",
+        "lt3",
+        "lt4",
+        "lt5",
+        "lt6",
+        "lt7",
+        "lt8",
+        "lt9",
+        "lt10",
+        "lt11",
+        "lt12",
+        "lt13",
+        "lt14"
+      ],
+      "uuid": null,
+      "vendor": "intel",
+      "watts": null
+    }
+  ],
+  "machine": {
+    "cores": 8,
+    "kernel": "7.2.11-arch1-1",
+    "load": [
+      "5.03",
+      "5.37",
+      "5.16"
+    ],
+    "mem_available_mb": 23626,
+    "mem_total_mb": 64079,
+    "os": "Omarchy",
+    "swap_devices": [],
+    "swap_total_mb": 0,
+    "swap_used_mb": 0
+  },
+  "users": [
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 13.8,
+      "mem_mb": 4741,
+      "name": "lt1",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 528,
+      "top": [
+        {
+          "mb": 1593,
+          "name": "code"
+        },
+        {
+          "mb": 1045,
+          "name": "chromium"
+        },
+        {
+          "mb": 425,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1003,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 1.7,
+        "kbps": 165,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 15.1,
+      "mem_mb": 2637,
+      "name": "lt2",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 562,
+      "top": [
+        {
+          "mb": 1653,
+          "name": "code"
+        },
+        {
+          "mb": 1238,
+          "name": "chromium"
+        },
+        {
+          "mb": 882,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1004,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 2.0,
+        "kbps": 372,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 20.4,
+      "mem_mb": 2391,
+      "name": "lt3",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 679,
+      "top": [
+        {
+          "mb": 2847,
+          "name": "chromium"
+        },
+        {
+          "mb": 1664,
+          "name": "code"
+        },
+        {
+          "mb": 929,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1005,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 0.3,
+        "kbps": 78,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 12.3,
+      "mem_mb": 2381,
+      "name": "lt4",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 665,
+      "top": [
+        {
+          "mb": 2773,
+          "name": "chromium"
+        },
+        {
+          "mb": 1661,
+          "name": "code"
+        },
+        {
+          "mb": 929,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1006,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 0.2,
+        "kbps": 95,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 41.6,
+      "mem_mb": 2029,
+      "name": "lt5",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 527,
+      "top": [
+        {
+          "mb": 1662,
+          "name": "code"
+        },
+        {
+          "mb": 1389,
+          "name": "chromium"
+        },
+        {
+          "mb": 938,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1007,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 1.5,
+        "kbps": 194,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 14.0,
+      "mem_mb": 2404,
+      "name": "lt6",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 564,
+      "top": [
+        {
+          "mb": 1662,
+          "name": "code"
+        },
+        {
+          "mb": 1391,
+          "name": "chromium"
+        },
+        {
+          "mb": 929,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1008,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 0.3,
+        "kbps": 323,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 25.4,
+      "mem_mb": 2399,
+      "name": "lt7",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 679,
+      "top": [
+        {
+          "mb": 2837,
+          "name": "chromium"
+        },
+        {
+          "mb": 1657,
+          "name": "code"
+        },
+        {
+          "mb": 940,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1009,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 4.0,
+        "kbps": 220,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 11.3,
+      "mem_mb": 2360,
+      "name": "lt8",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 671,
+      "top": [
+        {
+          "mb": 2759,
+          "name": "chromium"
+        },
+        {
+          "mb": 1660,
+          "name": "code"
+        },
+        {
+          "mb": 951,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1010,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 2.3,
+        "kbps": 342,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 38.0,
+      "mem_mb": 2026,
+      "name": "lt9",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 525,
+      "top": [
+        {
+          "mb": 1659,
+          "name": "code"
+        },
+        {
+          "mb": 1379,
+          "name": "chromium"
+        },
+        {
+          "mb": 928,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1011,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 0.1,
+        "kbps": 59,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 7.6,
+      "mem_mb": 2383,
+      "name": "lt10",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 562,
+      "top": [
+        {
+          "mb": 1652,
+          "name": "code"
+        },
+        {
+          "mb": 1398,
+          "name": "chromium"
+        },
+        {
+          "mb": 926,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1012,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 0.0,
+        "kbps": 37,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 17.2,
+      "mem_mb": 2371,
+      "name": "lt11",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 676,
+      "top": [
+        {
+          "mb": 2835,
+          "name": "chromium"
+        },
+        {
+          "mb": 1653,
+          "name": "code"
+        },
+        {
+          "mb": 938,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1013,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 0.3,
+        "kbps": 131,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 13.2,
+      "mem_mb": 2345,
+      "name": "lt12",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 657,
+      "top": [
+        {
+          "mb": 2758,
+          "name": "chromium"
+        },
+        {
+          "mb": 1657,
+          "name": "code"
+        },
+        {
+          "mb": 929,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1014,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 0.8,
+        "kbps": 100,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 12.6,
+      "mem_mb": 1966,
+      "name": "lt13",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 525,
+      "top": [
+        {
+          "mb": 1653,
+          "name": "code"
+        },
+        {
+          "mb": 1380,
+          "name": "chromium"
+        },
+        {
+          "mb": 925,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1015,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 0.2,
+        "kbps": 27,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 53.0,
+      "mem_mb": 2299,
+      "name": "lt14",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 558,
+      "top": [
+        {
+          "mb": 1654,
+          "name": "code"
+        },
+        {
+          "mb": 1372,
+          "name": "chromium"
+        },
+        {
+          "mb": 937,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1016,
+      "video": {
+        "compositor": "sway",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 19.6,
+        "kbps": 152,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    }
+  ],
+  "warnings": []
+}
