@@ -1,0 +1,8 @@
+# ramp-desktops.sh label=effects-off-4 desktop=omarchy profile=heavy max=4 date=2026-10-31T12:50:30Z
+# criteria: STOP_AVAIL_MB=1500 STOP_CPU=90 STOP_FPS=0 STOP_CLIENT_CPU=60 (plus admission refusal)
+n	account	profile	avail_MB	swap_MB	user_slice_MB	load1	cpu_busy_pct	cpu_waydesk	cpu_sway	cpu_chromium	cpu_shell	cpu_foot	cpu_sshd	cpu_harness	cpu_other	cpu_CLIENTS	server_side_pct	gpu_Render	gpu_Video	gpu_VideoEnhance	gpu_Blitter	gpu_MHz	pkg_W	errors	probe_ms	fps_min	fps_med	kbps_total	sessions_current	client_vps_cpu_pct	note
+1	lt1	worker	52836	0	11585	1.03	10.9	0.6	1.5	1.4	0.0	0.1	0.0	0.0	5.3	-	10.9	44.7	3.4	0.0	0.0	410	6.3	0	129	15.6	15.6	701	1	7.9	ok
+2	lt2	worker	50351	0	14410	0.73	9.8	1.0	1.3	1.6	0.2	0.2	0.0	0.0	3.4	-	9.8	31.7	3.5	0.0	0.0	328	6.0	0	136	7.6	8.0	4089	2	8.9	ok
+3	lt3	videoaudio	48141	0	16886	0.86	15.6	1.4	2.3	5.1	0.3	0.4	0.0	0.0	2.7	-	15.6	46.9	8.3	0.0	0.0	526	9.2	0	119	6.5	7.4	4806	3	14.9	ok
+4	lt4	video	45935	0	20065	2.18	23.0	1.9	3.7	8.0	0.4	0.6	0.0	0.0	3.7	-	23.0	66.5	14.4	0.0	0.0	797	15.1	0	95	4.8	11.6	6932	4	19.8	ok
+done 13:08:04
