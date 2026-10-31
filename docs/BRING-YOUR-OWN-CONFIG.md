@@ -32,7 +32,7 @@ to a card, or take it off the GPU:
     waydesk-admin users set alice --desktop sway --gpu off   # both settings in one command
 
 `users list` has a GPU column (a star: set for this account). The video encoder follows the card: VA-API on Intel and AMD, NVENC on NVIDIA. The setting is read when the session starts; a running
-session keeps its card until it is restarted. Every change is in the audit log (`admin.user.set`).
+session keeps its card until it is restarted.
 
 ## Which configuration is used
 

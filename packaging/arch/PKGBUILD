@@ -92,7 +92,7 @@ package() {
   # the card node for Hyprland sessions is a choice, not a default (docs/HYPRLAND.md, Security notes): shipped as an example
   install -Dm644 packaging/udev/71-waydesk-hyprland-card.rules -t "$pkgdir/usr/share/waydesk/udev"
 
-  install -Dm644 README.md docs/MULTIUSER-DESIGN.md docs/WIREGUARD.md docs/ACCESS.md docs/AUDIT-DESIGN.md docs/THREAT-MODEL.md \
+  install -Dm644 README.md docs/MULTIUSER-DESIGN.md docs/WIREGUARD.md docs/ACCESS.md docs/THREAT-MODEL.md \
     docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md docs/HYPRLAND.md docs/ARCH.md docs/BRING-YOUR-OWN-CONFIG.md docs/REFERENCE.md -t "$pkgdir/usr/share/doc/$pkgname"
   install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
   install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE"
