@@ -20,7 +20,7 @@ Before any run: `python3 /srv/load/llm-bench.py 1 20 MODEL` by hand (tokens/s sa
 | Model | 8B Q4 first; 14B Q4 as the second pass (`MODEL=...`) |
 | Session load (`PROFILE`) | `mixed`; `video` as the worst case for the encoder |
 
-Order: 8B with `igpu`, `rtx`, `software`; then `balance`; then the 14B with the first two. Between runs `./cleanup-remote.sh`, `loginctl` without sessions, `free -m` back to the baseline, and `ollama ps` showing the same model loaded.
+Order: 8B with `igpu`, `rtx`, then `balance`; then the 14B with `igpu` and `rtx`. (`software`, a model next to CPU-rendered desktops, was dropped on 2026-10-31: not what the test is about.) Between runs `./cleanup-remote.sh`, `loginctl` without sessions, `free -m` back to the baseline, and `ollama ps` showing the same model loaded.
 
 ## Criteria, stated before the run (also in each `out-*.tsv`)
 This is a comparison at fixed points, not a ramp to a limit.
