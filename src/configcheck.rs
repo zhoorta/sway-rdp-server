@@ -437,13 +437,64 @@ pub fn normalize_desktop(s: &str) -> Option<&'static str> {
     }
 }
 
-pub fn render_account_env(name: &str, desktop: &str) -> String {
-    format!("# Written by `waydesk-admin users set {name} --desktop {desktop}`; read by the session unit after /etc/default/waydesk.\nWAYDESK_COMPOSITOR={desktop}\n")
+/// What the account's settings file holds: a value per setting, `None` where the account follows the server.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct AccountSettings {
+    /// `sway` or `hyprland` (`WAYDESK_COMPOSITOR`).
+    pub desktop: Option<String>,
+    /// `auto`, `off` or a render node (`WAYDESK_GPU`).
+    pub gpu: Option<String>,
 }
 
-/// The desktop an account's settings file asks for (None: no file, or none set).
-pub fn parse_account_env(text: &str) -> Option<String> {
-    text.lines().filter_map(|l| l.trim().strip_prefix("WAYDESK_COMPOSITOR=")).map(|v| v.trim().trim_matches(['"', '\'']).to_ascii_lowercase()).filter(|v| !v.is_empty()).last()
+impl AccountSettings {
+    pub fn is_empty(&self) -> bool {
+        self.desktop.is_none() && self.gpu.is_none()
+    }
+}
+
+/// The text of the settings file for an account (`changed` is the command line that wrote it, for the comment).
+pub fn render_account_env(name: &str, settings: &AccountSettings, changed: &str) -> String {
+    let mut out = format!("# Written by `waydesk-admin users set {name} {changed}`; read by the session unit after /etc/default/waydesk.\n");
+    if let Some(d) = &settings.desktop {
+        out.push_str(&format!("WAYDESK_COMPOSITOR={d}\n"));
+    }
+    if let Some(g) = &settings.gpu {
+        out.push_str(&format!("WAYDESK_GPU={g}\n"));
+    }
+    out
+}
+
+fn parse_account_value(text: &str, key: &str) -> Option<String> {
+    let prefix = format!("{key}=");
+    text.lines().filter_map(|l| l.trim().strip_prefix(prefix.as_str())).map(|v| v.trim().trim_matches(['"', '\'']).to_owned()).filter(|v| !v.is_empty()).last()
+}
+
+/// The settings an account's file asks for (nothing set: no file, or no such line).
+pub fn parse_account_env(text: &str) -> AccountSettings {
+    AccountSettings {
+        desktop: parse_account_value(text, "WAYDESK_COMPOSITOR").map(|v| v.to_ascii_lowercase()),
+        gpu: parse_account_value(text, "WAYDESK_GPU"),
+    }
+}
+
+/// What `--gpu` accepts, given the render nodes that exist: `auto`, `off`, `renderD129` or `/dev/dri/renderD129` (a node that exists), or `default`
+/// (the server's setting, `Ok(None)`). Anything else is an error that says what is possible.
+pub fn normalize_gpu(s: &str, nodes: &[String]) -> Result<Option<String>, String> {
+    let t = s.trim();
+    match t.to_ascii_lowercase().as_str() {
+        "default" | "server" => return Ok(None),
+        "auto" => return Ok(Some("auto".into())),
+        "off" | "none" | "cpu" => return Ok(Some("off".into())),
+        _ => {}
+    }
+    let path = if t.starts_with('/') { t.to_owned() } else { format!("/dev/dri/{t}") };
+    if nodes.contains(&path) {
+        Ok(Some(path))
+    } else if nodes.is_empty() {
+        Err(format!("{t:?} is not a render node of this machine (it has no GPU); use auto, off or default"))
+    } else {
+        Err(format!("{t:?} is not a render node of this machine; use auto, off, default or one of: {}", nodes.join(", ")))
+    }
 }
 
 #[cfg(test)]
@@ -569,9 +620,17 @@ mod tests {
         assert_eq!(normalize_desktop("SWAY"), Some("sway"));
         assert_eq!(normalize_desktop("default"), Some("default"));
         assert_eq!(normalize_desktop("gnome"), None);
-        let text = render_account_env("alice", "hyprland");
-        assert_eq!(parse_account_env(&text), Some("hyprland".into()));
-        assert_eq!(parse_account_env("# nothing\n"), None);
-        assert_eq!(parse_account_env("WAYDESK_COMPOSITOR=sway\nWAYDESK_COMPOSITOR=\"Hyprland\"\n"), Some("hyprland".into()), "the last one wins");
+        let both = AccountSettings { desktop: Some("hyprland".into()), gpu: Some("/dev/dri/renderD129".into()) };
+        assert_eq!(parse_account_env(&render_account_env("alice", &both, "--gpu renderD129")), both);
+        assert_eq!(parse_account_env("# nothing\n"), AccountSettings::default());
+        assert_eq!(parse_account_env("WAYDESK_COMPOSITOR=sway\nWAYDESK_COMPOSITOR=\"Hyprland\"\n").desktop, Some("hyprland".into()), "the last one wins");
+        let nodes = vec!["/dev/dri/renderD128".to_owned(), "/dev/dri/renderD129".to_owned()];
+        assert_eq!(normalize_gpu("renderD129", &nodes), Ok(Some("/dev/dri/renderD129".into())));
+        assert_eq!(normalize_gpu("/dev/dri/renderD128", &nodes), Ok(Some("/dev/dri/renderD128".into())));
+        assert_eq!(normalize_gpu("OFF", &nodes), Ok(Some("off".into())));
+        assert_eq!(normalize_gpu("auto", &[]), Ok(Some("auto".into())));
+        assert_eq!(normalize_gpu("default", &nodes), Ok(None));
+        assert!(normalize_gpu("renderD130", &nodes).is_err(), "a node that does not exist is refused");
+        assert!(normalize_gpu("renderD128", &[]).is_err());
     }
 }

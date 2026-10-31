@@ -12,7 +12,7 @@
 //!   waydesk-admin status [--json] [--watch [SECONDS]]   (memory, swap, load, the GPUs and how busy they are, whether a new session would be accepted, and what each
 //!                                                account uses and runs: renderer and video encoder; `--watch` repeats it, `--json --watch` prints one line of JSON each time)
 //!   waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
-//!   waydesk-admin users set NAME --desktop sway|hyprland|default     the compositor of one account's sessions (default: the server's setting)
+//!   waydesk-admin users set NAME [--desktop sway|hyprland|default] [--gpu auto|off|renderDN|default]     the compositor and the GPU of one account's sessions (default: the server's setting)
 //!   waydesk-admin config check NAME [--json]     whether the account's own compositor setup will work as a Waydesk session (docs/BRING-YOUR-OWN-CONFIG.md)
 //!   waydesk-admin access [show | local | lan | vpn | custom ...]     who can reach the RDP port (scripts in /usr/lib/waydesk/admin)
 //!   waydesk-admin cert [status | local-ca | reissue | export-ca | install | self-signed]     the certificate clients check
@@ -275,7 +275,7 @@ usage: waydesk-admin users list [--json]
        waydesk-admin sessions list [--json] | end NAME
        waydesk-admin status [--json] [--watch [SECONDS]]
        waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
-       waydesk-admin users set NAME --desktop sway|hyprland|default
+       waydesk-admin users set NAME [--desktop sway|hyprland|default] [--gpu auto|off|renderDN|default]
        waydesk-admin config check NAME [--json]
        waydesk-admin access [show | local | lan [--address IP] [--allow LIST] | vpn | custom --bind ADDR:PORT [--allow LIST]]
        waydesk-admin cert [status | local-ca [--san NAME] | reissue | export-ca | install --cert FILE --key FILE | self-signed]
@@ -314,23 +314,24 @@ fn users_list(json_out: bool) -> Result<()> {
     for a in visible_accounts()? {
         let (session, since) = session_state(a.uid);
         let (desktop, source) = desktop_of(a.uid);
+        let gpu = gpu_of(a.uid);
         let running = sessionstatus::read(Path::new(sessionstatus::DIR), a.uid).and_then(|s| s.compositor);
-        rows.push((a.name.clone(), a.uid, in_group(&a, RDP_GROUP), in_group(&a, ADMIN_GROUP), in_group(&a, SUDO_GROUP), login_shell(&a.shell, &shells), session, since, desktop, source, running));
+        rows.push((a.name.clone(), a.uid, in_group(&a, RDP_GROUP), in_group(&a, ADMIN_GROUP), in_group(&a, SUDO_GROUP), login_shell(&a.shell, &shells), session, since, desktop, source, gpu, running));
     }
     if json_out {
         let list: Vec<_> = rows
             .iter()
-            .map(|(name, uid, rdp, admin, sudo, shell, session, since, desktop, source, running)| {
+            .map(|(name, uid, rdp, admin, sudo, shell, session, since, desktop, source, gpu, running)| {
                 json!({ "name": name, "uid": uid, "rdp": rdp, "flatpak_admin": admin, "sudo": sudo, "login_shell": shell, "session": session, "session_since": since,
-                        "desktop": desktop, "desktop_from": source, "desktop_running": running })
+                        "desktop": desktop, "desktop_from": source, "desktop_running": running, "gpu": gpu.0, "gpu_from": gpu.1 })
             })
             .collect();
         println!("{}", serde_json::to_string_pretty(&list)?);
         return Ok(());
     }
     let yes = |v: bool| if v { "yes" } else { "-" };
-    println!("{:<20} {:>5}  {:<4} {:<8} {:<5} {:<7} {:<10} SESSION", "ACCOUNT", "UID", "RDP", "FLATPAK", "SUDO", "SHELL", "DESKTOP");
-    for (name, uid, rdp, admin, sudo, shell, session, _, desktop, source, running) in &rows {
+    println!("{:<20} {:>5}  {:<4} {:<8} {:<5} {:<7} {:<10} {:<12} SESSION", "ACCOUNT", "UID", "RDP", "FLATPAK", "SUDO", "SHELL", "DESKTOP", "GPU");
+    for (name, uid, rdp, admin, sudo, shell, session, _, desktop, source, gpu, running) in &rows {
         // A star: the account has a setting of its own. A running session keeps the desktop it started with, whatever is set now.
         let mut cell = format!("{desktop}{}", if *source == "account" { "*" } else { "" });
         let session_cell = match running {
@@ -339,7 +340,10 @@ fn users_list(json_out: bool) -> Result<()> {
             None => session.clone(),
         };
         cell.truncate(10);
-        println!("{:<20} {:>5}  {:<4} {:<8} {:<5} {:<7} {:<10} {}", name, uid, yes(*rdp), yes(*admin), yes(*sudo), yes(*shell), cell, session_cell);
+        // `renderD129` for a node; a star as for the desktop.
+        let mut gcell = format!("{}{}", gpu.0.rsplit('/').next().unwrap_or(&gpu.0), if gpu.1 == "account" { "*" } else { "" });
+        gcell.truncate(12);
+        println!("{:<20} {:>5}  {:<4} {:<8} {:<5} {:<7} {:<10} {:<12} {}", name, uid, yes(*rdp), yes(*admin), yes(*sudo), yes(*shell), cell, gcell, session_cell);
     }
     Ok(())
 }
@@ -846,32 +850,54 @@ fn account_settings_path(uid: u32) -> PathBuf {
     Path::new(configcheck::ACCOUNT_SETTINGS_DIR).join(format!("{uid}.env"))
 }
 
+fn account_settings(uid: u32) -> configcheck::AccountSettings {
+    std::fs::read_to_string(account_settings_path(uid)).ok().map(|t| configcheck::parse_account_env(&t)).unwrap_or_default()
+}
+
 /// The desktop an account's sessions start with, and where that comes from: `account` (its settings file) or `server` (/etc/default/waydesk).
 fn desktop_of(uid: u32) -> (String, &'static str) {
-    let own = std::fs::read_to_string(account_settings_path(uid)).ok().and_then(|t| configcheck::parse_account_env(&t));
-    match own.as_deref().and_then(configcheck::normalize_desktop) {
+    match account_settings(uid).desktop.as_deref().and_then(configcheck::normalize_desktop) {
         Some(d) if d != "default" => (d.to_owned(), "account"),
         _ => (compositor_setting(), "server"),
     }
 }
 
-/// `users set NAME --desktop sway|hyprland|default`: which compositor this account's sessions start with. The session unit reads the file after
-/// /etc/default/waydesk, so it wins there; a running session keeps what it has until it is restarted.
+/// The GPU setting an account's new sessions start with (`auto`, `off` or a render node), and where it comes from: `account` or `server`.
+fn gpu_of(uid: u32) -> (String, &'static str) {
+    match account_settings(uid).gpu {
+        Some(g) => (g, "account"),
+        None => (gpu_setting(), "server"),
+    }
+}
+
+/// `users set NAME [--desktop sway|hyprland|default] [--gpu auto|off|renderDN|default]`: what this account's sessions start with. The session unit reads
+/// the file after /etc/default/waydesk, so it wins there; a running session keeps what it has until it is restarted.
 fn users_set(name: &str, opts: &[&str]) -> Result<()> {
     require_root()?;
     let a = account(name)?;
-    let mut wanted = None;
+    let (mut desktop_arg, mut gpu_arg) = (None, None);
     let mut it = opts.iter();
     while let Some(flag) = it.next() {
         match *flag {
-            "--desktop" => wanted = Some(*it.next().context("--desktop needs sway, hyprland or default")?),
+            "--desktop" => desktop_arg = Some(*it.next().context("--desktop needs sway, hyprland or default")?),
+            "--gpu" => gpu_arg = Some(*it.next().context("--gpu needs auto, off, default or a render node such as renderD129")?),
             other => bail!("unknown option {other}"),
         }
     }
-    let wanted = wanted.context("nothing to set: --desktop sway|hyprland|default")?;
-    let desktop = configcheck::normalize_desktop(wanted).with_context(|| format!("{wanted:?} is not a desktop Waydesk can start (sway, hyprland, or default for the server's setting)"))?;
+    if desktop_arg.is_none() && gpu_arg.is_none() {
+        bail!("nothing to set: --desktop sway|hyprland|default and/or --gpu auto|off|renderDN|default");
+    }
+    let mut settings = account_settings(a.uid);
+    if let Some(wanted) = desktop_arg {
+        let desktop = configcheck::normalize_desktop(wanted).with_context(|| format!("{wanted:?} is not a desktop Waydesk can start (sway, hyprland, or default for the server's setting)"))?;
+        settings.desktop = (desktop != "default").then(|| desktop.to_owned());
+    }
+    if let Some(wanted) = gpu_arg {
+        let nodes: Vec<String> = gpuinfo::list().into_iter().map(|g| g.node).collect();
+        settings.gpu = configcheck::normalize_gpu(wanted, &nodes).map_err(anyhow::Error::msg)?;
+    }
     let path = account_settings_path(a.uid);
-    if desktop == "default" {
+    if settings.is_empty() {
         match std::fs::remove_file(&path) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -881,7 +907,7 @@ fn users_set(name: &str, opts: &[&str]) -> Result<()> {
         let dir = Path::new(configcheck::ACCOUNT_SETTINGS_DIR);
         std::fs::create_dir_all(dir).with_context(|| format!("cannot create {}", dir.display()))?;
         let tmp = dir.join(format!("{}.env.tmp", a.uid));
-        std::fs::write(&tmp, configcheck::render_account_env(&a.name, desktop)).with_context(|| format!("cannot write {}", tmp.display()))?;
+        std::fs::write(&tmp, configcheck::render_account_env(&a.name, &settings, &opts.join(" "))).with_context(|| format!("cannot write {}", tmp.display()))?;
         {
             use std::os::unix::fs::PermissionsExt as _;
             std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o644))?;
@@ -889,12 +915,21 @@ fn users_set(name: &str, opts: &[&str]) -> Result<()> {
         std::fs::rename(&tmp, &path).with_context(|| format!("cannot write {}", path.display()))?;
     }
     let (now, source) = desktop_of(a.uid);
-    println!("{}: sessions start with {now} ({})", a.name, if source == "account" { "set for this account" } else { "the server's setting" });
-    if now == "hyprland" && gpuinfo::list().is_empty() {
-        eprintln!("note: this server has no GPU (no render node), and Hyprland has no software renderer: the session will not start");
+    let from = |s: &str| if s == "account" { "set for this account" } else { "the server's setting" };
+    println!("{}: sessions start with {now} ({})", a.name, from(source));
+    let (gpu, gsource) = gpu_of(a.uid);
+    let gpu_text = match gpu.as_str() {
+        "off" => "no GPU (software rendering)".to_owned(),
+        "auto" => "the first usable GPU".to_owned(),
+        node => node.to_owned(),
+    };
+    println!("{}: new sessions use {gpu_text} ({})", a.name, from(gsource));
+    if now == "hyprland" && (gpuinfo::list().is_empty() || gpu == "off") {
+        eprintln!("note: Hyprland has no software renderer and needs a GPU (this server has none, or the account's GPU is off): the session will not start");
     }
     match sessionstatus::read(Path::new(sessionstatus::DIR), a.uid).and_then(|s| s.compositor) {
         Some(r) if r != now => println!("{} has a session running on {r}; it changes when that session is restarted (waydesk-admin sessions end {})", a.name, a.name),
+        Some(_) if gpu_arg.is_some() => println!("{} has a session running; its GPU changes when that session is restarted (waydesk-admin sessions end {})", a.name, a.name),
         _ => {}
     }
     println!("check the account's own configuration with: waydesk-admin config check {}", a.name);

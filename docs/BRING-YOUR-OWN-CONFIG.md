@@ -23,6 +23,17 @@ The setting is a file, `/etc/default/waydesk.d/UID.env`, that the session unit r
 (`waydesk-admin sessions end NAME`); `users list` says so. Several accounts with different compositors run side by side (tried: one on sway with the Waydesk desktop and one on Hyprland
 with ML4W, at the same time).
 
+## Which GPU an account gets
+
+`WAYDESK_GPU=auto|off|/dev/dri/renderDN` in `/etc/default/waydesk` is the server's setting (`auto`: the first usable GPU). On a machine with more than one GPU an administrator can pin one account
+to a card, or take it off the GPU:
+
+    waydesk-admin users set alice --gpu renderD129       # a render node that exists here (see `waydesk-admin status`); `auto`, `off`, or `default` (the server's setting)
+    waydesk-admin users set alice --desktop sway --gpu off   # both settings in one command
+
+`users list` has a GPU column (a star: set for this account). The video encoder follows the card: VA-API on Intel and AMD, NVENC on NVIDIA. The setting is read when the session starts; a running
+session keeps its card until it is restarted. Every change is in the audit log (`admin.user.set`).
+
 ## Which configuration is used
 
 **sway.** The first of these that exists: `~/.config/waydesk/config` (the account's file for Waydesk sessions), `/etc/xdg/waydesk/sway.conf` (the Waydesk desktop package), then sway's own

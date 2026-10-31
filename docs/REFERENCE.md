@@ -24,7 +24,7 @@ Packages, commands, units, ports and files of Waydesk. The short version is on [
 - `waydesk-admin users admin NAME on|off`: Flatpak installs without a password
 - `waydesk-admin users sudo NAME on|off`: membership of the sudo group
 - `waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]`: per-account ceilings
-- `waydesk-admin users set NAME --desktop sway|hyprland|default`: the compositor of one account's sessions (`default`: the server's `WAYDESK_COMPOSITOR`); written to `/etc/default/waydesk.d/UID.env`, taken up when the session next starts ([BRING-YOUR-OWN-CONFIG.md](BRING-YOUR-OWN-CONFIG.md))
+- `waydesk-admin users set NAME [--desktop sway|hyprland|default] [--gpu auto|off|renderDN|default]`: the compositor and the GPU of one account's sessions (`default`: the server's `WAYDESK_COMPOSITOR` / `WAYDESK_GPU`; a render node must exist on this machine, e.g. `renderD129`; the encoder follows the GPU); written to `/etc/default/waydesk.d/UID.env`, taken up when the session next starts ([BRING-YOUR-OWN-CONFIG.md](BRING-YOUR-OWN-CONFIG.md))
 - `waydesk-admin config check NAME [--json]`: whether the account's own sway or Hyprland setup will work as a session (exit status 1 when something is a problem)
 - `waydesk-admin sessions list [--json] | end NAME`: running sessions; ending one closes that account's desktop
 
