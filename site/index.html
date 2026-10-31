@@ -32,6 +32,7 @@
   <nav aria-label="Sections">
     <a href="#who">who for</a>
     <a href="#fast">fast</a>
+    <a href="#ai">ai</a>
     <a href="#apps">apps</a>
     <a href="#connect">connect</a>
     <a href="#install">install</a>
@@ -96,6 +97,25 @@
   <div class="win card">
     <div class="bar"><span class="t">isolation</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
     <div class="body"><h3>One session per account</h3><p>Each account in its own session and systemd slice; the daemon has no privileges, and a small root helper starts sessions.</p></div>
+  </div>
+</div>
+
+<section class="band" id="ai">
+<h2>One GPU, one shared model, a desktop for everyone</h2>
+<p>A local model (Ollama, vLLM or another service) that every account reaches on <code>localhost</code>, so the code and the documents stay on your server. Waydesk does not install or run the model: it keeps the desktops off its card and shows who is using it. <a href="/docs/recipes/#a-gpu-server-that-also-runs-a-shared-model">The recipe</a> &middot; <a href="/docs/recipes/#workstations-that-use-the-server-s-model">for workstations</a>.</p>
+</section>
+<div class="grid">
+  <div class="win card">
+    <div class="bar"><span class="t">GPU roles</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3>Desktops on one card, the model on the other</h3><p>Give a card the role <code>inference</code> and sessions are rendered and encoded on the Intel or AMD card. Measured with 8B and 14B models and up to 10 sessions: the model's speed <span class="num">did not change</span>.</p></div>
+  </div>
+  <div class="win card">
+    <div class="bar"><span class="t">localhost</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3>Every account reaches it, with nothing to set up</h3><p>Any account on the server can call the model on <code>localhost</code>. There is no authentication and no per-account limit yet, so it suits a team that trusts itself.</p></div>
+  </div>
+  <div class="win card">
+    <div class="bar"><span class="t">status</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
+    <div class="body"><h3>See who is using it</h3><p><code>waydesk-admin status</code> shows the model, its video memory and an <code>AI</code> column with the connections each account has open. Connections, not tokens.</p></div>
   </div>
 </div>
 
