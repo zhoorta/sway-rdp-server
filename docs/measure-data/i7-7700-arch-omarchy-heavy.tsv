@@ -1,0 +1,14 @@
+# ramp-desktops.sh label=omarchy-heavy desktop=omarchy profile=heavy max=40 date=2026-10-31T09:20:25Z
+# criteria: STOP_AVAIL_MB=1500 STOP_CPU=90 STOP_FPS=0 STOP_CLIENT_CPU=60 (plus admission refusal)
+n	account	profile	avail_MB	swap_MB	user_slice_MB	load1	cpu_busy_pct	cpu_waydesk	cpu_sway	cpu_chromium	cpu_shell	cpu_foot	cpu_sshd	cpu_harness	cpu_other	cpu_CLIENTS	server_side_pct	gpu_Render	gpu_Video	gpu_VideoEnhance	gpu_Blitter	gpu_MHz	pkg_W	errors	probe_ms	fps_min	fps_med	kbps_total	sessions_current	client_vps_cpu_pct	note
+1	lt1	worker	57821	0	7138	0.85	13.1	2.5	1.7	1.5	0.1	0.1	0.0	0.0	5.3	-	13.1	42.6	2.4	0.0	0.0	265	5.1	0	124	5.6	5.6	1465	1	1.1	ok
+2	lt2	worker	55320	0	9968	0.90	10.4	2.9	1.0	1.9	0.2	0.3	0.0	0.0	1.8	-	10.4	11.6	3.1	0.0	0.0	120	4.2	0	241	5.6	8.6	3002	2	2.3	ok
+3	lt3	videoaudio	52890	0	12736	1.66	20.0	6.4	2.2	5.1	0.3	0.3	0.0	0.0	2.5	-	20.0	31.8	11.3	0.0	0.0	365	9.5	0	114	4.6	8.4	4439	3	5.8	ok
+4	lt4	video	50409	0	15527	2.50	30.6	10.6	3.7	7.7	0.4	0.5	0.0	0.0	3.4	-	30.6	45.7	18.0	0.0	0.0	627	15.2	0	135	6.1	13.8	6014	4	9.4	ok
+5	lt5	worker	48056	0	17912	3.74	38.8	13.0	4.7	9.3	0.6	0.8	0.0	0.0	4.8	-	38.8	50.9	19.7	0.0	0.0	701	18.4	0	123	4.2	7.0	8179	5	10.2	ok
+6	lt6	worker	45684	0	20569	5.60	39.8	14.5	4.7	8.2	0.6	0.7	0.0	0.0	4.8	-	39.8	56.4	22.0	0.0	0.0	802	26.2	0	139	3.9	6.5	8582	6	11.5	ok
+7	lt7	videoaudio	42860	0	23565	8.30	62.0	23.7	7.6	14.2	0.8	0.9	0.0	0.0	6.9	-	62.0	73.7	31.2	0.0	0.0	1020	44.8	0	89	4.5	7.1	12255	7	13.9	ok
+8	lt8	video	40147	0	26374	18.47	85.6	32.7	10.5	20.4	1.0	1.0	0.0	0.0	9.3	-	85.6	87.2	38.9	0.0	0.0	1125	60.0	0	172	2.9	9.8	10827	8	14.8	ok
+9	lt9	worker	37916	0	28799	25.91	92.2	33.6	11.2	21.7	1.2	1.3	0.0	0.0	10.8	-	92.2	87.7	38.3	0.0	0.0	1126	61.4	0	172	2.8	5.7	11057	9	14.9	ok
+stop: cpu (server side 92.2 % at step 9)
+done 09:59:34

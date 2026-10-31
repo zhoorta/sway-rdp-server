@@ -1,0 +1,340 @@
+{
+  "admission": {
+    "max_active_users": 0,
+    "min_available_mb": 9611,
+    "open": true,
+    "reason": "",
+    "sessions": 9
+  },
+  "compositor_setting": "hyprland",
+  "gpu_setting": "auto",
+  "gpus": [
+    {
+      "busy_percent": 97.9,
+      "driver": "i915",
+      "encoder_percent": null,
+      "mem_total_mb": null,
+      "mem_used_mb": null,
+      "mhz": 1150,
+      "model": "Intel Kaby Lake-S GT2 [HD Graphics 630]",
+      "node": "/dev/dri/renderD128",
+      "pci": "0000:00:02.0",
+      "vendor": "intel",
+      "watts": null
+    }
+  ],
+  "machine": {
+    "cores": 8,
+    "kernel": "7.2.11-arch1-1",
+    "load": [
+      "24.86",
+      "22.34",
+      "13.15"
+    ],
+    "mem_available_mb": 37911,
+    "mem_total_mb": 64079,
+    "os": "Omarchy",
+    "swap_devices": [],
+    "swap_total_mb": 0,
+    "swap_used_mb": 0
+  },
+  "users": [
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 44.7,
+      "mem_mb": 6399,
+      "name": "lt1",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 675,
+      "top": [
+        {
+          "mb": 2256,
+          "name": "chromium"
+        },
+        {
+          "mb": 1514,
+          "name": "code"
+        },
+        {
+          "mb": 469,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1003,
+      "video": {
+        "compositor": "hyprland",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 3.5,
+        "kbps": 650,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 111.1,
+      "mem_mb": 2504,
+      "name": "lt2",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 565,
+      "top": [
+        {
+          "mb": 1512,
+          "name": "code"
+        },
+        {
+          "mb": 1246,
+          "name": "chromium"
+        },
+        {
+          "mb": 488,
+          "name": "quickshell"
+        }
+      ],
+      "uid": 1004,
+      "video": {
+        "compositor": "hyprland",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 3.6,
+        "kbps": 662,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 112.1,
+      "mem_mb": 2631,
+      "name": "lt3",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 677,
+      "top": [
+        {
+          "mb": 2731,
+          "name": "chromium"
+        },
+        {
+          "mb": 1513,
+          "name": "code"
+        },
+        {
+          "mb": 526,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1005,
+      "video": {
+        "compositor": "hyprland",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 12.2,
+        "kbps": 1555,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 139.4,
+      "mem_mb": 2624,
+      "name": "lt4",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 679,
+      "top": [
+        {
+          "mb": 2667,
+          "name": "chromium"
+        },
+        {
+          "mb": 1513,
+          "name": "code"
+        },
+        {
+          "mb": 526,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1006,
+      "video": {
+        "compositor": "hyprland",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 12.6,
+        "kbps": 1435,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 55.2,
+      "mem_mb": 2194,
+      "name": "lt5",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 532,
+      "top": [
+        {
+          "mb": 1519,
+          "name": "code"
+        },
+        {
+          "mb": 1344,
+          "name": "chromium"
+        },
+        {
+          "mb": 536,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1007,
+      "video": {
+        "compositor": "hyprland",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 4.0,
+        "kbps": 986,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 90.7,
+      "mem_mb": 2479,
+      "name": "lt6",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 583,
+      "top": [
+        {
+          "mb": 1517,
+          "name": "code"
+        },
+        {
+          "mb": 1326,
+          "name": "chromium"
+        },
+        {
+          "mb": 534,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1008,
+      "video": {
+        "compositor": "hyprland",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 5.7,
+        "kbps": 1985,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 137.7,
+      "mem_mb": 2827,
+      "name": "lt7",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 685,
+      "top": [
+        {
+          "mb": 2727,
+          "name": "chromium"
+        },
+        {
+          "mb": 1517,
+          "name": "code"
+        },
+        {
+          "mb": 577,
+          "name": "quickshell"
+        }
+      ],
+      "uid": 1009,
+      "video": {
+        "compositor": "hyprland",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 12.5,
+        "kbps": 1814,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 129.9,
+      "mem_mb": 2629,
+      "name": "lt8",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 674,
+      "top": [
+        {
+          "mb": 2658,
+          "name": "chromium"
+        },
+        {
+          "mb": 1519,
+          "name": "code"
+        },
+        {
+          "mb": 530,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1010,
+      "video": {
+        "compositor": "hyprland",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 12.2,
+        "kbps": 1589,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    },
+    {
+      "cap_mb": 32039,
+      "cpu_percent": 71.6,
+      "mem_mb": 2201,
+      "name": "lt9",
+      "session": true,
+      "swap_mb": 0,
+      "tasks": 537,
+      "top": [
+        {
+          "mb": 1512,
+          "name": "code"
+        },
+        {
+          "mb": 1319,
+          "name": "chromium"
+        },
+        {
+          "mb": 533,
+          "name": "soffice.bin"
+        }
+      ],
+      "uid": 1011,
+      "video": {
+        "compositor": "hyprland",
+        "current": true,
+        "encoder": "vaapi",
+        "fps": 2.8,
+        "kbps": 381,
+        "qp": 18,
+        "render": "/dev/dri/renderD128"
+      }
+    }
+  ]
+}
