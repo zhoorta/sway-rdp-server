@@ -6,6 +6,7 @@ mod allow;
 mod audio;
 mod auth;
 mod capture;
+mod capture_ext;
 mod base64;
 mod clipboard;
 mod compositor;

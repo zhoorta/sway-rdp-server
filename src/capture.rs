@@ -1,4 +1,4 @@
-//! wlr-screencopy capture of one output, plus the shared "latest frame + dirty rectangle" the RDP side reads.
+//! Capture of one output (wlr-screencopy, or ext-image-copy-capture where that is all the compositor has: capture_ext.rs), plus the shared "latest frame + dirty rectangle" the RDP side reads.
 
 use std::os::fd::{AsFd, FromRawFd};
 use std::sync::{Arc, Mutex};
@@ -222,6 +222,35 @@ pub struct Captured {
 /// Set when nothing consumes GPU frames (the encoder is not the VAAPI one, or the client wants bitmaps): the capture goes back to shm.
 pub static PREFER_SHM: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
+/// The capture of one output with whichever protocol the compositor offers. wlr-screencopy is preferred (it is the one with GPU buffers);
+/// `WAYDESK_CAPTURE=ext` forces ext-image-copy-capture (for testing it where both are offered).
+pub enum Capturer {
+    Wlr(Box<WlrCapturer>),
+    Ext(Box<crate::capture_ext::ExtCapturer>),
+}
+
+impl Capturer {
+    pub fn new(want_output: Option<&str>) -> Result<Self> {
+        let conn = Connection::connect_to_env().context("cannot connect to the Wayland display")?;
+        let (globals, _queue) = registry_queue_init::<State>(&conn).context("registry")?;
+        let wlr = globals.contents().with_list(|l| l.iter().any(|g| g.interface == "zwlr_screencopy_manager_v1"));
+        let force_ext = std::env::var("WAYDESK_CAPTURE").is_ok_and(|v| v == "ext");
+        if (!wlr || force_ext) && crate::capture_ext::offered(globals.contents()) {
+            tracing::info!("screen capture with ext-image-copy-capture");
+            return Ok(Self::Ext(Box::new(crate::capture_ext::ExtCapturer::new(want_output)?)));
+        }
+        Ok(Self::Wlr(Box::new(WlrCapturer::new(want_output)?)))
+    }
+
+    /// Blocks until the output has a changed frame and returns it.
+    pub fn next_frame(&mut self) -> Result<Captured> {
+        match self {
+            Self::Wlr(c) => c.next_frame(),
+            Self::Ext(c) => c.next_frame(),
+        }
+    }
+}
+
 #[derive(Clone)]
 struct BufInfo {
     format: wl_shm::Format,
@@ -261,7 +290,7 @@ struct Pool {
     size: usize,
 }
 
-pub struct Capturer {
+pub struct WlrCapturer {
     queue: EventQueue<State>,
     qh: QueueHandle<State>,
     state: State,
@@ -282,7 +311,7 @@ struct Gpu {
     pool: Option<crate::dmabuf::DmaPool>,
 }
 
-impl Capturer {
+impl WlrCapturer {
     pub fn new(want_output: Option<&str>) -> Result<Self> {
         let conn = Connection::connect_to_env().context("cannot connect to the Wayland display")?;
         let (globals, mut queue) = registry_queue_init::<State>(&conn).context("registry")?;

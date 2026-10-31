@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 
 [features]
 default = ["vaapi", "nvenc"]
-vaapi = ["dep:cros-codecs", "dep:gbm", "dep:wayland-protocols"]
+vaapi = ["dep:cros-codecs", "dep:gbm"]
 nvenc = ["dep:nvidia-video-codec-sdk", "dep:cudarc"]
 
 [dependencies]
@@ -31,7 +31,7 @@ cudarc = { version = "0.16", default-features = false, features = ["driver", "st
 cros-codecs = { version = "0.0.6", optional = true, default-features = false, features = ["vaapi"] }
 # GPU buffers for the capture: the compositor renders into a dmabuf (stage 3 of docs/GPU-PLAN.md).
 gbm = { version = "0.15", optional = true, default-features = false }
-wayland-protocols = { version = "0.32", optional = true, features = ["client"] }
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
 anyhow = "1"
 serde_json = "1"
 libc = "0.2"
