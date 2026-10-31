@@ -229,12 +229,17 @@ fn choice(value: Option<&str>) -> Choice {
     }
 }
 
+/// Whether the VAAPI encoder is tried: with `auto` and `vaapi`. `nvenc` and `software` skip it (before this, `nvenc` still started VAAPI first when the card had it).
+fn tries_vaapi(choice: &Choice) -> bool {
+    matches!(choice, Choice::Auto | Choice::Vaapi)
+}
+
 /// The encoder for a desktop of `width` x `height`. With a GPU the session can use, VAAPI; if that does not start (no driver, no H.264
 /// encoder on the chip), OpenH264 and a line in the log.
 pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> {
     let choice = choice(std::env::var("WAYDESK_ENCODER").ok().as_deref());
     #[cfg(feature = "vaapi")]
-    if choice != Choice::Software {
+    if tries_vaapi(&choice) {
         if let Some(node) = crate::gpu::usable_node() {
             match crate::encode_va::VaH264::new(&node, width, height, tuning) {
                 Ok(enc) => {
@@ -276,6 +281,12 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nvenc_and_software_do_not_start_with_vaapi() {
+        assert!(tries_vaapi(&Choice::Auto) && tries_vaapi(&Choice::Vaapi));
+        assert!(!tries_vaapi(&Choice::Nvenc) && !tries_vaapi(&Choice::Software));
+    }
 
     #[test]
     fn choice_from_text() {

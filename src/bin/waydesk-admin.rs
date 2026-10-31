@@ -498,8 +498,17 @@ fn users_remove(name: &str, rest: &[&str]) -> Result<()> {
     }
     userdel.push(&a.name);
     run_tool("/usr/sbin/userdel", &userdel)?;
+    // The account's settings belong to its user id, which a new account can get again: they go with it.
+    forget_account_files(a.uid, &[Path::new(configcheck::ACCOUNT_SETTINGS_DIR)]);
     println!("removed {}{}", a.name, if rest.contains(&"--delete-home") { " and its home folder" } else { " (its home folder was kept)" });
     Ok(())
+}
+
+/// Removes `UID.env` from each directory (it is fine if there is none).
+fn forget_account_files(uid: u32, dirs: &[&Path]) {
+    for d in dirs {
+        let _ = std::fs::remove_file(d.join(format!("{uid}.env")));
+    }
 }
 
 fn users_passwd(name: &str, rest: &[&str], json_out: bool) -> Result<()> {
@@ -1232,6 +1241,22 @@ mod tests {
         assert!(parse_watch(&["--watch", "0"]).is_err(), "a refresh takes a second of sampling");
         assert!(parse_watch(&["--watch", "soon"]).is_err());
         assert!(parse_watch(&["--watch", "99999"]).is_err());
+    }
+
+    #[test]
+    fn removing_an_account_removes_its_settings_and_placement_files_and_only_those() {
+        let dir = std::env::temp_dir().join(format!("waydesk-forget-{}", std::process::id()));
+        let (a, b) = (dir.join("settings"), dir.join("gpu"));
+        std::fs::create_dir_all(&a).unwrap();
+        std::fs::create_dir_all(&b).unwrap();
+        for f in [a.join("1002.env"), b.join("1002.env"), a.join("1003.env")] {
+            std::fs::write(f, "x").unwrap();
+        }
+        forget_account_files(1002, &[&a, &b]);
+        forget_account_files(1002, &[&a, &b]); // again: nothing left, no error
+        assert!(!a.join("1002.env").exists() && !b.join("1002.env").exists());
+        assert!(a.join("1003.env").exists(), "another account's file stays");
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
