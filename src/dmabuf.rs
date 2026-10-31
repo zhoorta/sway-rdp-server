@@ -18,6 +18,9 @@ use wayland_protocols::wp::linux_dmabuf::zv1::client::zwp_linux_dmabuf_v1::ZwpLi
 
 /// `DRM_FORMAT_XRGB8888`, what a GLES compositor offers for a screencopy dmabuf (and what the pixman one cannot).
 pub const XRGB8888: u32 = 0x3432_5258;
+/// `DRM_FORMAT_ARGB8888`, what Hyprland offers: the same bytes (B G R A). The pool then makes ARGB buffers (the compositor only renders into the format it
+/// offered) and the encoder reads them as XRGB (`encode_va.rs`), so the alpha byte is ignored.
+pub const ARGB8888: u32 = 0x3432_5241;
 
 /// How many buffers the pool rotates through: the compositor renders into one, the encoder reads another, and the newest waits in between.
 /// One more, the first, is the damage oracle (see `oracle`) and is never given out.
@@ -41,6 +44,8 @@ pub struct DmaPool {
     id: u64,
     pub width: u32,
     pub height: u32,
+    /// `XRGB8888` or `ARGB8888`: what the compositor offered.
+    pub format: u32,
     stride: u32,
     #[allow(dead_code)]
     device: Device<File>,
@@ -100,7 +105,7 @@ impl GpuFrame {
 }
 
 impl DmaPool {
-    pub fn new<S: 'static>(node: &Path, dmabuf: &ZwpLinuxDmabufV1, qh: &QueueHandle<S>, width: u32, height: u32) -> Result<Self>
+    pub fn new<S: 'static>(node: &Path, dmabuf: &ZwpLinuxDmabufV1, qh: &QueueHandle<S>, width: u32, height: u32, format: u32) -> Result<Self>
     where
         S: Dispatch<ZwpLinuxBufferParamsV1, ()> + Dispatch<wl_buffer::WlBuffer, ()>,
     {
@@ -109,7 +114,7 @@ impl DmaPool {
         let (mut slots, mut stride_of) = (Vec::with_capacity(BUFFERS), 0);
         for _ in 0..BUFFERS {
             let bo = device
-                .create_buffer_object::<()>(width, height, Format::Xrgb8888, BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR)
+                .create_buffer_object::<()>(width, height, if format == ARGB8888 { Format::Argb8888 } else { Format::Xrgb8888 }, BufferObjectFlags::RENDERING | BufferObjectFlags::LINEAR)
                 .context("GBM buffer")?;
             let fd = bo.fd().map_err(|e| anyhow!("dmabuf fd: {e}"))?;
             let stride = bo.stride().map_err(|e| anyhow!("stride: {e}"))?;
@@ -120,12 +125,12 @@ impl DmaPool {
             }
             let params = dmabuf.create_params(qh, ());
             params.add(fd.as_fd(), 0, offset, stride, (modifier >> 32) as u32, modifier as u32);
-            let wl = params.create_immed(width as i32, height as i32, XRGB8888, zwp_linux_buffer_params_v1::Flags::empty(), qh, ());
+            let wl = params.create_immed(width as i32, height as i32, format, zwp_linux_buffer_params_v1::Flags::empty(), qh, ());
             params.destroy();
             stride_of = stride;
             slots.push(Slot { bo, wl, fd: Arc::new(fd), busy: Arc::new(AtomicBool::new(false)) });
         }
-        Ok(Self { slots, next: 0, id: NEXT_ID.fetch_add(1, Ordering::Relaxed), width, height, stride: stride_of, device })
+        Ok(Self { slots, next: 0, id: NEXT_ID.fetch_add(1, Ordering::Relaxed), width, height, format, stride: stride_of, device })
     }
 
     /// The buffer the compositor copies into with `copy_with_damage` only to say what changed. That request writes just the changed areas, into

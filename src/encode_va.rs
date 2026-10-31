@@ -76,7 +76,7 @@ impl VideoFrame for VaFrame {
     }
 }
 
-/// A captured dmabuf (linear XRGB8888) as a VA surface the video processor can read.
+/// A captured dmabuf (linear XRGB8888 or ARGB8888, read as XRGB: the alpha byte is ignored) as a VA surface the video processor can read.
 struct DmabufXrgb {
     fd: OwnedFd,
     width: u32,

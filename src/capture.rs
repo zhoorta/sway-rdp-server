@@ -367,14 +367,14 @@ impl Capturer {
             self.gpu.node = None;
             return Ok(None);
         };
-        if format != crate::dmabuf::XRGB8888 {
+        if format != crate::dmabuf::XRGB8888 && format != crate::dmabuf::ARGB8888 {
             tracing::info!(format = format!("{format:#x}"), "the compositor offers a dmabuf format the capture does not take: shm");
             self.gpu.node = None;
             return Ok(None);
         }
-        if self.gpu.pool.as_ref().is_none_or(|p| p.width != w || p.height != h) {
+        if self.gpu.pool.as_ref().is_none_or(|p| p.width != w || p.height != h || p.format != format) {
             self.gpu.pool = None;
-            match crate::dmabuf::DmaPool::new(&node, &dmabuf, &self.qh, w, h) {
+            match crate::dmabuf::DmaPool::new(&node, &dmabuf, &self.qh, w, h, format) {
                 Ok(pool) => {
                     tracing::info!(w, h, "screen capture into dmabufs");
                     self.gpu.pool = Some(pool);
