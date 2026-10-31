@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Waydesk recipes: a shared team server, a company VPN, a slow link</title>
-<meta name="description" content="Three set-ups made from the documented commands: a shared server for a small team, a server behind a WireGuard VPN, and a long or lossy link.">
+<title>Waydesk recipes: a team server, a VPN, a slow link, a shared local AI model</title>
+<meta name="description" content="Five set-ups made from the documented commands: a shared server for a small team, a server behind a WireGuard VPN, a long or lossy link, a GPU server that also runs a shared model, and workstations that use that model.">
 <link rel="canonical" href="https://waydesk.dev/docs/recipes/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#06121c">
-<meta property="og:title" content="Waydesk recipes: a shared team server, a company VPN, a slow link">
-<meta property="og:description" content="Three set-ups made from the documented commands: a shared server for a small team, a server behind a WireGuard VPN, and a long or lossy link.">
+<meta property="og:title" content="Waydesk recipes: a team server, a VPN, a slow link, a shared local AI model">
+<meta property="og:description" content="Five set-ups made from the documented commands: a shared server for a small team, a server behind a WireGuard VPN, a long or lossy link, a GPU server that also runs a shared model, and workstations that use that model.">
 <meta property="og:url" content="https://waydesk.dev/docs/recipes/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Waydesk">
@@ -19,8 +19,8 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Waydesk recipes: a shared team server, a company VPN, a slow link">
-<meta name="twitter:description" content="Three set-ups made from the documented commands: a shared server for a small team, a server behind a WireGuard VPN, and a long or lossy link.">
+<meta name="twitter:title" content="Waydesk recipes: a team server, a VPN, a slow link, a shared local AI model">
+<meta name="twitter:description" content="Five set-ups made from the documented commands: a shared server for a small team, a server behind a WireGuard VPN, a long or lossy link, a GPU server that also runs a shared model, and workstations that use that model.">
 <meta name="twitter:image" content="https://waydesk.dev/og.jpg">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Waydesk", "item": "https://waydesk.dev/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://waydesk.dev/docs/"}, {"@type": "ListItem", "position": 3, "name": "Recipes", "item": "https://waydesk.dev/docs/recipes/"}]}</script>
 <link rel="stylesheet" href="/style.css">
@@ -48,7 +48,7 @@
 <h2>Run it</h2>
 <ul>
 <li><a href="/docs/cli/">Command line</a></li>
-<li><a href="/docs/recipes/" aria-current="page">Recipes</a><ul><li><a href="#a-shared-server-for-a-small-team">A shared server for a small team</a></li><li><a href="#a-server-behind-a-vpn">A server behind a VPN</a></li><li><a href="#a-long-or-lossy-link">A long or lossy link</a></li></ul></li>
+<li><a href="/docs/recipes/" aria-current="page">Recipes</a><ul><li><a href="#a-shared-server-for-a-small-team">A shared server for a small team</a></li><li><a href="#a-server-behind-a-vpn">A server behind a VPN</a></li><li><a href="#a-long-or-lossy-link">A long or lossy link</a></li><li><a href="#a-gpu-server-that-also-runs-a-shared-model">A GPU server that also runs a shared model</a></li><li><a href="#workstations-that-use-the-server-s-model">Workstations that use the server's model</a></li></ul></li>
 <li><a href="/docs/gpu/">GPU</a></li>
 <li><a href="/docs/desktops/">Desktops</a></li>
 <li><a href="/docs/reference/">Files and settings</a></li>
@@ -96,6 +96,25 @@
 <p>A tunnel runs TCP inside TCP and stalls on a long round trip, so use the VPN above, and watch the picture adapt:</p>
 <pre><code><span class="p">$</span> waydesk-admin status --watch              <span class="c"># encoder, quantiser and frame rate per session</span></code></pre>
 <p>The picture follows what the link delivers, from 300 kbit/s to 10 Mbit/s, and gets blockier before it gets slower. The numbers are on <a href="/docs/measurements/">Measurements</a>.</p>
+</section>
+<section id="a-gpu-server-that-also-runs-a-shared-model">
+<h2>A GPU server that also runs a shared model</h2>
+<p>Desktops on the Intel card, the NVIDIA card kept for a local model (Ollama, vLLM or another service) that every session reaches on <code>localhost</code>. Waydesk does not install or start the model; it keeps the sessions off its card and shows who uses it.</p>
+<pre><code><span class="p">$</span> sudo waydesk-admin status                 <span class="c"># note the card names and the Inference line (CUDA_VISIBLE_DEVICES=GPU-...)</span>
+<span class="p">$</span> sudoedit /etc/default/waydesk             <span class="c"># WAYDESK_GPU_ROLES=renderD128=render,renderD129=inference</span>
+                                            # WAYDESK_AI_ENDPOINT=127.0.0.1:11434
+<span class="p">$</span> sudo systemctl edit ollama                <span class="c"># Environment="CUDA_VISIBLE_DEVICES=GPU-..." (the value from status)</span>
+<span class="p">$</span> sudo waydesk-admin users set alice --gpu renderD128   <span class="c"># optional: pin an account to the Intel card; auto already skips the inference card</span>
+<span class="p">$</span> sudo waydesk-admin status --watch         <span class="c"># the card's role, the model and its VRAM, an AI column per account</span></code></pre>
+<p>Sessions that start afterwards draw on the Intel card, and the NVIDIA card holds the model alone. On a test server (Intel UHD 770 plus an RTX 4000 SFF Ada with a 70 W limit) the model's speed did not change with 1, 5 or 10 sessions on the Intel card, and the sessions took no video memory on the other. The same sessions on the model's own card cost about 0.5 GB of video memory each and slowed the model by up to a quarter. The numbers are on <a href="/docs/measurements/">Measurements</a> and the settings on <a href="/docs/gpu/">Using a GPU</a>.</p>
+<p>Two things to know. Ollama on <code>localhost</code> has no authentication, so every account on the server can use it, and there are no per-account limits on it; the <code>AI</code> column shows who has requests open, not how many tokens. And a card with the role <code>inference</code> only keeps sessions off it when they have another card to go to.</p>
+</section>
+<section id="workstations-that-use-the-server-s-model">
+<h2>Workstations that use the server's model</h2>
+<p>The desktops stay local and only the model is shared, so no Waydesk session is needed. This uses other tools and is not something Waydesk configures or has tested: the model service listens on the VPN address only, and the workstations point their editor or chat application at it.</p>
+<pre><code><span class="p">$</span> sudo systemctl edit ollama                <span class="c"># Environment="OLLAMA_HOST=10.8.0.1:11434" (the VPN address of the server)</span>
+<span class="p">$</span> sudo systemctl restart ollama</code></pre>
+<p>The port is reachable only through the <a href="/docs/vpn/">VPN</a>, as the RDP port is. The model service has no accounts, so for several people, separate keys or budgets, put a gateway such as LiteLLM or Open WebUI in front of it; that is their documentation, not Waydesk's.</p>
 </section>
 <nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/cli/"><span>previous</span>The command line</a><a class="next" href="/docs/gpu/"><span>next</span>Using a GPU</a></nav>
 <p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/recipes.md">a file in the repository</a>: corrections are welcome.</p>
