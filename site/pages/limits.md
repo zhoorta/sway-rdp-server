@@ -6,8 +6,8 @@ description: What Waydesk is not yet: early software, the clients and GPUs it wa
 Waydesk is early, free software, written and tested by one person on real servers. This page says what was tried, what was not, and what to expect. Nothing here is hidden in a footnote elsewhere.
 
 ## Status {bar: notes}
-- **Early software.** Version 0.4.0. Expect rough edges; [open an issue](https://github.com/zhoorta/waydesk/issues) when you find one.
-- **Systems:** Debian 13 and Ubuntu 26.04, on amd64 and arm64 (the table below). Clean installs of earlier versions passed on both; the 0.4.0 arm64 packages are built but have not been installed on a machine yet.
+- **Early software.** Version 0.5.0. Expect rough edges; [open an issue](https://github.com/zhoorta/waydesk/issues) when you find one.
+- **Systems:** Debian 13 and Ubuntu 26.04, on amd64 and arm64 (the table below). Clean installs of earlier versions passed on both; the 0.5.0 packages are built for both and an upgrade from 0.4.0 was not tested on a real machine, and the arm64 packages have not been installed on a machine yet. COSMIC, KDE Plasma and Hyprland sessions are experimental and were tested on Arch only ([Other desktops](/docs/desktops/)).
 - **No second factor.** The login is the account's password inside TLS: keep the port behind an SSH tunnel or a [VPN](/docs/vpn/#security-what-protects-the-login).
 - **Not an audited product.** Four internal review passes are written down, with what is still open.
 

@@ -22,7 +22,7 @@ GH_ICON = (SITE / "index.html").read_text().split('<a class="gh" href="https://g
 # The documentation, in groups: the order of the sidebar, of the index and of "next page".
 GROUPS = [
     ("Get started", ["install", "connect", "clients", "vpn"]),
-    ("Run it", ["cli", "recipes", "gpu", "reference"]),
+    ("Run it", ["cli", "recipes", "gpu", "desktops", "reference"]),
     ("Understand it", ["architecture", "measurements", "compare", "limits"]),
     ("Help", ["help", "faq"]),
 ]

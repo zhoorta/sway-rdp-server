@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>COSMIC, KDE Plasma and Hyprland over RDP on a Linux server · Waydesk</title>
+<meta name="description" content="Waydesk gives every account the Waydesk desktop by default. An account can have COSMIC, KDE Plasma or Hyprland instead (experimental): how each one runs, what you install, what was tested and what was not.">
+<link rel="canonical" href="https://waydesk.dev/docs/desktops/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#06121c">
+<meta property="og:title" content="COSMIC, KDE Plasma and Hyprland over RDP on a Linux server · Waydesk">
+<meta property="og:description" content="Waydesk gives every account the Waydesk desktop by default. An account can have COSMIC, KDE Plasma or Hyprland instead (experimental): how each one runs, what you install, what was tested and what was not.">
+<meta property="og:url" content="https://waydesk.dev/docs/desktops/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Waydesk">
+<meta property="og:image" content="https://waydesk.dev/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="COSMIC, KDE Plasma and Hyprland over RDP on a Linux server · Waydesk">
+<meta name="twitter:description" content="Waydesk gives every account the Waydesk desktop by default. An account can have COSMIC, KDE Plasma or Hyprland instead (experimental): how each one runs, what you install, what was tested and what was not.">
+<meta name="twitter:image" content="https://waydesk.dev/og.jpg">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Waydesk", "item": "https://waydesk.dev/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://waydesk.dev/docs/"}, {"@type": "ListItem", "position": 3, "name": "Other desktops", "item": "https://waydesk.dev/docs/desktops/"}]}</script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="sans">
+<div class="col">
+<header>
+  <a class="logo" href="/"><img src="/logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
+  <nav aria-label="Site">
+    <a href="/">home</a>
+    <a href="/docs/" aria-current="page">documentation</a>
+    <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  </nav>
+</header>
+<div class="docs">
+<div class="side">
+<nav aria-label="Documentation">
+<h2>Get started</h2>
+<ul>
+<li><a href="/docs/install/">Install</a></li>
+<li><a href="/docs/connect/">Connect</a></li>
+<li><a href="/docs/clients/">RDP clients</a></li>
+<li><a href="/docs/vpn/">VPN and security</a></li>
+</ul>
+<h2>Run it</h2>
+<ul>
+<li><a href="/docs/cli/">Command line</a></li>
+<li><a href="/docs/recipes/">Recipes</a></li>
+<li><a href="/docs/gpu/">GPU</a></li>
+<li><a href="/docs/desktops/" aria-current="page">Desktops</a><ul><li><a href="#choose-one">Choose one</a></li><li><a href="#how-they-run">How they run</a></li><li><a href="#what-was-not-tested">What was not tested</a></li><li><a href="#arch-linux">Arch Linux</a></li></ul></li>
+<li><a href="/docs/reference/">Files and settings</a></li>
+</ul>
+<h2>Understand it</h2>
+<ul>
+<li><a href="/docs/architecture/">Architecture</a></li>
+<li><a href="/docs/measurements/">Measurements</a></li>
+<li><a href="/docs/compare/">How it compares</a></li>
+<li><a href="/docs/limits/">Limits and status</a></li>
+</ul>
+<h2>Help</h2>
+<ul>
+<li><a href="/docs/help/">Troubleshooting</a></li>
+<li><a href="/docs/faq/">FAQ</a></li>
+</ul>
+</nav>
+</div>
+<main class="doc">
+<div class="pagehead">
+<h1>Other desktops</h1>
+<p class="lede">Every account gets the Waydesk desktop (sway with a shell, a launcher and a dock) unless you choose otherwise. Three other desktops can be given to an account with one command. All three are <strong>experimental</strong> and were tested on Arch Linux; they have not been tested on Debian or Ubuntu.</p>
+</div>
+<section id="choose-one">
+<h2>Choose one</h2>
+<pre><code><span class="p">$</span> sudo waydesk-admin users set anna --desktop cosmic     <span class="c"># or plasma, hyprland, sway, default</span>
+<span class="p">$</span> sudo waydesk-admin config check anna                   <span class="c"># will this account's setup work as a session?</span></code></pre>
+<p>The setting is read when the session starts: end the session or log out first. <code>default</code> follows the server's <code>WAYDESK_COMPOSITOR</code>, which is <code>sway</code> unless you changed it. You install the desktop yourself with the system's package manager; Waydesk does not install COSMIC, Plasma or Hyprland.</p>
+</section>
+<section id="how-they-run">
+<h2>How they run</h2>
+<ul class="plain"><li><strong>COSMIC and KDE Plasma</strong> run as one fullscreen window of the session's headless sway. Their own compositors cannot make a headless output (COSMIC exits without a monitor; KDE's RDP server only shares a session that already exists), so sway stays underneath and the client sees only the inner desktop. Waydesk bridges the text clipboard to the inner desktop and sets its keyboard layout. An idle session takes about 940 MB with COSMIC and 750 MB with Plasma 6.8. Capacity under load was not measured.</li><li><strong>Hyprland</strong> (0.55 or later) is a compositor of its own, one per account, and needs a GPU. Set it per account with <code>--desktop hyprland</code> or for the whole server with <code>WAYDESK_COMPOSITOR=hyprland</code>. It was tested with Omarchy's configuration: on an i7-7700 with an HD 630, 20 heavy users were admitted before the memory rule refused the 21st, with the render engine saturated from about 8 users.</li><li><strong>The Waydesk desktop</strong> (sway) is the default and the one that is measured most: 21 heavy users on the same i7-7700, limited by memory.</li></ul>
+</section>
+<section id="what-was-not-tested">
+<h2>What was not tested</h2>
+<ul class="plain"><li>The lock screen of COSMIC.</li><li>COSMIC and Plasma under load, and on Debian or Ubuntu.</li><li>Hyprland without a GPU (it has no software renderer and the session will not start).</li></ul>
+</section>
+<section id="arch-linux">
+<h2>Arch Linux</h2>
+<p>There is a package for Arch (a <code>PKGBUILD</code> in the source, <code>docs/ARCH.md</code>), but no Arch repository yet. It has the server and the session; the Waydesk desktop packages are for Debian and Ubuntu. It was last tested on a real Arch machine before this release.</p>
+</section>
+<nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/gpu/"><span>previous</span>Using a GPU</a><a class="next" href="/docs/reference/"><span>next</span>Files and settings</a></nav>
+<p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/desktops.md">a file in the repository</a>: corrections are welcome.</p>
+</main>
+</div>
+<footer>
+  <span>© 2026 StackCare</span>
+  <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>
+  <a class="gh" href="https://github.com/zhoorta/waydesk"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github</a>
+  <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
+  <a href="https://stackcare.pt/en">commercial support: StackCare</a>
+  <span>MIT or Apache-2.0</span>
+</footer>
+</div>
+</body>
+</html>
