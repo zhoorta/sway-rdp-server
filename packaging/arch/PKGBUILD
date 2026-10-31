@@ -14,7 +14,8 @@ license=(MIT Apache-2.0)
 depends=(acl foot sway pam polkit libva libdrm mesa libxkbcommon openssl logrotate systemd
          pipewire pipewire-pulse libpulse wireplumber wl-clipboard openh264)
 makedepends=(cargo clang pkgconf)
-optdepends=('cosmic: COSMIC sessions (waydesk-admin users set NAME --desktop cosmic, see /usr/share/doc/waydesk-server/COSMIC.md)'
+optdepends=('plasma-desktop: KDE Plasma sessions (waydesk-admin users set NAME --desktop plasma, see /usr/share/doc/waydesk-server/PLASMA.md)'
+            'cosmic: COSMIC sessions (waydesk-admin users set NAME --desktop cosmic, see /usr/share/doc/waydesk-server/COSMIC.md)'
             'hyprland: Hyprland sessions (WAYDESK_COMPOSITOR=hyprland; needs a GPU, see /usr/share/doc/waydesk-server/HYPRLAND.md)'
             'intel-media-driver: hardware H.264 encoding on Intel GPUs (VA-API)'
             'libva-mesa-driver: hardware H.264 encoding on AMD GPUs (VA-API)'
@@ -79,6 +80,7 @@ package() {
   # sessions: a minimal sway configuration, the blank cursor theme, the Mac keyboard layout, the GPU rules
   install -Dm644 packaging/sway-minimal.conf "$pkgdir/usr/share/waydesk/sway-minimal.conf"
   install -Dm644 packaging/sway-cosmic.conf "$pkgdir/usr/share/waydesk/sway-cosmic.conf"
+  install -Dm644 packaging/sway-plasma.conf "$pkgdir/usr/share/waydesk/sway-plasma.conf"
   install -d "$pkgdir/usr/share/icons"
   cp -a packaging/cursors/waydesk-blank "$pkgdir/usr/share/icons/"
   install -Dm644 packaging/xkb/waydeskmac "$pkgdir/etc/xkb/symbols/waydeskmac"
@@ -95,7 +97,7 @@ package() {
   install -Dm644 packaging/udev/71-waydesk-hyprland-card.rules -t "$pkgdir/usr/share/waydesk/udev"
 
   install -Dm644 README.md docs/MULTIUSER-DESIGN.md docs/WIREGUARD.md docs/ACCESS.md docs/THREAT-MODEL.md \
-    docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md docs/HYPRLAND.md docs/COSMIC.md docs/ARCH.md docs/BRING-YOUR-OWN-CONFIG.md docs/REFERENCE.md -t "$pkgdir/usr/share/doc/$pkgname"
+    docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md docs/HYPRLAND.md docs/COSMIC.md docs/PLASMA.md docs/ARCH.md docs/BRING-YOUR-OWN-CONFIG.md docs/REFERENCE.md -t "$pkgdir/usr/share/doc/$pkgname"
   install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
   install -Dm644 LICENSE-APACHE "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE"
 }

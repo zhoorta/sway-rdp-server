@@ -614,7 +614,7 @@ impl OwnCompositor {
         use std::os::unix::process::CommandExt;
         let runtime = std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?);
         let uid = unsafe { libc::getuid() };
-        let desktop = if crate::compositor::is_cosmic() { "cosmic" } else { "sway" };
+        let desktop = crate::compositor::desktop_name();
         let config = crate::configcheck::sway_config_for(std::env::var_os("HOME").as_deref().map(std::path::Path::new), desktop, |p| p.is_file());
         let mut cmd = std::process::Command::new("sway");
         if let Some(path) = &config {

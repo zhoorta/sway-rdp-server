@@ -62,40 +62,76 @@ pub enum Kind {
 
 static KIND: std::sync::OnceLock<Kind> = std::sync::OnceLock::new();
 
-static COSMIC: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// 0: the compositor is the session's own; 1: COSMIC, 2: KDE Plasma, each running as one fullscreen window of the session's sway (docs/COSMIC.md, docs/PLASMA.md).
+static NESTED: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
 
-/// Whether the desktop is COSMIC: the compositor is a sway all the same, and its configuration starts COSMIC inside it (docs/COSMIC.md).
-pub fn is_cosmic() -> bool {
-    COSMIC.load(std::sync::atomic::Ordering::Relaxed)
+fn nested() -> u8 {
+    NESTED.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-/// COSMIC's own keyboard layout. The session's virtual keyboard has the layout's keymap, but a COSMIC running as a window of sway gets raw key codes from
-/// sway and reads them with the layout of its own settings: so they are made the same (COSMIC watches the file and applies it at once). No-op for other desktops.
-pub fn set_cosmic_layout(layout: &str) {
-    if !is_cosmic() {
+/// Whether the desktop runs inside the session's sway (COSMIC or Plasma): the compositor is a sway all the same, and its configuration starts the desktop inside it.
+pub fn is_nested() -> bool {
+    nested() != 0
+}
+
+/// The desktop of a session whose compositor is sway: `sway`, `cosmic` or `plasma` (what picks the configuration).
+pub fn desktop_name() -> &'static str {
+    match nested() {
+        1 => "cosmic",
+        2 => "plasma",
+        _ => "sway",
+    }
+}
+
+/// The keyboard layout of a desktop that runs inside the session's sway. The session's virtual keyboard has the layout's keymap, but a nested desktop gets raw key
+/// codes from sway and reads them with the layout of its own settings: so they are made the same (both watch their file and apply it at once). No-op otherwise.
+pub fn set_nested_layout(layout: &str) {
+    let kind = nested();
+    if kind == 0 {
         return;
     }
     let Some(home) = std::env::var_os("HOME") else { return };
-    let dir = std::path::Path::new(&home).join(".config/cosmic/com.system76.CosmicComp/v1");
-    let layout = layout.replace(['"', '\\'], "");
-    let ron = format!("(rules: \"\", model: \"\", layout: \"{layout}\", variant: \"\", options: None, repeat_delay: 600, repeat_rate: 25)");
-    let write = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join("xkb_config"), ron));
+    let home = std::path::Path::new(&home);
+    let layout = layout.replace(['"', '\\', '\n', '='], "");
+    if kind == 2 {
+        // KWin applies a change of kxkbrc when it is told about it (KConfig's notification on the session bus), which a plain write does not do: kwriteconfig6 --notify does.
+        let bus = std::env::var_os("DBUS_SESSION_BUS_ADDRESS")
+            .or_else(|| std::env::var_os("XDG_RUNTIME_DIR").map(|r| format!("unix:path={}/bus", std::path::Path::new(&r).display()).into()));
+        let set = |key: &str, value: &str| {
+            let mut cmd = std::process::Command::new("kwriteconfig6");
+            cmd.args(["--file", "kxkbrc", "--group", "Layout", "--key", key, "--notify", value]);
+            if let Some(b) = &bus {
+                cmd.env("DBUS_SESSION_BUS_ADDRESS", b);
+            }
+            cmd.stdin(std::process::Stdio::null()).status().is_ok_and(|s| s.success())
+        };
+        let ok = set("Use", "true") && set("VariantList", "") && set("LayoutList", &layout);
+        if ok {
+            tracing::info!(%layout, "the nested desktop's keyboard layout set");
+        } else {
+            tracing::warn!("cannot set Plasma's keyboard layout (kwriteconfig6 failed or is not installed)");
+        }
+        return;
+    }
+    let path = home.join(".config/cosmic/com.system76.CosmicComp/v1/xkb_config");
+    let text = format!("(rules: \"\", model: \"\", layout: \"{layout}\", variant: \"\", options: None, repeat_delay: 600, repeat_rate: 25)");
+    let write = path.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|_| std::fs::write(&path, text));
     match write {
-        Ok(()) => tracing::info!(%layout, "COSMIC keyboard layout set"),
-        Err(e) => tracing::warn!("cannot set COSMIC's keyboard layout: {e}"),
+        Ok(()) => tracing::info!(%layout, "the nested desktop's keyboard layout set"),
+        Err(e) => tracing::warn!("cannot set the nested desktop's keyboard layout: {e}"),
     }
 }
 
-/// Chooses the compositor from its name (`sway`, `cosmic`, `hyprland`; empty is sway). Once, before any session is made.
+/// Chooses the compositor from its name (`sway`, `cosmic`, `plasma`, `hyprland`; empty is sway). Once, before any session is made.
 pub fn select(name: &str) -> Result<Kind> {
     let kind = match name.trim().to_ascii_lowercase().as_str() {
         "" | "sway" => Kind::Sway,
-        "cosmic" => {
-            COSMIC.store(true, std::sync::atomic::Ordering::Relaxed);
+        "cosmic" | "plasma" => {
+            NESTED.store(if name.trim().eq_ignore_ascii_case("cosmic") { 1 } else { 2 }, std::sync::atomic::Ordering::Relaxed);
             Kind::Sway
         }
         "hyprland" => Kind::Hyprland,
-        other => bail!("unknown compositor {other:?} (sway, cosmic or hyprland)"),
+        other => bail!("unknown compositor {other:?} (sway, cosmic, plasma or hyprland)"),
     };
     let _ = KIND.set(kind);
     Ok(*KIND.get().unwrap_or(&kind))

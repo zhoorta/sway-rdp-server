@@ -12,7 +12,7 @@
 //!   waydesk-admin status [--json] [--watch [SECONDS]]   (memory, swap, load, the GPUs and how busy they are, whether a new session would be accepted, and what each
 //!                                                account uses and runs: renderer and video encoder; `--watch` repeats it, `--json --watch` prints one line of JSON each time)
 //!   waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
-//!   waydesk-admin users set NAME [--desktop sway|cosmic|hyprland|default] [--gpu auto|off|renderDN|default]     the compositor and the GPU of one account's sessions (default: the server's setting)
+//!   waydesk-admin users set NAME [--desktop sway|cosmic|plasma|hyprland|default] [--gpu auto|off|renderDN|default]     the compositor and the GPU of one account's sessions (default: the server's setting)
 //!   waydesk-admin config check NAME [--json]     whether the account's own compositor setup will work as a Waydesk session (docs/BRING-YOUR-OWN-CONFIG.md)
 //!   waydesk-admin access [show | local | lan | vpn | custom ...]     who can reach the RDP port (scripts in /usr/lib/waydesk/admin)
 //!   waydesk-admin cert [status | local-ca | reissue | export-ca | install | self-signed]     the certificate clients check
@@ -275,7 +275,7 @@ usage: waydesk-admin users list [--json]
        waydesk-admin sessions list [--json] | end NAME
        waydesk-admin status [--json] [--watch [SECONDS]]
        waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
-       waydesk-admin users set NAME [--desktop sway|cosmic|hyprland|default] [--gpu auto|off|renderDN|default]
+       waydesk-admin users set NAME [--desktop sway|cosmic|plasma|hyprland|default] [--gpu auto|off|renderDN|default]
        waydesk-admin config check NAME [--json]
        waydesk-admin access [show | local | lan [--address IP] [--allow LIST] | vpn | custom --bind ADDR:PORT [--allow LIST]]
        waydesk-admin cert [status | local-ca [--san NAME] | reissue | export-ca | install --cert FILE --key FILE | self-signed]
@@ -879,7 +879,7 @@ fn gpu_of(uid: u32) -> (String, &'static str) {
     }
 }
 
-/// `users set NAME [--desktop sway|cosmic|hyprland|default] [--gpu auto|off|renderDN|default]`: what this account's sessions start with. The session unit reads
+/// `users set NAME [--desktop sway|cosmic|plasma|hyprland|default] [--gpu auto|off|renderDN|default]`: what this account's sessions start with. The session unit reads
 /// the file after /etc/default/waydesk, so it wins there; a running session keeps what it has until it is restarted.
 fn users_set(name: &str, opts: &[&str]) -> Result<()> {
     require_root()?;
@@ -888,7 +888,7 @@ fn users_set(name: &str, opts: &[&str]) -> Result<()> {
     let mut it = opts.iter();
     while let Some(flag) = it.next() {
         match *flag {
-            "--desktop" => desktop_arg = Some(*it.next().context("--desktop needs sway, cosmic, hyprland or default")?),
+            "--desktop" => desktop_arg = Some(*it.next().context("--desktop needs sway, cosmic, plasma, hyprland or default")?),
             "--gpu" => gpu_arg = Some(*it.next().context("--gpu needs auto, off, default or a render node such as renderD129")?),
             other => bail!("unknown option {other}"),
         }
@@ -898,7 +898,7 @@ fn users_set(name: &str, opts: &[&str]) -> Result<()> {
     }
     let mut settings = account_settings(a.uid);
     if let Some(wanted) = desktop_arg {
-        let desktop = configcheck::normalize_desktop(wanted).with_context(|| format!("{wanted:?} is not a desktop Waydesk can start (sway, cosmic, hyprland, or default for the server's setting)"))?;
+        let desktop = configcheck::normalize_desktop(wanted).with_context(|| format!("{wanted:?} is not a desktop Waydesk can start (sway, cosmic, plasma, hyprland, or default for the server's setting)"))?;
         settings.desktop = (desktop != "default").then(|| desktop.to_owned());
     }
     if let Some(wanted) = gpu_arg {

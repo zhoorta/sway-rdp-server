@@ -11,6 +11,8 @@ pub const SWAY_OWN_CONFIGS: [&str; 2] = ["/etc/sway/config", "/usr/lib/waydesk/e
 pub const MINIMAL_CONFIG: &str = "/usr/share/waydesk/sway-minimal.conf";
 /// The configuration of the `cosmic` desktop: sway starts COSMIC (`start-cosmic`) as one fullscreen window of its own headless output.
 pub const COSMIC_CONFIG: &str = "/usr/share/waydesk/sway-cosmic.conf";
+/// The same for `plasma`: KDE Plasma's own compositor (KWin) as the fullscreen window.
+pub const PLASMA_CONFIG: &str = "/usr/share/waydesk/sway-plasma.conf";
 /// The configuration of the Waydesk desktop package.
 pub const SYSTEM_SWAY_CONFIG: &str = "/etc/xdg/waydesk/sway.conf";
 /// Where an administrator's per-account settings are kept (read by the session unit after /etc/default/waydesk): `UID.env`. Next to that file, not under /etc/waydesk
@@ -44,9 +46,13 @@ pub fn sway_source_for(home: Option<&Path>, desktop: &str, is_file: impl Fn(&Pat
     if let Some(p) = user(".config/waydesk/config") {
         return SwaySource::AccountWaydesk(p);
     }
-    let cosmic = PathBuf::from(COSMIC_CONFIG);
-    if desktop == "cosmic" && is_file(&cosmic) {
-        return SwaySource::SystemWaydesk(cosmic);
+    let nested = match desktop {
+        "cosmic" => Some(PathBuf::from(COSMIC_CONFIG)),
+        "plasma" => Some(PathBuf::from(PLASMA_CONFIG)),
+        _ => None,
+    };
+    if let Some(path) = nested.filter(|p| is_file(p)) {
+        return SwaySource::SystemWaydesk(path);
     }
     let system = PathBuf::from(SYSTEM_SWAY_CONFIG);
     if is_file(&system) {
@@ -442,11 +448,12 @@ pub fn is_common_program(name: &str) -> bool {
 
 // ---- the per-account settings file ----
 
-/// `sway`, `cosmic`, `hyprland` or `default` (the server-wide setting), whatever the case.
+/// `sway`, `cosmic`, `plasma`, `hyprland` or `default` (the server-wide setting), whatever the case.
 pub fn normalize_desktop(s: &str) -> Option<&'static str> {
     match s.trim().to_ascii_lowercase().as_str() {
         "sway" => Some("sway"),
         "cosmic" => Some("cosmic"),
+        "plasma" => Some("plasma"),
         "hyprland" => Some("hyprland"),
         "default" | "server" => Some("default"),
         _ => None,
@@ -541,6 +548,7 @@ mod tests {
         assert_eq!(sway_source_for(home, "sway", has(&[COSMIC_CONFIG, SYSTEM_SWAY_CONFIG])), SwaySource::SystemWaydesk(SYSTEM_SWAY_CONFIG.into()));
         assert_eq!(sway_source_for(home, "cosmic", has(&[COSMIC_CONFIG, "/home/a/.config/waydesk/config"])), SwaySource::AccountWaydesk("/home/a/.config/waydesk/config".into()));
         assert_eq!(sway_source_for(home, "cosmic", has(&[SYSTEM_SWAY_CONFIG])), SwaySource::SystemWaydesk(SYSTEM_SWAY_CONFIG.into()), "without the COSMIC file: as for sway");
+        assert_eq!(sway_source_for(home, "plasma", has(&[COSMIC_CONFIG, PLASMA_CONFIG])), SwaySource::SystemWaydesk(PLASMA_CONFIG.into()));
     }
 
     #[test]
@@ -645,6 +653,7 @@ mod tests {
         assert_eq!(normalize_desktop(" Hyprland "), Some("hyprland"));
         assert_eq!(normalize_desktop("SWAY"), Some("sway"));
         assert_eq!(normalize_desktop("COSMIC"), Some("cosmic"));
+        assert_eq!(normalize_desktop("Plasma"), Some("plasma"));
         assert_eq!(normalize_desktop("default"), Some("default"));
         assert_eq!(normalize_desktop("gnome"), None);
         let both = AccountSettings { desktop: Some("hyprland".into()), gpu: Some("/dev/dri/renderD129".into()) };

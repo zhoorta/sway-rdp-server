@@ -34,22 +34,22 @@ impl Clipboard {
         self.stop();
         self.stopped = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (up, last_set, watcher, stopped) = (self.up.clone(), self.last_set.clone(), self.watcher.clone(), self.stopped.clone());
-        // COSMIC's clipboard is its own, on its own display, which appears some seconds after the session starts: wait for it off this thread.
+        // The clipboard of a nested desktop (COSMIC, Plasma) is its own, on its own display, which appears some seconds after the session starts: wait for it off this thread.
         std::thread::spawn(move || {
-            let display = if crate::compositor::is_cosmic() {
+            let display = if crate::compositor::is_nested() {
                 let mut found = None;
                 for _ in 0..90 {
                     if stopped.load(std::sync::atomic::Ordering::Relaxed) {
                         return;
                     }
-                    found = cosmic_display();
+                    found = nested_display();
                     if found.is_some() {
                         break;
                     }
                     std::thread::sleep(std::time::Duration::from_secs(1));
                 }
                 if found.is_none() {
-                    warn!("clipboard: COSMIC's display did not show up in 90 s");
+                    warn!("clipboard: the nested desktop's display did not show up in 90 s");
                 }
                 found
             } else {
@@ -122,8 +122,8 @@ impl Clipboard {
             // wl-copy forks into the background to keep serving the selection; its parent returns at once.
             let mut cmd = Command::new("wl-copy");
             cmd.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null());
-            if crate::compositor::is_cosmic() {
-                if let Some(d) = cosmic_display() {
+            if crate::compositor::is_nested() {
+                if let Some(d) = nested_display() {
                     cmd.env("WAYLAND_DISPLAY", d);
                 }
             }
@@ -151,8 +151,8 @@ impl Drop for Clipboard {
 fn wayland_text() -> Option<String> {
     let mut cmd = Command::new("wl-paste");
     cmd.args(["--no-newline", "--type", "text"]).stderr(Stdio::null());
-    if crate::compositor::is_cosmic() {
-        cmd.env("WAYLAND_DISPLAY", cosmic_display()?);
+    if crate::compositor::is_nested() {
+        cmd.env("WAYLAND_DISPLAY", nested_display()?);
     }
     let out = cmd.output().ok()?;
     if !out.status.success() {
@@ -162,8 +162,8 @@ fn wayland_text() -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-/// The display of the COSMIC that runs inside the session's sway: the other Wayland socket of the runtime directory (sway's own is `WAYLAND_DISPLAY`).
-fn cosmic_display() -> Option<String> {
+/// The display of the desktop (COSMIC, Plasma) that runs inside the session's sway: the other Wayland socket of the runtime directory (sway's own is `WAYLAND_DISPLAY`).
+fn nested_display() -> Option<String> {
     use std::os::unix::fs::FileTypeExt as _;
     let runtime = std::env::var_os("XDG_RUNTIME_DIR")?;
     let own = std::env::var("WAYLAND_DISPLAY").unwrap_or_default();
