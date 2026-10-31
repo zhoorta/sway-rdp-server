@@ -12,7 +12,13 @@ So the session stays what it always was, a headless sway with one output of the 
 
 An account's own `~/.config/waydesk/config` replaces the package's file, as for sway.
 
+## What Waydesk does for it
+
+- **Clipboard** (text): COSMIC's clipboard is its own, on its own display; the clipboard bridge uses that display instead of sway's.
+- **Keyboard layout:** the layout Waydesk applies (the client's, or the account's `~/.config/waydesk/keyboard`) is also written to COSMIC's own keyboard setting, because COSMIC reads sway's raw key codes with that setting, not with the keymap of the virtual keyboard.
+- **Pointer:** COSMIC starts with the invisible cursor theme, so only the client's pointer is seen (COSMIC drew a second one into the picture for some shapes).
+
 ## Cost and limits
 
 - Two compositors per session: memory and render time are those of sway plus COSMIC's (see `docs/measure-data/` for the measured capacity).
-- Not tried: a client that changes its window size during the session, the clipboard between the client and COSMIC apps, locking the screen, `Super` shortcuts (sway has no bindings in this configuration, so the keys go to COSMIC).
+- Not tried: locking the screen, `Super` shortcuts (sway has no bindings in this configuration, so the keys go to COSMIC).

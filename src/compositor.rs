@@ -69,6 +69,23 @@ pub fn is_cosmic() -> bool {
     COSMIC.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+/// COSMIC's own keyboard layout. The session's virtual keyboard has the layout's keymap, but a COSMIC running as a window of sway gets raw key codes from
+/// sway and reads them with the layout of its own settings: so they are made the same (COSMIC watches the file and applies it at once). No-op for other desktops.
+pub fn set_cosmic_layout(layout: &str) {
+    if !is_cosmic() {
+        return;
+    }
+    let Some(home) = std::env::var_os("HOME") else { return };
+    let dir = std::path::Path::new(&home).join(".config/cosmic/com.system76.CosmicComp/v1");
+    let layout = layout.replace(['"', '\\'], "");
+    let ron = format!("(rules: \"\", model: \"\", layout: \"{layout}\", variant: \"\", options: None, repeat_delay: 600, repeat_rate: 25)");
+    let write = std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join("xkb_config"), ron));
+    match write {
+        Ok(()) => tracing::info!(%layout, "COSMIC keyboard layout set"),
+        Err(e) => tracing::warn!("cannot set COSMIC's keyboard layout: {e}"),
+    }
+}
+
 /// Chooses the compositor from its name (`sway`, `cosmic`, `hyprland`; empty is sway). Once, before any session is made.
 pub fn select(name: &str) -> Result<Kind> {
     let kind = match name.trim().to_ascii_lowercase().as_str() {

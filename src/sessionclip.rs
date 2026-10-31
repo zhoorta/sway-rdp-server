@@ -14,7 +14,9 @@ use crate::proto::{Up, MAX_CLIPBOARD};
 
 /// Watches the session's clipboard while the client's channel is open. Stopped when dropped.
 pub struct Clipboard {
-    watcher: Option<Child>,
+    watcher: Arc<Mutex<Option<Child>>>,
+    /// Set when this watch is stopped (a thread that still waits for COSMIC's display then gives up).
+    stopped: Arc<std::sync::atomic::AtomicBool>,
     up: mpsc::UnboundedSender<Up>,
     /// Text the client put on the clipboard: its echo must not go back to the client.
     last_set: Arc<Mutex<Option<String>>>,
@@ -22,7 +24,7 @@ pub struct Clipboard {
 
 impl Clipboard {
     pub fn new(up: mpsc::UnboundedSender<Up>) -> Self {
-        Self { watcher: None, up, last_set: Arc::new(Mutex::new(None)) }
+        Self { watcher: Arc::new(Mutex::new(None)), stopped: Arc::new(std::sync::atomic::AtomicBool::new(false)), up, last_set: Arc::new(Mutex::new(None)) }
     }
 
     /// (Re)starts the watch. `wl-paste --watch` runs its command once at once and then on every change; that first
@@ -30,18 +32,43 @@ impl Clipboard {
     /// offering it at connect would replace the client's clipboard with it.
     pub fn watch(&mut self) {
         self.stop();
-        let child = Command::new("wl-paste")
-            .args(["--watch", "sh", "-c", "echo c"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn();
-        match child {
-            Ok(mut c) => {
-                let out = c.stdout.take().expect("piped stdout");
-                self.watcher = Some(c);
-                let (up, last_set) = (self.up.clone(), self.last_set.clone());
-                std::thread::spawn(move || {
+        self.stopped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (up, last_set, watcher, stopped) = (self.up.clone(), self.last_set.clone(), self.watcher.clone(), self.stopped.clone());
+        // COSMIC's clipboard is its own, on its own display, which appears some seconds after the session starts: wait for it off this thread.
+        std::thread::spawn(move || {
+            let display = if crate::compositor::is_cosmic() {
+                let mut found = None;
+                for _ in 0..90 {
+                    if stopped.load(std::sync::atomic::Ordering::Relaxed) {
+                        return;
+                    }
+                    found = cosmic_display();
+                    if found.is_some() {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                }
+                if found.is_none() {
+                    warn!("clipboard: COSMIC's display did not show up in 90 s");
+                }
+                found
+            } else {
+                None
+            };
+            let mut cmd = Command::new("wl-paste");
+            cmd.args(["--watch", "sh", "-c", "echo c"]).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+            if let Some(d) = &display {
+                cmd.env("WAYLAND_DISPLAY", d);
+            }
+            match cmd.spawn() {
+                Ok(mut c) => {
+                    let out = c.stdout.take().expect("piped stdout");
+                    if stopped.load(std::sync::atomic::Ordering::Relaxed) {
+                        let _ = c.kill();
+                        let _ = c.wait();
+                        return;
+                    }
+                    *watcher.lock().unwrap() = Some(c);
                     let mut first = true;
                     for line in BufReader::new(out).lines() {
                         if line.is_err() {
@@ -63,14 +90,15 @@ impl Clipboard {
                             break;
                         }
                     }
-                });
+                }
+                Err(e) => warn!("clipboard from session to client is off (cannot run wl-paste --watch): {e}"),
             }
-            Err(e) => warn!("clipboard from session to client is off (cannot run wl-paste --watch): {e}"),
-        }
+        });
     }
 
     pub fn stop(&mut self) {
-        if let Some(mut c) = self.watcher.take() {
+        self.stopped.store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Some(mut c) = self.watcher.lock().unwrap().take() {
             let _ = c.kill();
             let _ = c.wait();
         }
@@ -92,7 +120,14 @@ impl Clipboard {
         *self.last_set.lock().unwrap() = Some(text.clone());
         std::thread::spawn(move || {
             // wl-copy forks into the background to keep serving the selection; its parent returns at once.
-            match Command::new("wl-copy").stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn() {
+            let mut cmd = Command::new("wl-copy");
+            cmd.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null());
+            if crate::compositor::is_cosmic() {
+                if let Some(d) = cosmic_display() {
+                    cmd.env("WAYLAND_DISPLAY", d);
+                }
+            }
+            match cmd.spawn() {
                 Ok(mut c) => {
                     if let Some(mut stdin) = c.stdin.take() {
                         let _ = stdin.write_all(text.as_bytes());
@@ -114,10 +149,31 @@ impl Drop for Clipboard {
 
 /// What the Wayland clipboard holds as text, if anything.
 fn wayland_text() -> Option<String> {
-    let out = Command::new("wl-paste").args(["--no-newline", "--type", "text"]).stderr(Stdio::null()).output().ok()?;
+    let mut cmd = Command::new("wl-paste");
+    cmd.args(["--no-newline", "--type", "text"]).stderr(Stdio::null());
+    if crate::compositor::is_cosmic() {
+        cmd.env("WAYLAND_DISPLAY", cosmic_display()?);
+    }
+    let out = cmd.output().ok()?;
     if !out.status.success() {
         return None;
     }
     let text = String::from_utf8(out.stdout).ok()?;
     (!text.is_empty()).then_some(text)
+}
+
+/// The display of the COSMIC that runs inside the session's sway: the other Wayland socket of the runtime directory (sway's own is `WAYLAND_DISPLAY`).
+fn cosmic_display() -> Option<String> {
+    use std::os::unix::fs::FileTypeExt as _;
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR")?;
+    let own = std::env::var("WAYLAND_DISPLAY").unwrap_or_default();
+    let mut names: Vec<String> = std::fs::read_dir(runtime)
+        .ok()?
+        .flatten()
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_socket()))
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|n| n.starts_with("wayland-") && n[8..].chars().all(|c| c.is_ascii_digit()) && *n != own)
+        .collect();
+    names.sort();
+    names.pop()
 }
