@@ -76,6 +76,8 @@ WAYDESK_SESSION_ARGS=
 #WAYDESK_VA_MAX_QP=40
 # Takes effect for sessions that start after the change (end the session or log out first).
 #WAYDESK_GPU=auto
+#WAYDESK_AI_ENDPOINT=127.0.0.1:11434    a local inference service (Ollama, vLLM, llama.cpp). `waydesk-admin status` then shows an AI line (the model it holds and its video
+#                                        memory, if it is Ollama; how many connections are open) and an AI column with each account's open connections to it
 #WAYDESK_ENCODER=auto
 
 # The compositor of the sessions: sway (default), or hyprland, which needs a GPU and Hyprland 0.55 or later. Experimental: see docs/HYPRLAND.md.

@@ -36,6 +36,8 @@ use serde_json::json;
 
 #[path = "../configcheck.rs"]
 mod configcheck;
+#[path = "../aistatus.rs"]
+mod aistatus;
 #[path = "../gpuinfo.rs"]
 mod gpuinfo;
 #[path = "../memory.rs"]
@@ -672,6 +674,12 @@ fn parse_watch(rest: &[&str]) -> Result<Option<std::time::Duration>> {
     }
 }
 
+/// The last value of `KEY=` in `/etc/default/waydesk` (quotes taken off), if there is one.
+fn server_setting(key: &str) -> Option<String> {
+    let prefix = format!("{key}=");
+    std::fs::read_to_string("/etc/default/waydesk").unwrap_or_default().lines().filter_map(|l| l.trim().strip_prefix(prefix.as_str())).map(|v| v.trim().trim_matches(|c| c == '"' || c == '\'').to_owned()).filter(|v| !v.is_empty()).last()
+}
+
 /// `WAYDESK_GPU` as `/etc/default/waydesk` sets it (what the sessions that start next will use): `auto`, `off` or a render node.
 fn gpu_setting() -> String {
     let text = std::fs::read_to_string("/etc/default/waydesk").unwrap_or_default();
@@ -760,6 +768,13 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
     let sampler = gpuinfo::begin(&gpus);
     let usage = gather_usage(std::time::Duration::from_millis(1000))?;
     gpuinfo::finish(sampler, &mut gpus);
+    // A local inference service (WAYDESK_AI_ENDPOINT): the models it holds and the connections each account has open to it.
+    let ai_endpoint = server_setting("WAYDESK_AI_ENDPOINT");
+    let ai = ai_endpoint.as_deref().map(|ep| {
+        let by_uid = aistatus::parse_endpoint(ep).map(|(addr, port)| aistatus::connections_by_uid(&aistatus::parse_proc_net_tcp(&std::fs::read_to_string("/proc/net/tcp").unwrap_or_default()), addr, port)).unwrap_or_default();
+        (ep.to_owned(), aistatus::probe(ep), by_uid)
+    });
+    let ai_of = |uid: u32| -> Option<usize> { ai.as_ref().map(|(_, _, m)| m.get(&uid).copied().unwrap_or(0)) };
     let setting = gpu_setting();
     // The admission rule counts every account with a session, whoever the caller may look at.
     let running = accounts()?.iter().filter(|a| session_state(a.uid).0 == "running").count();
@@ -775,7 +790,7 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
         let round = |x: f64| (x * 10.0).round() / 10.0;
         let users: Vec<_> = usage.iter().map(|u| json!({
             "name": u.name, "uid": u.uid, "session": u.session, "mem_mb": u.mem_mb, "swap_mb": u.swap_mb, "tasks": u.tasks,
-            "cpu_percent": round(u.cpu_percent), "cap_mb": u.cap_mb,
+            "cpu_percent": round(u.cpu_percent), "cap_mb": u.cap_mb, "ai_connections": ai_of(u.uid),
             "top": u.top.iter().map(|(n, mb)| json!({ "name": n, "mb": mb })).collect::<Vec<_>>(),
             "video": u.video.as_ref().map(|v| json!({
                 "render": v.render, "encoder": v.encoder, "compositor": v.compositor, "qp": v.qp, "fps": v.fps.map(round), "kbps": v.kbps, "current": sessionstatus::is_fresh(v),
@@ -796,6 +811,13 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
                 "kernel": std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default().trim(),
             },
             "compositor_setting": compositor_setting(),
+            "ai": ai.as_ref().map(|(ep, probe, by_uid)| json!({
+                "endpoint": ep,
+                "state": match probe { aistatus::Probe::Down => "down", aistatus::Probe::Up => "up", aistatus::Probe::Models(_) => "ollama" },
+                "models": match probe { aistatus::Probe::Models(m) => m.iter().map(|m| json!({ "name": m.name, "size_mb": m.size_mb, "vram_mb": m.vram_mb })).collect::<Vec<_>>(), _ => vec![] },
+                "connections": by_uid.values().sum::<usize>(),
+                "connections_other": by_uid.iter().filter(|(uid, _)| !usage.iter().any(|u| u.uid == **uid)).map(|(_, n)| n).sum::<usize>(),
+            })),
             "gpus": gpu_list,
             "gpu_setting": setting,
             "admission": { "open": open, "reason": reason, "min_available_mb": needed_mb, "max_active_users": max_users, "sessions": running },
@@ -821,6 +843,12 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
         }
         println!("          new sessions use: {setting}");
     }
+    if let Some((ep, probe, by_uid)) = &ai {
+        let total: usize = by_uid.values().sum();
+        let other: usize = by_uid.iter().filter(|(uid, _)| !usage.iter().any(|u| u.uid == **uid)).map(|(_, n)| n).sum();
+        let extra = if other > 0 { format!(" ({other} from other users, such as root)") } else { String::new() };
+        println!("AI        {}{extra}", aistatus::describe(ep, probe, total));
+    }
     println!("Desktop   {} for new sessions (WAYDESK_COMPOSITOR: sway, or hyprland, which needs a GPU)", compositor_setting());
     let limit = if max_users > 0 { format!(", at most {max_users} active users") } else { String::new() };
     if open {
@@ -832,12 +860,12 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
         println!("\nNobody is logged in.");
         return Ok(());
     }
-    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8} {:<6} {:<17} {:<9}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT", "RENDER", "ENCODER", "DESKTOP");
+    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8} {:<6} {:<17} {}{:<9}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT", "RENDER", "ENCODER", if ai.is_some() { "AI  " } else { "" }, "DESKTOP");
     for u in &usage {
         let top: Vec<String> = u.top.iter().map(|(n, mb)| format!("{n} {mb} MB")).collect();
         let (render, encoder) = video_cells(u.video.as_ref());
         println!(
-            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8} {:<6} {:<17} {:<9}  {}",
+            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8} {:<6} {:<17} {}{:<9}  {}",
             u.name,
             if u.session { "running" } else { "-" },
             human_mb(u.mem_mb),
@@ -846,6 +874,7 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
             u.cap_mb.map(human_mb).unwrap_or_else(|| "none".into()),
             render,
             encoder,
+            ai_of(u.uid).map(|n| format!("{:<4}", if n == 0 { "-".to_owned() } else { n.to_string() })).unwrap_or_default(),
             u.video.as_ref().and_then(|v| v.compositor.clone()).unwrap_or_else(|| "-".into()),
             top.join(", ")
         );
