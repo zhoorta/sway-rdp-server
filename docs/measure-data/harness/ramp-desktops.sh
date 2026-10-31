@@ -31,7 +31,7 @@ OUT=out-$LABEL.tsv; RAW=raw-$LABEL; mkdir -p $RAW
 T 'uname -a; echo; cat /etc/os-release | head -3; echo; lscpu | grep -E "Model name|^CPU\(s\)"; free -m; echo; waydesk-admin status 2>&1 | head -30; echo; cat /etc/default/waydesk 2>/dev/null; pacman -Q waydesk sway hyprland omarchy 2>&1 | head' > $RAW/system.txt 2>&1
 { printf '# ramp-desktops.sh label=%s desktop=%s profile=%s max=%s date=%s\n' "$LABEL" "$DESKTOP" "$PROFILE" "$MAX" "$(date -u +%FT%TZ)"
   printf '# criteria: STOP_AVAIL_MB=%s STOP_CPU=%s STOP_FPS=%s STOP_CLIENT_CPU=%s (plus admission refusal)\n' "$STOP_AVAIL_MB" "$STOP_CPU" "$STOP_FPS" "$STOP_CLIENT_CPU"
-  printf 'n\taccount\tprofile\tavail_MB\tswap_MB\tuser_slice_MB\tload1\tcpu_busy_pct\tcpu_waydesk\tcpu_sway\tcpu_chromium\tcpu_shell\tcpu_foot\tcpu_sshd\tcpu_harness\tcpu_other\tcpu_CLIENTS\tserver_side_pct\tgpu_Render\tgpu_Video\tgpu_VideoEnhance\tgpu_Blitter\tgpu_MHz\tpkg_W\terrors\tprobe_ms\tfps_min\tfps_med\tkbps_total\tsessions_current\tclient_vps_cpu_pct\tnote\n'; } > $OUT
+  printf 'n\taccount\tprofile\tavail_MB\tswap_MB\tuser_slice_MB\tload1\tcpu_busy_pct\tcpu_waydesk\tcpu_sway\tcpu_chromium\tcpu_shell\tcpu_foot\tcpu_sshd\tcpu_harness\tcpu_other\tcpu_CLIENTS\tserver_side_pct\tgpu_Render\tgpu_Video\tgpu_VideoEnhance\tgpu_Blitter\tgpu_MHz\tpkg_W\terrors\tprobe_ms\tfps_min\tfps_med\tkbps_total\tsessions_current\tclient_vps_cpu_pct\tgpu_top_clients\tnote\n'; } > $OUT
 stop() { echo -e "stop: $1" | tee -a $OUT; STOPPED=1; }
 STOPPED=0
 for i in $(seq 1 $MAX); do
@@ -77,7 +77,7 @@ try:
         v=u.get('video')
         if v and v.get('current') and v.get('fps') is not None: fps.append(v['fps']); kb+=v.get('kbps') or 0; cur+=1
 except Exception: pass
-print('\t'.join(map(str,[i,n,p,av,sw,us,ld,g('cpu_busy_pct'),g('cpu_waydesk'),g('cpu_sway'),g('cpu_chromium'),g('cpu_shell'),g('cpu_foot'),g('cpu_sshd'),g('cpu_harness'),g('cpu_other'),g('cpu_CLIENTS'),ss,g('gpu_Render'),g('gpu_Video'),g('gpu_VideoEnhance'),g('gpu_Blitter'),g('gpu_MHz'),g('pkg_W'),er,pr,min(fps) if fps else '-',round(statistics.median(fps),1) if fps else '-',kb,cur,cc,'ok'])))
+print('\t'.join(map(str,[i,n,p,av,sw,us,ld,g('cpu_busy_pct'),g('cpu_waydesk'),g('cpu_sway'),g('cpu_chromium'),g('cpu_shell'),g('cpu_foot'),g('cpu_sshd'),g('cpu_harness'),g('cpu_other'),g('cpu_CLIENTS'),ss,g('gpu_Render'),g('gpu_Video'),g('gpu_VideoEnhance'),g('gpu_Blitter'),g('gpu_MHz'),g('pkg_W'),er,pr,min(fps) if fps else '-',round(statistics.median(fps),1) if fps else '-',kb,cur,cc,g('gpu_top') or '-','ok'])))
 PY
   tail -1 $OUT
   av=$(tail -1 $OUT | cut -f4); ss=$(tail -1 $OUT | cut -f18); fm=$(tail -1 $OUT | cut -f28)

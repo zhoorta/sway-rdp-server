@@ -41,6 +41,14 @@ try:
         if v: out['gpu_' + eng.split('/')[0]] = round(sum(v) / len(v), 1)
     f = [float(x) for x in re.findall(r'"actual": ([0-9.]+)', txt)][1:]
     if f: out['gpu_MHz'] = round(sum(f) / len(f))
+    # who used the render engine: the `clients` of each sample (intel_gpu_top -J), summed by program name, averaged over the samples
+    import json as _json
+    arr = _json.loads(re.sub(r"\}\s*\n\s*\{", "},{", ("[" + txt.strip().lstrip("[")).rstrip().rstrip(",").rstrip("]") + "]"))[1:]
+    agg = collections.Counter()
+    for d in arr:
+        for c in (d.get("clients") or {}).values():
+            agg[c.get("name", "?")] += float(((c.get("engine-classes") or {}).get("Render/3D") or {}).get("busy", 0))
+    out['gpu_top'] = ",".join("%s:%.1f" % (k, v / max(len(arr), 1)) for k, v in agg.most_common(4) if v > 0)
     w = [float(x) for x in re.findall(r'"Package": ([0-9.]+)', txt)][1:]
     if w: out['pkg_W'] = round(sum(w) / len(w), 1)
 except Exception as ex: out['gpu_err'] = str(ex)[:40]
