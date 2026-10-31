@@ -1,0 +1,8 @@
+# ai-load.sh label=14b-igpu gpumode=igpu (sessions on renderD128) model=qwen2.5:14b-instruct-q4_K_M profile=mixed desktop=waydesk-desktop window=90s date=2026-10-31T15:44:37Z
+# criteria: STOP_CLIENT_CPU=60 STOP_AVAIL_MB=1500; model must be wholly in video memory; degradation is read afterwards with ai-summary.py
+phase	n	conc	requests	errors	tps_med	tps_min	tps_total	ttft_med_s	ttft_p95_s	sessions	fps_med	fps_p10	kbps_total	cpu_busy_pct	igpu_busy	igpu_enc	nv_busy	nv_enc	nv_mem_used_MB	model_vram_MB	model_total_MB	avail_MB	client_cpu_pct	note
+model	0	1	10	0	28.5	28.4	28.4	0.04	0.05	0.0	-	-	0.0	17.1	0.0	-	99.0	0.0	12050.0	11470.0	11470.0	60713	0.0	ok
+model	0	2	20	0	27.2	27.1	54.0	0.07	0.1	0.0	-	-	0.0	17.6	0.0	-	98.0	0.0	12050.0	11470.0	11470.0	60507	0.0	ok
+model	0	4	28	0	20.1	19.4	79.5	0.09	0.18	0.0	-	-	0.0	17.6	0.0	-	98.0	0.0	12052.0	11470.0	11470.0	60437	0.0	ok
+stop: could not start session 1 (refused or failed; client log on the client machine: client-14b-igpu-1.log)
+done 15:49:34

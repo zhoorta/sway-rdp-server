@@ -1,0 +1,11 @@
+
+== out-14b-igpu.tsv
+  stop: could not start session 1 (refused or failed; client log on the client machine: client-14b-igpu-1.log)
+
+Sessions with the model against the same sessions without it
+  N conc |  fps med  (alone)  change |  fps p10  change |    kbps  change |  cpu % (alone)
+
+The model with sessions against the model alone
+  N conc | tok/s one  (alone)  change | tok/s all  change | ttft med  (alone) | ttft p95 | nv busy nv enc
+
+Video memory of a session on the NVIDIA card (model loaded, no requests)

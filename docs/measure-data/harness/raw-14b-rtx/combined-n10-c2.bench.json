@@ -1,0 +1,1 @@
+{"conc": 2, "seconds": 90.0, "model": "qwen2.5:14b-instruct-q4_K_M", "load_s": 0.0, "requests": 16, "errors": 0, "tps_med": 20.6, "tps_min": 20.4, "tps_total": 41.0, "ttft_med": 0.1, "ttft_p95": 0.1}
