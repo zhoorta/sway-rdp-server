@@ -3,13 +3,14 @@
 # PROFILE: worker (light: a document that scrolls, a terminal that types), video (+ a muted 720p loop), videoaudio (+ the loop with sound).
 # HEAVY=1 adds LibreOffice Calc (300,000 rows), VS Code on a source tree and keystrokes into them (wtype); GIMP=1 adds GIMP on a 4000x3000 image (zoom in and out).
 P=${1:-worker}
-# COMPOSITOR=hyprland (a session that is not sway): the few swaymsg forms used below are translated: exec = a plain Wayland client, [app_id|class|title="X"] focus|kill = Lua through
+cd ~   # the driver starts this from /root, which the account cannot read: foot, soffice and the others fail to start from there
+# COMPOSITOR=hyprland (a session that is not sway): the few swaymsg forms used below are translated: exec = hl.exec_cmd (the program inherits the session's environment, DISPLAY included), [app_id|class|title="X"] focus|kill = Lua through
 # hyprctl eval (windows matched by a lower-case part of the class or title; verified on Hyprland 0.57: hl.get_windows() + hl.dsp.focus({ window = w })), -t get_tree = the client list.
 wd_hl() { hyprctl eval "$1" >/dev/null 2>&1; }
 wd_sm() {
   [ "$COMPOSITOR" = hyprland ] || { swaymsg "$@"; return; }
   case "$1" in
-    exec) (setsid sh -c "$2" >/dev/null 2>&1 < /dev/null &) ;;
+    exec) wd_hl "hl.exec_cmd([==[$2]==])" ;;   # through the compositor, so the program gets its DISPLAY (Flatpak VS Code needs X11); a plain setsid from this shell has none
     -t) hyprctl clients -j ;;
     \[*)
       local f=class; case "$1" in \[title=*) f=title;; esac
