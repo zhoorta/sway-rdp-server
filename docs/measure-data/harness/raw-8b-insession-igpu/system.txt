@@ -1,0 +1,155 @@
+Linux waydesk-rtx 6.12.113+deb13-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.12.113-1 (2026-10-15) x86_64 GNU/Linux
+
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+VERSION_ID="13"
+
+CPU(s):                                  20
+Model name:                              13th Gen Intel(R) Core(TM) i5-13500
+CPU(s) scaling MHz:                      19%
+               total        used        free      shared  buff/cache   available
+Mem:           64087        3369       34475        1372       26670       60718
+Swap:          24575           0       24575
+
+Memory    62.6 GB in all, 59.3 GB available
+Swap      nvme0n1p2 8.0 GB (0 MB used), zram0 16.0 GB (0 MB used)
+Load      2.92 3.35 3.36 (20 cores)
+System    Debian GNU/Linux 13 (trixie), kernel 6.12.113+deb13-amd64
+GPU       Intel AlderLake-S GT1 (i915, renderD128): 0 % busy
+            no sessions
+          NVIDIA RTX 4000 SFF Ada Generation (nvidia, renderD129): 0 % busy, encoder 0 %, 7 GB of 20 GB, 1560 MHz, 25 W
+            no sessions; for a model: CUDA_VISIBLE_DEVICES=GPU-135bf55a-cdf3-d072-c499-bdc16464ecca
+          new sessions use: auto
+AI        127.0.0.1:11434: llama3.1:8b-instruct-q4_K_M 6.5 GB in video memory; 0 connections open
+Desktop   sway for new sessions (WAYDESK_COMPOSITOR: sway, or hyprland, which needs a GPU)
+Sessions  0 running; a new one would be accepted (needs 9.4 GB available)
+
+Nobody is logged in.
+
+# /etc/default/waydesk: settings of the waydesk services.
+
+# Where the RDP port listens. Loopback by default: reach it through an SSH tunnel or a VPN. Put a VPN or private
+# address here to serve a network; do not publish it to the internet without reading docs/MULTIUSER-DESIGN.md.
+WAYDESK_BIND="5.9.138.21:3389"
+
+# Which source addresses may connect: checked when a connection is accepted, before TLS and before any login (a daemon on loopback needs none).
+# Without a line here a daemon on any other address allows only local networks (10/8, 172.16/12, 192.168/16, 100.64/10, link-local, fc00::/7).
+# Ranges narrow it: WAYDESK_ALLOW_FROM="192.168.1.0/24 10.8.0.0/24" (also single addresses, and the words private, loopback and any).
+# "any" allows every address: then keep the port off the open internet (a password login, no second factor). `waydesk-admin access` sets this
+# and WAYDESK_BIND together.
+#WAYDESK_ALLOW_FROM=
+
+# Extra options of the network daemon (see the README): --quality must be the same here and in the session args.
+WAYDESK_ARGS=
+
+# Options of the sessions the helper starts, for example: --idle-timeout 28800 --end-on-disconnect --kb-layout pt
+#   --idle-timeout SECONDS   a session without a client ends after this long (default 28800 = 8 h, 0 = never)
+#   --end-on-disconnect      a session ends as soon as its client leaves
+#   --bitrate BITS           H.264 bitrate (default 40000000); lower it for slow links, with --quality MAXQP
+WAYDESK_SESSION_ARGS=
+
+# Where the mouse pointer is drawn: "client" (default) = by the RDP client, which is instant but always an arrow (sway gets a
+# cursor theme with nothing in it, waydesk-blank); "server" = in the picture, with the shape the app asked for (text cursor,
+# resize arrows), but a network round trip behind, and only for clients that make their own pointer invisible when told to.
+#WAYDESK_CURSOR=client
+
+# Who may log in: members of the group waydesk-users (the package makes it and, on a first install, adds the account that ran the
+# installation). Add accounts with: adduser ACCOUNT waydesk-users. To let every ordinary account with a login shell in, as
+# before, put the line below WITH nothing after the equals sign; another group: WAYDESK_HELPER_ARGS=--require-group NAME
+#WAYDESK_HELPER_ARGS=--require-group waydesk-users
+
+# Memory: a session costs about 0.5 GB for the desktop itself (see the README, "Sizing"), most of it the shell (DankMaterialShell).
+# 1 makes the shell use Qt's software renderer: about 110 MB less per session (249 MB against 360 MB resident, DMS 2.0). Elements cannot be
+# rounded or shaded then, so new accounts start with square corners; some previews stay blank.
+#WAYDESK_DMS_SOFTWARE=1
+
+# The audit log (/var/log/waydesk/audit.log, docs/REFERENCE.md): a login that cannot be written to it goes through with a warning. For a site where an
+# unlogged login is not acceptable, add --audit-required to the helper's options (keep the group): then a full disk stops logins.
+#WAYDESK_HELPER_ARGS=--require-group waydesk-users --audit-required
+
+# A new session is refused when the machine cannot take one more (the account's running session is never refused: it reconnects).
+# By default it needs the larger of 900 MB and 15 % of the memory available (`waydesk-admin status` shows it and whether a login would
+# be accepted now). Change it, or limit the accounts that may have a session, by adding to the helper's options (keep the group):
+#WAYDESK_HELPER_ARGS=--require-group waydesk-users --min-available-mb 1500 --max-active-users 6
+#   --min-available-mb N    0 switches the memory check off
+#   --max-active-users N    0 (the default) is no limit
+
+# A client far away (about 100 ms: another country over the internet). Nothing needs setting: the frames in flight follow the round trip
+# measured, the encoder's bitrate follows what the kernel says the link delivers (--bitrate is only the highest it may be), and the daemon
+# asks the kernel for TCP BBR on each connection, which keeps a lossy link usable. A fixed number of frames in flight (1 to 32) overrides the
+# measured one. --bitrate and --quality must be given to the daemon (WAYDESK_ARGS) AND to the sessions (WAYDESK_SESSION_ARGS): the session
+# is what encodes, the daemon only tells the client the quality. Restart waydesk, and end the sessions (or log out) so that they start
+# again. Over an SSH tunnel TCP runs inside TCP and stalls at this distance: a WireGuard VPN is better (docs/WIREGUARD.md). What stays is the
+# round trip itself (typing and moving windows feel it; the pointer does not, the client draws it).
+#WAYDESK_FRAMES_IN_FLIGHT=8
+#WAYDESK_ARGS="--bitrate 10000000 --quality 28"
+#WAYDESK_SESSION_ARGS="--bitrate 10000000 --quality 28"
+
+# Video encoder: "screen" (default) uses OpenH264's screen-content mode, which needs about half the bandwidth for moving pictures but
+# about two to three times the CPU of "camera" (measured with a full-screen 720p30 test pattern: 26-29 % against 42-45 % of a core
+# for a worst-case pattern but 3x for a mostly still desktop, which camera mode encodes almost for free; see docs/MEASUREMENTS.md).
+# The encoder runs at low complexity (WAYDESK_H264_COMPLEXITY=medium|high to change it). On a server with few cores that plays video, "camera" can
+# keep the frame rate up. Takes effect for sessions that start after the change (end the session or log out first).
+#WAYDESK_H264_USAGE=camera
+
+# A GPU: when the machine has one (a render node in /dev/dri that the accounts of the sessions may open: the package gives waydesk-users the node
+# by a udev rule), every session draws its desktop on it and encodes the H.264 picture with the chip's encoder (VAAPI on Intel and AMD, NVENC on NVIDIA),
+# which leaves the CPU to the programs. Chromium keeps its GPU process too, with WebGL and video. Measured on an Intel HD 630: OpenGL benchmark 17 times faster, the
+# session's CPU for a full-screen animation 107 % of a core down to 21 %. Without a GPU (or when anything about it fails) nothing changes: a session that
+# cannot be made on the GPU (NVIDIA's driver 550, which Debian ships, cannot give the compositor its buffers; 615 or newer from NVIDIA's own repository can)
+# is made again in software, and an encoder that does not start falls back to OpenH264; `waydesk-admin status` shows what each session runs.
+#   WAYDESK_GPU=off              software rendering, as without a GPU. Another value: the render node to use, e.g. /dev/dri/renderD129.
+#   WAYDESK_ENCODER=software     keep the GPU for drawing, but encode on the CPU. (auto, vaapi and nvenc are the others: auto tries VAAPI, then NVENC.)
+#   WAYDESK_NVENC_DEVICE=1       the NVIDIA card (CUDA number) that encodes; by default the card the session draws on, else the first.
+# The encoder's quantiser stays at the picture quality asked for (two steps below --quality) and rises, one step at a time and only after a
+# second of overload, up to 40 when the link is slower than the picture needs (a step is a number in the next picture's header: no keyframe). To change
+# the two ends:
+#WAYDESK_VA_MIN_QP=18
+#WAYDESK_VA_MAX_QP=40
+# Takes effect for sessions that start after the change (end the session or log out first).
+#WAYDESK_GPU=auto
+# WAYDESK_GPU=balance: on a machine with more than one GPU, each new session is placed on the card with the fewest sessions for its weight (a card with its own memory counts 4,
+# an integrated one 1), when the session starts and as root (waydesk-admin gpu place; a running session stays where it is). An account pinned with
+# `waydesk-admin users set NAME --gpu ...` is left alone. No card that can take it: software rendering, with a line in the log and the audit trail.
+#WAYDESK_GPU_RESERVE=renderD129          cards that balance never uses (for a model, say); a pin by hand still can
+#WAYDESK_GPU_WEIGHTS=renderD128=1,renderD129=4
+#WAYDESK_GPU_MIN_FREE_VRAM_MB=4096        no new session on a card with less free video memory than this (NVIDIA, AMD)
+#WAYDESK_ENCODER=auto
+
+# The compositor of the sessions: sway (default), or hyprland, which needs a GPU and Hyprland 0.55 or later. Experimental: see docs/HYPRLAND.md.
+#WAYDESK_COMPOSITOR=sway
+WAYDESK_ALLOW_FROM="91.99.155.107"
+
+WAYDESK_AI_ENDPOINT=127.0.0.1:11434
+
+Sat Oct 31 17:59:44 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 615.71.10              KMD Version: 615.71.10     CUDA UMD Version: 13.4     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX 4000 SFF Ada ...    On  |   00000000:01:00.0 Off |                  Off |
+| 30%   53C    P2             24W /   70W |    6890MiB /  20475MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A          484963      C   ...local/lib/ollama/llama-server       6880MiB |
++-----------------------------------------------------------------------------------------+
+
+ollama version is 0.40.13
+NAME                           ID              SIZE      PROCESSOR    CONTEXT    RUNNER      UNTIL   
+llama3.1:8b-instruct-q4_K_M    46e0c10c039e    7.0 GB    100% GPU     4096       llamacpp    Forever    
+ExecStart=/usr/local/bin/ollama serve
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="CUDA_VISIBLE_DEVICES=GPU-135bf55a-cdf3-d072-c499-bdc16464ecca"
+Environment="OLLAMA_HOST=127.0.0.1:11434"
+Environment="OLLAMA_NUM_PARALLEL=4"
+Environment="OLLAMA_MAX_LOADED_MODELS=1"
+Environment="OLLAMA_KEEP_ALIVE=-1"
