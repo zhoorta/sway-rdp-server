@@ -245,6 +245,7 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
                 Ok(enc) => {
                     tracing::info!(node = %node.display(), "H.264 encoder: VAAPI");
                     crate::sessionstatus::set_encoder("vaapi");
+                    crate::sessionstatus::set_encoder_node(Some(&node));
                     return Ok(maybe_dump(Box::new(Timed::new(Box::new(enc), "vaapi"))));
                 }
                 Err(e) => tracing::warn!("VAAPI encoder not available ({e:#}): OpenH264 on the CPU"),
@@ -261,6 +262,7 @@ pub fn open(width: u16, height: u16, tuning: Tuning) -> Result<Box<dyn Encode>> 
                 Ok(enc) => {
                     tracing::info!("H.264 encoder: NVENC");
                     crate::sessionstatus::set_encoder("nvenc");
+                    crate::sessionstatus::set_encoder_node(enc.render_node());
                     return Ok(maybe_dump(Box::new(Timed::new(Box::new(enc), "nvenc"))));
                 }
                 Err(e) => tracing::warn!("NVENC encoder not available ({e:#}): OpenH264 on the CPU"),

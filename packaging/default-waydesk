@@ -76,6 +76,10 @@ WAYDESK_SESSION_ARGS=
 #WAYDESK_VA_MAX_QP=40
 # Takes effect for sessions that start after the change (end the session or log out first).
 #WAYDESK_GPU=auto
+#WAYDESK_GPU_ROLES=renderD128=render,renderD129=inference,renderD130=both
+#                                        what each card is for: render = sessions only; inference = a model only (`auto` never picks it, and no other card's session
+#                                        encodes on it; an account pinned there by hand still can); both = sessions and a model. Cards not listed are render.
+#                                        `waydesk-admin status` prints the CUDA_VISIBLE_DEVICES for the inference and both cards; point the model service at those.
 #WAYDESK_AI_ENDPOINT=127.0.0.1:11434    a local inference service (Ollama, vLLM, llama.cpp). `waydesk-admin status` then shows an AI line (the model it holds and its video
 #                                        memory, if it is Ollama; how many connections are open) and an AI column with each account's open connections to it
 #WAYDESK_ENCODER=auto

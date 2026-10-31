@@ -35,18 +35,20 @@ pub fn render_nodes() -> Vec<PathBuf> {
     nodes
 }
 
-/// The node to use for a setting, given the nodes that exist.
-pub fn choose(setting: &Setting, nodes: &[PathBuf]) -> Option<PathBuf> {
+/// The node to use for a setting, given the nodes that exist and the ones kept for inference (`WAYDESK_GPU_ROLES`): `auto` takes the first node that is not kept
+/// for a model (none, so software, when they all are); a node named by hand is used all the same.
+pub fn choose(setting: &Setting, nodes: &[PathBuf], reserved: &[String]) -> Option<PathBuf> {
     match setting {
         Setting::Off => None,
-        Setting::Auto => nodes.first().cloned(),
+        Setting::Auto => nodes.iter().find(|n| !n.file_name().is_some_and(|f| reserved.iter().any(|r| r.as_str() == f.to_string_lossy()))).cloned(),
         Setting::Node(p) => nodes.contains(p).then(|| p.clone()),
     }
 }
 
 /// The node this session should render on, if the account can really open it. `WAYDESK_GPU` comes from `/etc/default/waydesk`.
 pub fn usable_node() -> Option<PathBuf> {
-    let path = choose(&parse(std::env::var("WAYDESK_GPU").ok().as_deref()), &render_nodes())?;
+    let reserved = crate::gpuroles::reserved_nodes(std::env::var("WAYDESK_GPU_ROLES").ok().as_deref());
+    let path = choose(&parse(std::env::var("WAYDESK_GPU").ok().as_deref()), &render_nodes(), &reserved)?;
     match std::fs::OpenOptions::new().read(true).write(true).open(&path) {
         Ok(_) => Some(path),
         Err(e) => {
@@ -72,10 +74,20 @@ mod tests {
     #[test]
     fn choice_of_node() {
         let nodes = vec![PathBuf::from("/dev/dri/renderD128"), PathBuf::from("/dev/dri/renderD129")];
-        assert_eq!(choose(&Setting::Auto, &nodes), Some("/dev/dri/renderD128".into()));
-        assert_eq!(choose(&Setting::Auto, &[]), None, "no GPU: software");
-        assert_eq!(choose(&Setting::Off, &nodes), None);
-        assert_eq!(choose(&Setting::Node("/dev/dri/renderD129".into()), &nodes), Some("/dev/dri/renderD129".into()));
-        assert_eq!(choose(&Setting::Node("/dev/dri/renderD130".into()), &nodes), None, "a node that does not exist is not used");
+        assert_eq!(choose(&Setting::Auto, &nodes, &[]), Some("/dev/dri/renderD128".into()));
+        assert_eq!(choose(&Setting::Auto, &[], &[]), None, "no GPU: software");
+        assert_eq!(choose(&Setting::Off, &nodes, &[]), None);
+        assert_eq!(choose(&Setting::Node("/dev/dri/renderD129".into()), &nodes, &[]), Some("/dev/dri/renderD129".into()));
+        assert_eq!(choose(&Setting::Node("/dev/dri/renderD130".into()), &nodes, &[]), None, "a node that does not exist is not used");
+    }
+
+    #[test]
+    fn auto_leaves_a_card_kept_for_inference_alone() {
+        let nodes = vec![PathBuf::from("/dev/dri/renderD128"), PathBuf::from("/dev/dri/renderD129")];
+        let kept = |n: &str| vec![n.to_owned()];
+        assert_eq!(choose(&Setting::Auto, &nodes, &kept("renderD128")), Some("/dev/dri/renderD129".into()), "the first card is the model's: the next one");
+        assert_eq!(choose(&Setting::Auto, &nodes, &kept("renderD129")), Some("/dev/dri/renderD128".into()));
+        assert_eq!(choose(&Setting::Auto, &nodes, &["renderD128".to_owned(), "renderD129".to_owned()]), None, "every card is the model's: software");
+        assert_eq!(choose(&Setting::Node("/dev/dri/renderD129".into()), &nodes, &kept("renderD129")), Some("/dev/dri/renderD129".into()), "a pin by hand is respected");
     }
 }

@@ -35,6 +35,8 @@ pub struct Gpu {
     pub pci: String,
     /// The `cardN` directory of the same device.
     pub card: String,
+    /// NVIDIA's `GPU-...` identifier (NVML): what `CUDA_VISIBLE_DEVICES` takes without depending on the order the devices are counted in.
+    pub uuid: Option<String>,
     pub util: Util,
 }
 
@@ -126,7 +128,7 @@ fn list_in(drm: &Path) -> Vec<Gpu> {
             .ok()
             .and_then(|d| d.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).find(|n| n.starts_with("card")))
             .unwrap_or_default();
-        out.push(Gpu { node: format!("/dev/dri/{name}"), vendor: vendor_name(vendor), model: pci_model(vendor, device), driver, pci, card, util: Util::default() });
+        out.push(Gpu { node: format!("/dev/dri/{name}"), vendor: vendor_name(vendor), model: pci_model(vendor, device), driver, pci, card, uuid: None, util: Util::default() });
     }
     out
 }
@@ -191,7 +193,8 @@ fn finish_in(drm: &Path, sampler: Sampler, gpus: &mut [Gpu]) {
             }
             "nvidia" => {
                 if let Some(n) = &nvml {
-                    if let Some((name, util)) = n.read(&g.pci) {
+                    if let Some((name, util, uuid)) = n.read(&g.pci) {
+                        g.uuid = uuid;
                         if !name.is_empty() {
                             g.model = name;
                         }
@@ -240,7 +243,7 @@ impl Nvml {
     }
 
     /// The model name and utilisation of the card at the PCI address `pci` (`0000:01:00.0`).
-    fn read(&self, pci: &str) -> Option<(String, Util)> {
+    fn read(&self, pci: &str) -> Option<(String, Util, Option<String>)> {
         // SAFETY: each symbol is looked up with the signature NVML documents; the buffers are the sizes it is told.
         unsafe {
             let by_bus: libloading::Symbol<unsafe extern "C" fn(*const c_char, *mut Handle) -> c_int> = self.lib.get(b"nvmlDeviceGetHandleByPciBusId_v2\0").ok()?;
@@ -285,7 +288,12 @@ impl Nvml {
                     util.mhz = Some(mhz);
                 }
             }
-            Some((model, util))
+            let mut uuid = [0 as c_char; 96];
+            let uuid = match self.lib.get::<unsafe extern "C" fn(Handle, *mut c_char, c_uint) -> c_int>(b"nvmlDeviceGetUUID\0") {
+                Ok(f) if f(h, uuid.as_mut_ptr(), uuid.len() as c_uint) == 0 => Some(std::ffi::CStr::from_ptr(uuid.as_ptr()).to_string_lossy().into_owned()).filter(|u| !u.is_empty()),
+                _ => None,
+            };
+            Some((model, util, uuid))
         }
     }
 }

@@ -39,6 +39,8 @@ pub struct NvH264 {
     /// The picture in host memory with its padding (black) up to the surface size, the rows of a frame copied into it.
     stage: Vec<u8>,
     surface: (usize, usize),
+    /// The render node of the card this encoder runs on, when sysfs says.
+    render_node: Option<std::path::PathBuf>,
     config: Box<NV_ENC_CONFIG>,
     framerate: u32,
     qp: QpControl,
@@ -120,16 +122,31 @@ fn cuda_pci_addresses() -> Result<Vec<String>> {
         .collect()
 }
 
-/// The CUDA device to encode on: `WAYDESK_NVENC_DEVICE` when it says one; else the card the session renders on, if that is an NVIDIA card; else
-/// the first (a machine with an Intel or AMD card that renders and an NVIDIA one that only encodes, or one NVIDIA card).
-fn choose_device(node: Option<&Path>) -> usize {
-    if let Some(n) = std::env::var("WAYDESK_NVENC_DEVICE").ok().and_then(|v| v.trim().parse::<usize>().ok()) {
-        return n;
+/// The render node name (`renderD129`) of the card at a PCI address, from sysfs.
+fn render_name_of_pci(pci: &str) -> Option<String> {
+    std::fs::read_dir(format!("/sys/bus/pci/devices/{pci}/drm")).ok()?.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).find(|n| n.starts_with("renderD"))
+}
+
+/// The CUDA ordinal to encode on, given every CUDA device's PCI address: the card the session renders on when that is an NVIDIA card (even a reserved one: the session was put
+/// there on purpose); else the first card that is not reserved for something else (`WAYDESK_GPU_ROLES`, role `inference`: a model's card); `None` when every
+/// NVIDIA card is reserved, and the encoder then stays off it.
+fn pick_device(cuda: &[String], session_pci: Option<&str>, render_name: &dyn Fn(&str) -> Option<String>, reserve: &[String]) -> Option<usize> {
+    if let Some(i) = session_pci.and_then(|p| device_for(p, cuda)) {
+        return Some(i);
     }
-    let Some(pci) = node.and_then(node_pci) else { return 0 };
+    cuda.iter().position(|pci| render_name(pci).map_or(true, |n| !reserve.iter().any(|r| *r == n)))
+}
+
+/// The CUDA device to encode on: `WAYDESK_NVENC_DEVICE` when it says one; else `pick_device` (the card the session renders on if it is NVIDIA, else the first card not
+/// reserved: a machine with an Intel or AMD card that renders and an NVIDIA one that only encodes, or one NVIDIA card).
+fn choose_device(node: Option<&Path>) -> Option<usize> {
+    if let Some(n) = std::env::var("WAYDESK_NVENC_DEVICE").ok().and_then(|v| v.trim().parse::<usize>().ok()) {
+        return Some(n);
+    }
+    let reserve = crate::gpuroles::reserved_nodes(std::env::var("WAYDESK_GPU_ROLES").ok().as_deref());
     match cuda_pci_addresses() {
-        Ok(list) => device_for(&pci, &list).unwrap_or(0),
-        Err(_) => 0,
+        Ok(list) => pick_device(&list, node.and_then(node_pci).as_deref(), &render_name_of_pci, &reserve),
+        Err(_) => Some(0),
     }
 }
 
@@ -142,8 +159,9 @@ impl NvH264 {
     /// `node` is the render node the session's sway draws on, if any: the encoder then runs on that card when it is an NVIDIA one.
     pub fn new(node: Option<&Path>, width: u16, height: u16, t: Tuning) -> Result<Self> {
         let (sw, sh) = surface_size(usize::from(width), usize::from(height));
-        let ordinal = choose_device(node);
+        let ordinal = choose_device(node).ok_or_else(|| anyhow!("every NVIDIA card is kept for inference (WAYDESK_GPU_ROLES) and the session does not render on one"))?;
         tracing::debug!(device = ordinal, "NVENC on this CUDA device");
+        let render_node = cuda_pci_addresses().ok().and_then(|l| l.get(ordinal).cloned()).and_then(|p| render_name_of_pci(&p)).map(|n| std::path::PathBuf::from(format!("/dev/dri/{n}")));
         let ctx = CudaContext::new(ordinal).map_err(|e| anyhow!("CUDA device {ordinal}: {e}"))?;
         let encoder = Encoder::initialize_with_cuda(Arc::clone(&ctx)).map_err(|e| anyhow!("NVENC: {e:?}"))?;
         let encodes_h264 = encoder.get_encode_guids().map_err(|e| anyhow!("NVENC: {e:?}"))?.contains(&NV_ENC_CODEC_H264_GUID);
@@ -192,6 +210,7 @@ impl NvH264 {
             ctx,
             stage: vec![0; sw * sh * 4],
             surface: (sw, sh),
+            render_node,
             config,
             framerate: t.fps.max(1),
             qp: QpControl::new(floor, ceiling, t.bitrate),
@@ -199,6 +218,11 @@ impl NvH264 {
             refresh: false,
             timestamp: 0,
         })
+    }
+
+    /// The render node of the card the encoder runs on.
+    pub fn render_node(&self) -> Option<&Path> {
+        self.render_node.as_deref()
     }
 
     /// Moves the running encoder to another quantiser without a keyframe or new parameter sets.
@@ -277,6 +301,18 @@ impl Encode for NvH264 {
 /// The encoder, one frame at a time, on the real hardware: `cargo test nvenc -- --ignored` on a machine with an NVIDIA GPU.
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_encoder_stays_off_a_reserved_card_unless_the_session_is_on_it() {
+        let cuda = vec!["0000:01:00.0".to_owned(), "0000:02:00.0".to_owned()];
+        let names = |pci: &str| match pci { "0000:01:00.0" => Some("renderD129".to_owned()), "0000:02:00.0" => Some("renderD130".to_owned()), _ => None };
+        let reserve = vec!["renderD129".to_owned()];
+        assert_eq!(pick_device(&cuda, None, &names, &[]), Some(0), "nothing reserved: the first");
+        assert_eq!(pick_device(&cuda, Some("0000:00:02.0"), &names, &reserve), Some(1), "an Intel session skips the reserved card");
+        assert_eq!(pick_device(&cuda, Some("0000:01:00.0"), &names, &reserve), Some(0), "a session placed on the reserved card keeps it");
+        assert_eq!(pick_device(&cuda[..1], Some("0000:00:02.0"), &names, &reserve), None, "the only NVIDIA card is reserved");
+        assert_eq!(pick_device(&cuda[..1], None, &|_| None, &reserve), Some(0), "a card whose node is unknown is not reserved");
+    }
+
     use super::*;
     use anyhow::Context as _;
 

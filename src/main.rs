@@ -23,6 +23,7 @@ mod encode_nv;
 mod encoder;
 mod fdpass;
 mod gpu;
+mod gpuroles;
 mod helper;
 mod helperclient;
 mod input;

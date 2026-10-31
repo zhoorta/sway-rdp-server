@@ -40,6 +40,8 @@ mod configcheck;
 mod aistatus;
 #[path = "../gpuinfo.rs"]
 mod gpuinfo;
+#[path = "../gpuroles.rs"]
+mod gpuroles;
 #[path = "../memory.rs"]
 mod memory;
 #[path = "../sessionstatus.rs"]
@@ -724,9 +726,13 @@ fn system_line() -> String {
 /// What a session runs, for the table: "gpu" or "cpu" for the renderer, "nvenc q25 17fps" for the encoder.
 fn video_cells(v: Option<&sessionstatus::Status>) -> (String, String) {
     let Some(v) = v else { return ("-".into(), "-".into()) };
-    let render = if v.render.is_some() { "gpu" } else { "cpu" }.to_owned();
+    // The card's render node (`renderD129`), or `cpu`.
+    let render = v.render.as_deref().map(|r| gpuroles::short_name(r).to_owned()).unwrap_or_else(|| "cpu".to_owned());
     let Some(enc) = &v.encoder else { return (render, "-".into()) };
     let mut cell = enc.clone();
+    if let Some(n) = &v.encoder_node {
+        cell.push_str(&format!("@{}", gpuroles::short_name(n)));
+    }
     if sessionstatus::is_fresh(v) {
         if let Some(q) = v.qp {
             cell.push_str(&format!(" q{q}"));
@@ -768,6 +774,9 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
     let sampler = gpuinfo::begin(&gpus);
     let usage = gather_usage(std::time::Duration::from_millis(1000))?;
     gpuinfo::finish(sampler, &mut gpus);
+    let setting = gpu_setting();
+    let roles = gpuroles::effective_roles(server_setting("WAYDESK_GPU_ROLES").as_deref());
+    let role_of = |node: &str| roles.get(gpuroles::short_name(node)).copied();
     // A local inference service (WAYDESK_AI_ENDPOINT): the models it holds and the connections each account has open to it.
     let ai_endpoint = server_setting("WAYDESK_AI_ENDPOINT");
     let ai = ai_endpoint.as_deref().map(|ep| {
@@ -775,7 +784,23 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
         (ep.to_owned(), aistatus::probe(ep), by_uid)
     });
     let ai_of = |uid: u32| -> Option<usize> { ai.as_ref().map(|(_, _, m)| m.get(&uid).copied().unwrap_or(0)) };
-    let setting = gpu_setting();
+    // Per card: the accounts whose session draws on it, and the warnings about where sessions draw and encode.
+    let on_card = |node: &str| -> Vec<String> {
+        usage.iter().filter(|u| u.session && u.video.as_ref().and_then(|v| v.render.as_deref()).is_some_and(|r| gpuroles::short_name(r) == gpuroles::short_name(node))).map(|u| u.name.clone()).collect()
+    };
+    let warnings: Vec<String> = usage
+        .iter()
+        .filter(|u| u.session)
+        .flat_map(|u| {
+            let v = u.video.as_ref().filter(|v| sessionstatus::is_fresh(v));
+            let render = v.and_then(|v| v.render.as_deref());
+            [
+                v.and_then(|v| gpuroles::encoder_card_warning(&u.name, v.render.as_deref(), v.encoder_node.as_deref())),
+                gpuroles::role_warning(&u.name, render, &roles),
+            ]
+        })
+        .flatten()
+        .collect();
     // The admission rule counts every account with a session, whoever the caller may look at.
     let running = accounts()?.iter().filter(|a| session_state(a.uid).0 == "running").count();
     let admission = memory::admission(&info, running, min_mb, max_users);
@@ -793,13 +818,14 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
             "cpu_percent": round(u.cpu_percent), "cap_mb": u.cap_mb, "ai_connections": ai_of(u.uid),
             "top": u.top.iter().map(|(n, mb)| json!({ "name": n, "mb": mb })).collect::<Vec<_>>(),
             "video": u.video.as_ref().map(|v| json!({
-                "render": v.render, "encoder": v.encoder, "compositor": v.compositor, "qp": v.qp, "fps": v.fps.map(round), "kbps": v.kbps, "current": sessionstatus::is_fresh(v),
+                "render": v.render, "encoder": v.encoder, "encoder_node": v.encoder_node, "compositor": v.compositor, "qp": v.qp, "fps": v.fps.map(round), "kbps": v.kbps, "current": sessionstatus::is_fresh(v),
             })),
         })).collect();
         let gpu_list: Vec<_> = gpus.iter().map(|g| json!({
             "node": g.node, "vendor": g.vendor, "model": g.model, "driver": g.driver, "pci": g.pci,
             "busy_percent": g.util.busy.map(round), "encoder_percent": g.util.encoder.map(round),
             "mem_used_mb": g.util.mem_used_mb, "mem_total_mb": g.util.mem_total_mb, "mhz": g.util.mhz, "watts": g.util.watts.map(round),
+            "uuid": g.uuid, "role": role_of(&g.node).map(|r| r.word()), "reserved": role_of(&g.node) == Some(gpuroles::Role::Inference), "sessions": on_card(&g.node),
         })).collect();
         let doc = json!({
             "machine": {
@@ -811,6 +837,8 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
                 "kernel": std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default().trim(),
             },
             "compositor_setting": compositor_setting(),
+            "gpus": gpu_list,
+            "gpu_setting": setting,
             "ai": ai.as_ref().map(|(ep, probe, by_uid)| json!({
                 "endpoint": ep,
                 "state": match probe { aistatus::Probe::Down => "down", aistatus::Probe::Up => "up", aistatus::Probe::Models(_) => "ollama" },
@@ -818,8 +846,8 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
                 "connections": by_uid.values().sum::<usize>(),
                 "connections_other": by_uid.iter().filter(|(uid, _)| !usage.iter().any(|u| u.uid == **uid)).map(|(_, n)| n).sum::<usize>(),
             })),
-            "gpus": gpu_list,
-            "gpu_setting": setting,
+            "gpu_roles": roles.iter().map(|(n, r)| (n.clone(), r.word())).collect::<std::collections::BTreeMap<_, _>>(),
+            "warnings": warnings,
             "admission": { "open": open, "reason": reason, "min_available_mb": needed_mb, "max_active_users": max_users, "sessions": running },
             "users": users,
         });
@@ -840,8 +868,17 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
     } else {
         for (i, g) in gpus.iter().enumerate() {
             println!("{}{}", if i == 0 { "GPU       " } else { "          " }, gpuinfo::describe(g));
+            let note = gpuroles::card_note(role_of(&g.node), &on_card(&g.node), g.uuid.as_deref());
+            println!("            {note}");
         }
         println!("          new sessions use: {setting}");
+        let cards: Vec<_> = gpus.iter().map(|g| (g.node.clone(), role_of(&g.node), g.uuid.clone())).collect();
+        if let Some(line) = gpuroles::inference_line(&cards) {
+            println!("Inference {line}");
+        }
+    }
+    for w in &warnings {
+        println!("Warning   {w}");
     }
     if let Some((ep, probe, by_uid)) = &ai {
         let total: usize = by_uid.values().sum();
@@ -860,12 +897,12 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
         println!("\nNobody is logged in.");
         return Ok(());
     }
-    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8} {:<6} {:<17} {}{:<9}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT", "RENDER", "ENCODER", if ai.is_some() { "AI  " } else { "" }, "DESKTOP");
+    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8} {:<10} {:<28} {}{:<9}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT", "RENDER", "ENCODER", if ai.is_some() { "AI  " } else { "" }, "DESKTOP");
     for u in &usage {
         let top: Vec<String> = u.top.iter().map(|(n, mb)| format!("{n} {mb} MB")).collect();
         let (render, encoder) = video_cells(u.video.as_ref());
         println!(
-            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8} {:<6} {:<17} {}{:<9}  {}",
+            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8} {:<10} {:<28} {}{:<9}  {}",
             u.name,
             if u.session { "running" } else { "-" },
             human_mb(u.mem_mb),
@@ -962,6 +999,9 @@ fn users_set(name: &str, opts: &[&str]) -> Result<()> {
         node => node.to_owned(),
     };
     println!("{}: new sessions use {gpu_text} ({})", a.name, from(gsource));
+    if gpu.starts_with("/dev/dri/") && gpuroles::reserved_nodes(server_setting("WAYDESK_GPU_ROLES").as_deref()).iter().any(|n| n == gpuroles::short_name(&gpu)) {
+        eprintln!("note: {} is kept for inference (WAYDESK_GPU_ROLES); a session pinned there takes video memory a model may need", gpuroles::short_name(&gpu));
+    }
     if now == "hyprland" && (gpuinfo::list().is_empty() || gpu == "off") {
         eprintln!("note: Hyprland has no software renderer and needs a GPU (this server has none, or the account's GPU is off): the session will not start");
     }
@@ -1293,12 +1333,12 @@ mod tests {
         use crate::sessionstatus::Status;
         assert_eq!(video_cells(None), ("-".to_string(), "-".to_string()));
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-        let gpu = Status { render: Some("/dev/dri/renderD129".into()), encoder: Some("nvenc".into()), compositor: None, qp: Some(25), fps: Some(17.4), kbps: Some(9000), stats_at: now };
-        assert_eq!(video_cells(Some(&gpu)), ("gpu".to_string(), "nvenc q25 17fps".to_string()));
-        let soft = Status { render: None, encoder: Some("openh264".into()), compositor: None, qp: None, fps: Some(9.0), kbps: None, stats_at: now };
+        let gpu = Status { render: Some("/dev/dri/renderD129".into()), encoder: Some("nvenc".into()), encoder_node: Some("/dev/dri/renderD129".into()), compositor: None, qp: Some(25), fps: Some(17.4), kbps: Some(9000), stats_at: now };
+        assert_eq!(video_cells(Some(&gpu)), ("renderD129".to_string(), "nvenc@renderD129 q25 17fps".to_string()));
+        let soft = Status { render: None, encoder: Some("openh264".into()), encoder_node: None, compositor: None, qp: None, fps: Some(9.0), kbps: None, stats_at: now };
         assert_eq!(video_cells(Some(&soft)), ("cpu".to_string(), "openh264 9fps".to_string()));
         let idle = Status { stats_at: now - 600, ..gpu };
-        assert_eq!(video_cells(Some(&idle)).1, "nvenc", "old statistics are not shown as current");
+        assert_eq!(video_cells(Some(&idle)).1, "nvenc@renderD129", "old statistics are not shown as current");
     }
 
     #[test]

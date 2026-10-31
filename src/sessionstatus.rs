@@ -24,6 +24,8 @@ pub struct Status {
     pub render: Option<String>,
     /// `vaapi`, `nvenc` or `openh264`.
     pub encoder: Option<String>,
+    /// The render node of the card the encoder runs on (`None`: the CPU, or not known). It can differ from `render`: Intel draws and NVENC encodes.
+    pub encoder_node: Option<String>,
     /// The compositor the session runs on: `sway` or `hyprland` (a session keeps it until it restarts, whatever the setting says now).
     pub compositor: Option<String>,
     /// The quantiser of a GPU encoder.
@@ -44,13 +46,14 @@ pub fn path_for(dir: &Path, uid: u32) -> PathBuf {
 }
 
 pub fn to_json(s: &Status) -> Value {
-    json!({ "render": s.render, "encoder": s.encoder, "compositor": s.compositor, "qp": s.qp, "fps": s.fps, "kbps": s.kbps, "stats_at": s.stats_at })
+    json!({ "render": s.render, "encoder": s.encoder, "encoder_node": s.encoder_node, "compositor": s.compositor, "qp": s.qp, "fps": s.fps, "kbps": s.kbps, "stats_at": s.stats_at })
 }
 
 pub fn from_json(v: &Value) -> Status {
     Status {
         render: v.get("render").and_then(Value::as_str).map(str::to_owned),
         encoder: v.get("encoder").and_then(Value::as_str).map(str::to_owned),
+        encoder_node: v.get("encoder_node").and_then(Value::as_str).map(str::to_owned),
         compositor: v.get("compositor").and_then(Value::as_str).map(str::to_owned),
         qp: v.get("qp").and_then(Value::as_u64).map(|q| q as u32),
         fps: v.get("fps").and_then(Value::as_f64),
@@ -77,7 +80,7 @@ pub fn is_fresh(s: &Status) -> bool {
     s.stats_at != 0 && now().saturating_sub(s.stats_at) <= FRESH_SECS
 }
 
-static CURRENT: Mutex<Status> = Mutex::new(Status { render: None, encoder: None, compositor: None, qp: None, fps: None, kbps: None, stats_at: 0 });
+static CURRENT: Mutex<Status> = Mutex::new(Status { render: None, encoder: None, encoder_node: None, compositor: None, qp: None, fps: None, kbps: None, stats_at: 0 });
 
 fn publish(s: &Status) {
     let dir = Path::new(DIR);
@@ -117,11 +120,17 @@ pub fn set_compositor(name: &str) {
 pub fn set_encoder(name: &str) {
     update(|s| {
         s.encoder = Some(name.to_owned());
+        s.encoder_node = None;
         s.qp = None;
         s.fps = None;
         s.kbps = None;
         s.stats_at = 0;
     });
+}
+
+/// The card the encoder settled on (call it after `set_encoder`).
+pub fn set_encoder_node(node: Option<&Path>) {
+    update(|s| s.encoder_node = node.map(|n| n.display().to_string()));
 }
 
 /// How the encoder does, every few seconds.
@@ -146,7 +155,7 @@ mod tests {
 
     #[test]
     fn a_status_survives_its_json() {
-        let s = Status { render: Some("/dev/dri/renderD129".into()), encoder: Some("nvenc".into()), compositor: Some("hyprland".into()), qp: Some(25), fps: Some(17.5), kbps: Some(30_000), stats_at: 1_700_000_000 };
+        let s = Status { render: Some("/dev/dri/renderD129".into()), encoder: Some("nvenc".into()), encoder_node: Some("/dev/dri/renderD130".into()), compositor: Some("hyprland".into()), qp: Some(25), fps: Some(17.5), kbps: Some(30_000), stats_at: 1_700_000_000 };
         assert_eq!(from_json(&to_json(&s)), s);
         let soft = Status { render: None, encoder: Some("openh264".into()), ..Default::default() };
         assert_eq!(from_json(&to_json(&soft)), soft);
