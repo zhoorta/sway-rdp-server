@@ -71,7 +71,7 @@ for entry in $SUITES; do
 done
 cd /out
 # the repository package also goes at the top, where the install instructions download it
-ls pool/main/waydesk-repo_*_all.deb >/dev/null 2>&1 && cp "$(ls pool/main/waydesk-repo_*_all.deb | sort -V | tail -1)" /out/waydesk-repo.deb
+if ls pool/main/waydesk-repo_*_all.deb >/dev/null 2>&1; then cp "$(ls pool/main/waydesk-repo_*_all.deb | sort -V | tail -1)" /out/waydesk-repo.deb; fi
 '
 # the Release file of every suite: hashes of the index files
 python3 - "$OUT" <<'PY'
