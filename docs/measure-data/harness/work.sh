@@ -7,7 +7,20 @@ cd ~   # the driver starts this from /root, which the account cannot read: foot,
 # COMPOSITOR=hyprland (a session that is not sway): the few swaymsg forms used below are translated: exec = hl.exec_cmd (the program inherits the session's environment, DISPLAY included), [app_id|class|title="X"] focus|kill = Lua through
 # hyprctl eval (windows matched by a lower-case part of the class or title; verified on Hyprland 0.57: hl.get_windows() + hl.dsp.focus({ window = w })), -t get_tree = the client list.
 wd_hl() { hyprctl eval "$1" >/dev/null 2>&1; }
+# COMPOSITOR=cosmic: the session's sway only holds COSMIC as one fullscreen window (docs/COSMIC.md); the programs belong in COSMIC, whose display is the second one
+# of the runtime directory (wayland-2). There is nothing to focus or close from the outside: a new window takes the focus, and the keys (wtype) go to it.
+if [ "$COMPOSITOR" = cosmic ]; then
+  for _ in $(seq 1 60); do [ -S "$XDG_RUNTIME_DIR/wayland-2" ] && break; sleep 1; done
+  export WAYLAND_DISPLAY=wayland-2
+fi
 wd_sm() {
+  if [ "$COMPOSITOR" = cosmic ]; then
+    case "$1" in
+      exec) setsid sh -c "$2" >/dev/null 2>&1 < /dev/null & ;;
+      -t) echo ;;
+    esac
+    return
+  fi
   [ "$COMPOSITOR" = hyprland ] || { swaymsg "$@"; return; }
   case "$1" in
     exec) wd_hl "hl.exec_cmd([==[$2]==])" ;;   # through the compositor, so the program gets its DISPLAY (Flatpak VS Code needs X11); a plain setsid from this shell has none
@@ -32,7 +45,8 @@ if [ "$HEAVY" = 1 ]; then
   mkdir -p ~/.var/app/com.visualstudio.code/config/Code/User
   echo '{"security.workspace.trust.enabled": false, "workbench.startupEditor": "none", "update.mode": "none", "telemetry.telemetryLevel": "off", "extensions.autoUpdate": false}' > ~/.var/app/com.visualstudio.code/config/Code/User/settings.json
   $SM exec "soffice --calc ~/data.ods" >/dev/null; sleep 15
-  $SM exec "flatpak run com.visualstudio.code ~/src ~/src/os.py" >/dev/null; sleep 15
+  VSC="flatpak run"; [ "$COMPOSITOR" = cosmic ] && VSC="flatpak run --socket=wayland --env=ELECTRON_OZONE_PLATFORM_HINT=wayland"   # COSMIC has no DISPLAY for it to fall back on
+  $SM exec "$VSC com.visualstudio.code ~/src ~/src/os.py" >/dev/null; sleep 15
   [ "$GIMP" = 1 ] && { cp /srv/load/img.jpg ~/img.jpg; $SM exec "gimp ~/img.jpg" >/dev/null; sleep 25; }
   dismiss() { for t in "Tip of the Day" "Welcome to GIMP"; do $SM -t get_tree | grep -q "$t" && { $SM "[title=\"$t.*\"] kill" >/dev/null 2>&1; sleep 1; }; done; }
   keys() { sleep 0.4; for _ in $(seq 1 $2); do wtype -k "$1"; sleep 1; done; }

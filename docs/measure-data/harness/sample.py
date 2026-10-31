@@ -15,9 +15,9 @@ def procs():
     return d
 def group(n):
     if n.startswith('waydesk') or n == 'waydesk-server': return 'waydesk'
-    if n.startswith('sway') or n.lower().startswith(('hyprland', 'start-hyprland', '.hyprland')): return 'sway'  # the compositor, whichever it is
+    if n.startswith('sway') or n.lower().startswith(('hyprland', 'start-hyprland', '.hyprland', 'cosmic-comp')): return 'sway'  # the compositor, whichever it is
     if 'chrom' in n or n in ('chromium',): return 'chromium'
-    if n in ('dms', 'qs', 'quickshell') or 'dms' in n: return 'shell'
+    if n in ('dms', 'qs', 'quickshell') or 'dms' in n or n.startswith('cosmic-'): return 'shell'
     if n.startswith('sdl-freerdp') or n.startswith('xfreerdp'): return 'CLIENTS'
     if n == 'foot': return 'foot'
     if n.startswith('sshd'): return 'sshd'

@@ -1,6 +1,7 @@
 #!/bin/bash
 # ramp-desktops.sh MAX LABEL DESKTOP [PROFILE] : like ramp-remote.sh, for comparing desktops on the same machine.
 #   DESKTOP: sway-minimal    sway with the package's minimal configuration (account's ~/.config/waydesk/config = sway-minimal.conf)
+#            cosmic          COSMIC nested in the session's sway (docs/COSMIC.md; the load runs in COSMIC)
 #            waydesk-desktop sway with the Waydesk desktop (the system configuration of the waydesk-desktop package; needs it installed)
 #            omarchy         Hyprland with the configuration Omarchy puts in /etc/skel (needs omarchy-settings and a GPU)
 #            hyprland        Hyprland with the account's own configuration (no skel change; for ML4W and the like, prepare the home yourself)
@@ -24,6 +25,7 @@ T() { ssh -i $K -o IdentitiesOnly=yes -o UserKnownHostsFile=$SKH -o ServerAliveI
 C() { ssh -i $K -o IdentitiesOnly=yes -o UserKnownHostsFile=$KH -o ServerAliveInterval=15 root@$CLIENT "$@"; }
 case $DESKTOP in
   sway-minimal|waydesk-desktop) COMP=sway; SETDESK=sway;;
+  cosmic) COMP=sway; WCOMP=cosmic; SETDESK=cosmic;;
   omarchy|hyprland) COMP=hyprland; SETDESK=hyprland;;
   *) echo "unknown DESKTOP $DESKTOP" >&2; exit 2;;
 esac
@@ -54,7 +56,7 @@ for i in $(seq 1 $MAX); do
   if [ $ok = 0 ]; then echo -e "$i\t$name\t$prof\t$(T "free -m | awk '/^Mem:/ {print \$7}'")\tREFUSED or failed (client log on the VPS: client-$LABEL-$i.log)" >> $OUT; stop refused; break; fi
   sleep 25
   # the session's sockets: sway has its own IPC socket, Hyprland an instance directory; the Wayland display is the same search for both
-  T "wl=\$(ls /run/user/$uid | grep -E '^wayland-[0-9]+\$' | head -1); sock=\$(ls /run/user/$uid/sway-ipc.*.sock 2>/dev/null | head -1); sig=\$(ls /run/user/$uid/hypr 2>/dev/null | head -1); setsid nohup runuser -u $name -- env XDG_RUNTIME_DIR=/run/user/$uid WAYLAND_DISPLAY=\${wl:-wayland-1} DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus SWAYSOCK=\$sock HYPRLAND_INSTANCE_SIGNATURE=\$sig COMPOSITOR=$COMP PATH=/usr/lib/waydesk/bin:/usr/bin:/bin HOME=/home/$name USER=$name HEAVY=$hv GIMP=$gimp /srv/load/work.sh $prof > /root/load/work-$LABEL-$i.log 2>&1 < /dev/null &"
+  T "wl=\$(ls /run/user/$uid | grep -E '^wayland-[0-9]+\$' | head -1); sock=\$(ls /run/user/$uid/sway-ipc.*.sock 2>/dev/null | head -1); sig=\$(ls /run/user/$uid/hypr 2>/dev/null | head -1); setsid nohup runuser -u $name -- env XDG_RUNTIME_DIR=/run/user/$uid WAYLAND_DISPLAY=\${wl:-wayland-1} DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus SWAYSOCK=\$sock HYPRLAND_INSTANCE_SIGNATURE=\$sig COMPOSITOR=${WCOMP:-$COMP} PATH=/usr/lib/waydesk/bin:/usr/bin:/bin HOME=/home/$name USER=$name HEAVY=$hv GIMP=$gimp /srv/load/work.sh $prof > /root/load/work-$LABEL-$i.log 2>&1 < /dev/null &"
   sleep $([ $hv = 1 ] && echo 160 || echo 100)
   S=$(date +%s)
   ( C "python3 -c \"
