@@ -82,8 +82,8 @@ as the packages are on this server.
 How the packages are built from these: https://github.com/zhoorta/waydesk (packaging/dms/build-helpers.sh, packaging/quickshell/build-private.sh,
 packaging/pcmanfm-qt/build.sh). SHA256SUMS has the checksums of every file here. The tool that made this folder is packaging/source/collect-source.sh.
 
-The programs of Waydesk itself and the others it builds (sway, wlroots, DankMaterialShell, danksearch, dgop) are under permissive licences
-(MIT or Apache-2.0); their source and our patches are in the same GitHub repository.
+Waydesk itself is under the AGPL-3.0-or-later; the other programs it builds (sway, wlroots, DankMaterialShell, danksearch, dgop) are under the permissive MIT
+licence; their source and our patches are in the same GitHub repository.
 
 Questions: jose@stackcare.pt
 EOF

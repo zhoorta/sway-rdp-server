@@ -27,7 +27,10 @@ Not with the port published: the login is a password with no second factor. Use 
 The Windows App on macOS, mstsc on Windows 11 and FreeRDP were tried. The list, with what did not work, is on [Limits and status](/docs/limits/).
 
 ## What does it cost, and who makes it? {bar: notes}
-It is free software, MIT or Apache-2.0, written and maintained by [StackCare](https://stackcare.pt/en), which also offers commercial support and setup.
+It is free software, written and maintained by [StackCare](https://stackcare.pt/en), which also offers commercial support and setup. The licence is the AGPL, explained next.
+
+## What licence is it under, and what does it mean for me? {bar: notes}
+Waydesk is under the GNU Affero General Public License, version 3 or later. You may use it for any purpose, free of charge, including at a company and for paid work of your own, and you may charge for installing, hosting or supporting it. What the licence asks: if you give others a modified version, or let them use a modified version over a network, they must be able to get its source under the same licence. Versions published up to 2026-11-01 were under MIT or Apache-2.0, and copies obtained under those terms stay under them. This is a summary, not legal advice: the [licence text](https://github.com/zhoorta/waydesk/blob/main/LICENSE) decides. If the AGPL does not fit your case, write to [StackCare](https://stackcare.pt/en).
 
 ## Can I see how it is built? {bar: notes}
 Yes: [Architecture](/docs/architecture/) draws the three parts, [Measurements](/docs/measurements/) shows how each figure was taken, and the source is on [GitHub](https://github.com/zhoorta/waydesk).

@@ -161,7 +161,7 @@ FOOT = f"""<footer>
   {GH}
   <a href="https://github.com/zhoorta/waydesk/blob/main/CHANGELOG.md">changelog</a>
   <a href="https://stackcare.pt/en">commercial support: StackCare</a>
-  <span>MIT or Apache-2.0</span>
+  <span>AGPL-3.0-or-later</span>
 </footer>"""
 
 

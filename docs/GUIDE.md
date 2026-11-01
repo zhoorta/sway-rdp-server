@@ -150,14 +150,14 @@ do not start on a server without one (Zed). Applications that only speak X11 run
 
 ## Source of the copyleft programs
 
-Waydesk and the programs it builds itself (sway, wlroots, DankMaterialShell, danksearch, dgop) are under MIT or Apache-2.0. The repository also ships three copyleft programs as binaries:
+Waydesk is under the AGPL-3.0-or-later; the programs it builds from other projects keep their own licences (sway, wlroots, DankMaterialShell, danksearch and dgop are MIT). The repository also ships three copyleft programs as binaries:
 matugen 4.2.0 (GPL-2.0-or-later), quickshell 0.3.0 (LGPL-3.0-only) and our patched pcmanfm-qt (GPL-2.0-or-later). Their source is offered from the same place as the packages:
 <https://waydesk.dev/apt/source/> (`README`, `SHA256SUMS`, the upstream archives, the crates matugen builds from, the Debian and Ubuntu source packages of pcmanfm-qt and our two patches).
 `packaging/source/collect-source.sh` makes that folder.
 
 ## Licence
 
-Dual-licensed under either of [Apache-2.0](../LICENSE-APACHE) or [MIT](../LICENSE-MIT), at your option. `patches/ironrdp-server` is a
+Waydesk is licensed under the GNU Affero General Public License, version 3 or later ([LICENSE](../LICENSE)); up to commit `b429e5f` (2026-11-01) it was published under MIT or Apache-2.0, and copies obtained under those terms stay under them. `patches/ironrdp-server` is a
 modified copy of IronRDP's `ironrdp-server` crate and stays under its own licence (MIT or Apache-2.0, files included there).
 
 ## Sizing

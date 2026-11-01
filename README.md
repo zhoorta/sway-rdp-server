@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/zhoorta/waydesk/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/zhoorta/waydesk?label=release"></a>
-  <img alt="License: Apache-2.0 or MIT" src="https://img.shields.io/badge/license-Apache--2.0%20%7C%20MIT-blue">
+  <img alt="License: AGPL-3.0-or-later" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue">
   <img alt="Debian 13 and Ubuntu 26.04, amd64 and arm64" src="https://img.shields.io/badge/Debian%2013%20%7C%20Ubuntu%2026.04-amd64%20%7C%20arm64-informational">
   <a href="https://waydesk.dev"><img alt="Website" src="https://img.shields.io/badge/website-waydesk.dev-orange"></a>
 </p>
@@ -26,7 +26,7 @@ alive between connections, the picture is H.264 and no GPU is needed (an Intel, 
 - **Memory is protected.** A new session is refused when the machine is full, every account has ceilings, and compressed swap absorbs spikes. A 12-vCPU, 23 GB server held 12 heavy users (Chromium, Calc and VS Code open) before it refused the 13th: [measurements and methods](https://waydesk.dev/#measurements).
 - **Secure by default.** The RDP port listens on loopback only; a WireGuard VPN, a local certificate authority and an address allowlist are built in (`waydesk-admin vpn init`, `waydesk-admin access`). The daemon is unprivileged and sandboxed, and a small root helper only checks a password and starts a session. See the [threat model](docs/THREAT-MODEL.md).
 - **Administration included.** `waydesk-admin` and a Users & Access panel manage accounts, limits and sessions, and a Task Manager shows what each account uses.
-- **Free software.** Apache-2.0 or MIT, built on [IronRDP](https://github.com/Devolutions/IronRDP) and [sway](https://swaywm.org).
+- **Free software.** AGPL-3.0-or-later, built on [IronRDP](https://github.com/Devolutions/IronRDP) and [sway](https://swaywm.org).
 
 ## Install
 
@@ -64,5 +64,7 @@ The clipboard is text only, and there is no hardware encoding yet; the [roadmap]
 **Waydesk** is a working name; `apt install waydesk` installs everything (`waydesk-server` and `waydesk-desktop`). Waydesk builds on the sway compositor and is not part of the sway
 project. No trademark or package-name clearance has been done.
 
-Dual-licensed under either of [Apache-2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option. `patches/ironrdp-server` is a modified copy of IronRDP's `ironrdp-server` crate and keeps its own licence.
+Waydesk is licensed under the GNU Affero General Public License, version 3 or (at your option) any later version: [LICENSE](LICENSE). In short: you may use, study, change and share it, for any purpose, including at a company and for paid work of your own. If you give others a modified version, or let them use a modified version over a network, they must be able to get its source under the same licence. Charging for installing, hosting or supporting it is allowed. The text decides, not this summary; if the AGPL does not fit your case, write to [StackCare](https://stackcare.pt/en).
+
+Up to commit `b429e5f` (2026-11-01) the source was published under MIT or Apache-2.0; copies obtained under those terms stay under them. The third-party code in the repository keeps its own licences: `patches/ironrdp-server` is a modified copy of IronRDP's `ironrdp-server` crate (MIT or Apache-2.0, files included there), and the other patches belong to the projects they patch.
 The repository also ships three copyleft programs as binaries (matugen, quickshell, a patched pcmanfm-qt); their source is at <https://waydesk.dev/apt/source/>, see [the guide](docs/GUIDE.md#source-of-the-copyleft-programs).

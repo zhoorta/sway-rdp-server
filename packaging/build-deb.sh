@@ -37,7 +37,7 @@ mkdir -p $P/usr/share/icons && cp -a packaging/cursors/waydesk-blank $P/usr/shar
 install -m 644 README.md $P/usr/share/doc/waydesk-server/README.md
 install -m 644 docs/MULTIUSER-DESIGN.md $P/usr/share/doc/waydesk-server/MULTIUSER-DESIGN.md
 install -m 644 docs/WIREGUARD.md docs/ACCESS.md docs/THREAT-MODEL.md docs/SECURITY-REVIEW.md docs/MEASUREMENTS.md $P/usr/share/doc/waydesk-server/
-cat LICENSE-MIT > $P/usr/share/doc/waydesk-server/copyright
+{ printf "Waydesk\nCopyright (c) 2026 StackCare\nLicense: GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later). The full text follows.\n\n"; cat LICENSE; } > $P/usr/share/doc/waydesk-server/copyright
 for f in postinst prerm postrm conffiles; do install -m 755 packaging/debian/$f $P/DEBIAN/$f; done
 chmod 644 $P/DEBIAN/conffiles
 sed -e "s/@VERSION@/$VERSION/" -e "s/@ARCH@/$ARCH/" packaging/debian/control > $P/DEBIAN/control
@@ -73,7 +73,7 @@ mkdir -p $D/usr/share/waydesk/dms-plugin && cp -r packaging/desktop/dms-plugin/.
 mkdir -p $D/usr/share/waydesk/dms-patches && install -m 755 packaging/desktop/dms-patches/apply.sh $D/usr/share/waydesk/dms-patches/ && install -m 644 packaging/desktop/dms-patches/*.py $D/usr/share/waydesk/dms-patches/
 install -m 644 packaging/desktop/systemd-user/sway-session.target $D/usr/lib/systemd/user/sway-session.target
 ln -s ../dms.service $D/usr/lib/systemd/user/sway-session.target.wants/dms.service
-cat LICENSE-MIT > $D/usr/share/doc/waydesk-desktop/copyright
+{ printf "Waydesk\nCopyright (c) 2026 StackCare\nLicense: GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later). The full text follows.\n\n"; cat LICENSE; } > $D/usr/share/doc/waydesk-desktop/copyright
 printf "/etc/xdg/waydesk/sway.conf\n/etc/chromium.d/waydesk\n" > $D/DEBIAN/conffiles
 sed -e "s/@VERSION@/$VERSION/g" packaging/debian/control-desktop > $D/DEBIAN/control
 echo "Installed-Size: $(du -sk $D | cut -f1)" >> $D/DEBIAN/control
@@ -81,7 +81,7 @@ dpkg-deb --root-owner-group -Zxz -b $D /src/packaging/out/ >/dev/null
 
 # the Waydesk metapackage: apt install waydesk gets the server and the desktop (same version, so they stay together)
 M=/tmp/pkgm; rm -rf $M; mkdir -p $M/DEBIAN $M/usr/share/doc/waydesk
-cat LICENSE-MIT > $M/usr/share/doc/waydesk/copyright
+{ printf "Waydesk\nCopyright (c) 2026 StackCare\nLicense: GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later). The full text follows.\n\n"; cat LICENSE; } > $M/usr/share/doc/waydesk/copyright
 sed -e "s/@VERSION@/$VERSION/g" packaging/debian/control-waydesk > $M/DEBIAN/control
 echo "Installed-Size: $(du -sk $M | cut -f1)" >> $M/DEBIAN/control
 dpkg-deb --root-owner-group -Zxz -b $M /src/packaging/out/ >/dev/null
