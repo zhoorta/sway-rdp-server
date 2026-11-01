@@ -376,3 +376,14 @@ body.sans code, body.sans pre, body.sans pre * { font-family: var(--mono); font-
 .gtext .body { padding-top: 0; }
 .gtext .body p { margin-top: var(--s2); }
 body.sans .gtext pre, body.sans .gtext pre * { font-size: 11px; }
+
+/* On the home page the cards of Who it is for, Built to stay light and fast, the shared model and the applications are boxes, like the desktop tiles
+   (the documentation keeps its flat cards). */
+#who .win.card, #fast + .grid .win.card, #ai + .grid .win.card, #apps + .grid .win.card {
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, .11);
+  border-radius: var(--r-win);
+  box-shadow: var(--shadow);
+}
+#who .win.card > .body, #fast + .grid .win.card > .body, #ai + .grid .win.card > .body, #apps + .grid .win.card > .body { padding: var(--s4); }
