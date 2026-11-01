@@ -6,13 +6,13 @@
 #
 # --really needs the fingerprint of the key you mean to publish, typed by you; it must be the key in REPO-DIR/waydesk.gpg and every .sig must verify with it.
 # Environment: WAYDESK_PUBLISH_HOST (required: ssh host or alias), WAYDESK_PUBLISH_ARCH_DIR (folder behind /arch, relative to the ssh account's home; default
-# waydesk-arch), WAYDESK_PUBLISH_ARCH_URL (default https://waydesk.dev/arch, for the final check).
+# app/arch), WAYDESK_PUBLISH_ARCH_URL (default https://waydesk.dev/arch, for the final check).
 # Order: packages and their signatures first (new files only; nothing already on the server is overwritten or deleted: an old package may still be named by a
 # client's cached database), then the databases and their signatures, each replaced atomically, the .sig after its file.
 set -eu
 SRC=${1:?usage: publish-arch.sh REPO-DIR [--really --key FINGERPRINT]}
 HOST=${WAYDESK_PUBLISH_HOST:?set WAYDESK_PUBLISH_HOST to the ssh host (or alias) of the web server}
-DIR=${WAYDESK_PUBLISH_ARCH_DIR:-waydesk-arch}
+DIR=${WAYDESK_PUBLISH_ARCH_DIR:-app/arch}
 BASE=${WAYDESK_PUBLISH_ARCH_URL:-https://waydesk.dev/arch}
 REAL=""; WANT=""
 shift
@@ -35,7 +35,7 @@ if [ -n "$REAL" ] && [ "$WANT" != "$fp" ]; then echo "publish-arch.sh: --really 
 echo "target: $HOST:~/$DIR/   ${REAL:+(for real)}${REAL:-(dry run: nothing is changed)}"
 (cd "$SRC" && find . -mindepth 2 -type f ! -name 'waydesk.db*' ! -name 'waydesk.files*' | sed 's|^\./||' | sort) > "$tmpk/pk.txt"
 ssh "$HOST" "mkdir -p '$DIR' && cd '$DIR' && find . -mindepth 2 -type f | sed 's|^\./||' | sort" > "$tmpk/remote.txt" || true
-awk 'NR==FNR { seen[$0]; next } !($0 in seen)' "$tmpk/remote.txt" "$tmpk/pk.txt" > "$tmpk/new.txt"
+awk 'FILENAME == ARGV[1] { seen[$0]; next } !($0 in seen)' "$tmpk/remote.txt" "$tmpk/pk.txt" > "$tmpk/new.txt"
 echo "new package files: $(wc -l < "$tmpk/new.txt" | tr -d ' ')"; sed 's/^/  + /' "$tmpk/new.txt"
 echo "databases replaced: $(cd "$SRC" && ls -d */ | tr -d / | tr '\n' ' ')(waydesk.db, waydesk.files and their .sig); also waydesk.gpg"
 [ -n "$REAL" ] || { echo "dry run only. Add --really --key $fp to publish."; exit 0; }
