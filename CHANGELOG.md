@@ -2,7 +2,7 @@
 
 What changed, newest first. The numbered releases are the ones in the apt repository.
 
-## Unreleased
+## 2026-11-01 · 0.5.0
 
 **Licence.** Waydesk is now licensed under the GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later), with the full text in `LICENSE`; the MIT and Apache-2.0 files are gone. The third-party code in the repository (`patches/ironrdp-server` and the other patches) keeps its own licences, and the 411 Rust crates the server builds on are all permissive (MIT, Apache-2.0, BSD, ISC and the like), which the AGPL can include. The Debian packages carry the licence text in their `copyright` file, the Arch package in `/usr/share/licenses`.
 
