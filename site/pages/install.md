@@ -1,6 +1,6 @@
 title: Install and first login
 nav: Install
-seo_title: Install a Linux RDP desktop on Debian 13 or Ubuntu 26.04 · Waydesk
+seo_title: Install a Linux RDP desktop on Debian 13, Ubuntu 26.04 or Arch · Waydesk
 description: Install Waydesk on Debian 13, Ubuntu 26.04 or Arch Linux, make the first administrator, connect, and add more people. About ten minutes from a fresh server.
 ---
 From a fresh server to a desktop in about ten minutes: one package, one command to make the first administrator, and an RDP client. Everything below was run on a clean Debian 13 server.
