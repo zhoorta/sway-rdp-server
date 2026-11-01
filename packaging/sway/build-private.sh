@@ -49,7 +49,7 @@ cat > $P/DEBIAN/control <<CTL
 Package: waydesk-sway
 Version: 1.11+waydesk3+$TAG
 Architecture: $ARCH
-Maintainer: José Mendonça <jmendonca@gmail.com>
+Maintainer: StackCare <jose@stackcare.pt>
 Section: x11
 Priority: optional
 Depends: $DEPS, xwayland

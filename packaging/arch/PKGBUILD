@@ -1,4 +1,4 @@
-# Maintainer: José Mendonça <jmendonca@gmail.com>
+# Maintainer: StackCare <jose@stackcare.pt>
 #
 # Waydesk for Arch Linux: the RDP server, the root helper, the admin tools and the services. Build it with packaging/arch/build.sh
 # (it makes the source tarball of the committed tree and runs makepkg). The desktop of the Debian packages (waydesk-desktop: shell, launcher,

@@ -1,7 +1,7 @@
 Package: waydesk
 Version: @VERSION@
 Architecture: all
-Maintainer: José Mendonça <jmendonca@gmail.com>
+Maintainer: StackCare <jose@stackcare.pt>
 Section: metapackages
 Priority: optional
 Depends: waydesk-server (= @VERSION@), waydesk-desktop (= @VERSION@)

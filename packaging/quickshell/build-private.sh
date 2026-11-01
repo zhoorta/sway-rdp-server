@@ -48,7 +48,7 @@ cat > $P/DEBIAN/control <<CTL
 Package: waydesk-quickshell
 Version: 0.3.0+waydesk1+$TAG
 Architecture: $ARCH
-Maintainer: José Mendonça <jmendonca@gmail.com>
+Maintainer: StackCare <jose@stackcare.pt>
 Section: x11
 Priority: optional
 Depends: $DEPS, hicolor-icon-theme, qt6-svg-plugins, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts

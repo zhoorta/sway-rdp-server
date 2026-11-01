@@ -67,7 +67,7 @@ cat > \$P/DEBIAN/control <<C
 Package: waydesk-shell
 Version: $VERSION
 Architecture: $ARCH
-Maintainer: José Mendonça <jmendonca@gmail.com>
+Maintainer: StackCare <jose@stackcare.pt>
 Section: x11
 Priority: optional
 Installed-Size: \$(du -sk \$P | cut -f1)

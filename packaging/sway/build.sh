@@ -21,7 +21,7 @@ cd sway-*/
 mk-build-deps -i -r -t "apt-get -y -qq --no-install-recommends" debian/control >/dev/null
 cp /patch/waydesk-titlebar-buttons.patch debian/patches/
 echo waydesk-titlebar-buttons.patch >> debian/patches/series
-DEBFULLNAME="José Mendonça" DEBEMAIL=jmendonca@gmail.com dch --local +waydesk "Window buttons in the title bar (waydesk)."
+DEBFULLNAME="StackCare" DEBEMAIL=jose@stackcare.pt dch --local +waydesk "Window buttons in the title bar (waydesk)."
 DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -b -uc -us >/dev/null
 cd ..
 cp sway_*.deb /out/

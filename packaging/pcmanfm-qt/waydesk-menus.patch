@@ -1,7 +1,7 @@
 Description: waydesk: remove desktop-menu entries and "Open in Terminal"
  Hide Desktop Items, Create Launcher and Desktop Preferences, and Open in Terminal in
  folder menus: a remote desktop has no use for them (DMS does wallpaper and settings).
-Author: José Mendonça <jmendonca@gmail.com>
+Author: StackCare <jose@stackcare.pt>
 Forwarded: not-needed
 
 --- a/pcmanfm/desktopwindow.cpp	2026-10-20 21:47:31

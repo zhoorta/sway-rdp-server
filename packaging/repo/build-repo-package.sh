@@ -63,7 +63,7 @@ cat > $P/DEBIAN/control <<C
 Package: waydesk-repo
 Version: $VERSION
 Architecture: all
-Maintainer: José Mendonça <jmendonca@gmail.com>
+Maintainer: StackCare <jose@stackcare.pt>
 Section: admin
 Priority: optional
 Installed-Size: 8

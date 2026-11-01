@@ -46,10 +46,11 @@ if [ -n "$REAL" ] && [ "$WANT" != "$fp" ]; then echo "publish.sh: --really needs
 echo "target: $HOST:~/$DIR/   ${REAL:+(for real)}${REAL:-(dry run: nothing is changed)}"
 
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-# what is on the server: "size path" for every file under pool/
-ssh "$HOST" "mkdir -p '$DIR' && cd '$DIR' && find pool -type f -printf '%s %p\n' 2>/dev/null | sort -k2" > "$tmp/remote.txt" || true
-(cd "$SRC" && find pool -type f | while read -r f; do printf '%s %s\n' "$(wc -c < "$f" | tr -d ' ')" "$f"; done | sort -k2) > "$tmp/local.txt"
-# to upload: local entries (same size and name) that are not on the server; to delete: server entries that are not local any more
+# what is on the server: "sha256 path" for every file under pool/ (the checksum, not the size: a rebuilt package can have the same size and other contents, and the index
+# names the checksum: 2026-11-01, a file of the same size was skipped and the index no longer matched it)
+ssh "$HOST" "mkdir -p '$DIR' && cd '$DIR' && find pool -type f -exec sha256sum {} + 2>/dev/null | sed 's/  / /' | sort -k2" > "$tmp/remote.txt" || true
+(cd "$SRC" && find pool -type f | while read -r f; do printf '%s %s\n' "$(shasum -a 256 "$f" | cut -d' ' -f1)" "$f"; done | sort -k2) > "$tmp/local.txt"
+# to upload: local entries (same checksum and name) that are not on the server; to delete: server entries that are not local any more
 # (set differences with awk, not comm: comm needs both lists sorted the same way, and the Mac and the server sort + ~ and _ differently, which made it
 # report files that were there as missing, and then delete them by name after they had been uploaded: 2026-10-23)
 notin() { awk 'FILENAME == ARGV[1] { seen[$0]; next } !($0 in seen)' "$2" "$1"; }   # the lines of $1 that are not in $2
@@ -80,8 +81,8 @@ fi
 { cat "$tmp/upload.txt"; for f in waydesk-archive-keyring.gpg waydesk-repo.deb; do [ -f "$SRC/$f" ] && echo "$f"; done; } > "$tmp/first.txt"
 if [ -s "$tmp/first.txt" ]; then COPYFILE_DISABLE=1 tar --exclude="._*" --exclude=.DS_Store -C "$SRC" -cf - -T "$tmp/first.txt" | ssh "$HOST" "cd '$DIR' && tar -xf - && find pool -type d -exec chmod 755 {} + && find pool -type f -exec chmod 644 {} +; chmod 644 waydesk-* 2>/dev/null; true"; fi
 # The packages must really be on the server before any index names them (the upload above cannot report a cut-short transfer): compare the
-# server's pool with the local one, by name and size. If anything is missing nothing else is changed; run this again and it uploads what is missing.
-ssh "$HOST" "cd '$DIR' && find pool -type f -printf '%s %p\n' | sort -k2" > "$tmp/remote2.txt"
+# server's pool with the local one, by name and checksum. If anything is missing nothing else is changed; run this again and it uploads what is missing.
+ssh "$HOST" "cd '$DIR' && find pool -type f -exec sha256sum {} + | sed 's/  / /' | sort -k2" > "$tmp/remote2.txt"
 notin "$tmp/local.txt" "$tmp/remote2.txt" > "$tmp/missing.txt"
 if [ -s "$tmp/missing.txt" ]; then
     echo "publish.sh: $(wc -l < "$tmp/missing.txt" | tr -d ' ') package(s) are not on the server after the upload. The indexes were NOT changed:" >&2

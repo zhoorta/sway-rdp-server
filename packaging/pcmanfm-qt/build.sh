@@ -33,7 +33,7 @@ for p in waydesk-menus waydesk-no-mnemonics; do
     echo $p.patch >> debian/patches/series
 done
 V=$(dpkg-parsechangelog -S Version)
-DEBFULLNAME="José Mendonça" DEBEMAIL=jmendonca@gmail.com dch --newversion "${V}+waydesk2+${TAG}" -D UNRELEASED "Remove desktop menu entries and Open in Terminal (waydesk); no recommends of lxqt-qtplugin and lxqt-policykit."
+DEBFULLNAME="StackCare" DEBEMAIL=jose@stackcare.pt dch --newversion "${V}+waydesk2+${TAG}" -D UNRELEASED "Remove desktop menu entries and Open in Terminal (waydesk); no recommends of lxqt-qtplugin and lxqt-policykit."
 dpkg-buildpackage -b -uc -us >/dev/null
 cd ..
 cp pcmanfm-qt_*.deb /out/

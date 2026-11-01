@@ -62,7 +62,7 @@ control() { # dir package version depends description
         echo "Package: $2"
         echo "Version: $3"
         echo "Architecture: @ARCH@"
-        echo "Maintainer: José Mendonça <jmendonca@gmail.com>"
+        echo "Maintainer: StackCare <jose@stackcare.pt>"
         echo "Section: utils"
         echo "Priority: optional"
         echo "Installed-Size: $(du -sk $1 | cut -f1)"

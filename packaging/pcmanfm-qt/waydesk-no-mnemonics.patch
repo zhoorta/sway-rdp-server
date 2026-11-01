@@ -1,7 +1,7 @@
 Description: waydesk: no underlined mnemonic letters
  The menus of the file manager show underlined letters (File, Edit...) that a remote
  desktop in the look of DankMaterialShell does not want.
-Author: José Mendonça <jmendonca@gmail.com>
+Author: StackCare <jose@stackcare.pt>
 Forwarded: not-needed
 
 --- a/pcmanfm/application.cpp	2026-10-20 21:47:31

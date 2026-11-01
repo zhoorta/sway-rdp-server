@@ -27,7 +27,7 @@ Not with the port published: the login is a password with no second factor. Use 
 The Windows App on macOS, mstsc on Windows 11 and FreeRDP were tried. The list, with what did not work, is on [Limits and status](/docs/limits/).
 
 ## What does it cost, and who makes it? {bar: notes}
-It is free software, MIT or Apache-2.0, written by José Mendonça. Commercial support and setup are offered by [StackCare](https://stackcare.pt/en).
+It is free software, MIT or Apache-2.0, written and maintained by [StackCare](https://stackcare.pt/en), which also offers commercial support and setup.
 
 ## Can I see how it is built? {bar: notes}
 Yes: [Architecture](/docs/architecture/) draws the three parts, [Measurements](/docs/measurements/) shows how each figure was taken, and the source is on [GitHub](https://github.com/zhoorta/waydesk).
