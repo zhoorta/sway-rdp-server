@@ -101,8 +101,8 @@
 <h2>A GPU server that also runs a shared model</h2>
 <p>Desktops on the Intel card, the NVIDIA card kept for a local model (Ollama, vLLM or another service) that every session reaches on <code>localhost</code>. Waydesk does not install or start the model; it keeps the sessions off its card and shows who uses it.</p>
 <pre><code><span class="p">$</span> sudo waydesk-admin status                 <span class="c"># note the card names and the Inference line (CUDA_VISIBLE_DEVICES=GPU-...)</span>
-<span class="p">$</span> sudoedit /etc/default/waydesk             <span class="c"># WAYDESK_GPU_ROLES=renderD128=render,renderD129=inference</span>
-                                            # WAYDESK_AI_ENDPOINT=127.0.0.1:11434
+<span class="p">$</span> sudo waydesk-admin gpu roles renderD128=render renderD129=inference   <span class="c"># what each card is for</span>
+<span class="p">$</span> sudo waydesk-admin ai endpoint 127.0.0.1:11434                        <span class="c"># where the model listens, for the AI line and column</span>
 <span class="p">$</span> sudo systemctl edit ollama                <span class="c"># Environment="CUDA_VISIBLE_DEVICES=GPU-..." (the value from status)</span>
 <span class="p">$</span> sudo waydesk-admin users set alice --gpu renderD128   <span class="c"># optional: pin an account to the Intel card; auto already skips the inference card</span>
 <span class="p">$</span> sudo waydesk-admin status --watch         <span class="c"># the card's role, the model and its VRAM, an AI column per account</span></code></pre>

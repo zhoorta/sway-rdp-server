@@ -14,6 +14,8 @@
 //!   waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
 //!   waydesk-admin users set NAME [--desktop sway|cosmic|plasma|hyprland|default] [--gpu auto|off|renderDN|default]     the compositor and the GPU of one account's sessions (default: the server's setting)
 //!   waydesk-admin config check NAME [--json]     whether the account's own compositor setup will work as a Waydesk session (docs/BRING-YOUR-OWN-CONFIG.md)
+//!   waydesk-admin gpu roles [show | reset | NODE=ROLE ...]     what each GPU is for: render (sessions), inference (a local model) or both (WAYDESK_GPU_ROLES in /etc/default/waydesk)
+//!   waydesk-admin ai [show | endpoint HOST:PORT | endpoint off]     the local inference service `status` reports on (WAYDESK_AI_ENDPOINT in /etc/default/waydesk)
 //!   waydesk-admin access [show | local | lan | vpn | custom ...]     who can reach the RDP port (scripts in /usr/lib/waydesk/admin)
 //!   waydesk-admin cert [status | local-ca | reissue | export-ca | install | self-signed]     the certificate clients check
 //!   waydesk-admin vpn [status | init | add NAME | show NAME | list | remove NAME]     a WireGuard VPN for the port
@@ -42,6 +44,8 @@ mod aistatus;
 mod gpuinfo;
 #[path = "../gpuroles.rs"]
 mod gpuroles;
+#[path = "../serversettings.rs"]
+mod serversettings;
 #[path = "../memory.rs"]
 mod memory;
 #[path = "../sessionstatus.rs"]
@@ -244,6 +248,8 @@ fn run() -> Result<()> {
         ["users", "sudo", name, onoff] => users_sudo(name, parse_onoff(onoff)?),
         ["users", "set", name, rest @ ..] => users_set(name, rest),
         ["config", "check", name] => config_check(name, json_out),
+        ["gpu", "roles", rest @ ..] => gpu_roles(rest),
+        ["ai", rest @ ..] => ai_command(rest),
         ["sessions", "list"] => sessions_list(json_out),
         ["status", rest @ ..] => status(json_out, parse_watch(rest)?),
         ["--version"] | ["-V"] => {
@@ -281,6 +287,8 @@ usage: waydesk-admin users list [--json]
        waydesk-admin users limit NAME [show | reset | --memory SIZE] [--swap SIZE] [--cpu-weight N] [--tasks N]
        waydesk-admin users set NAME [--desktop sway|cosmic|plasma|hyprland|default] [--gpu auto|off|renderDN|default]
        waydesk-admin config check NAME [--json]
+       waydesk-admin gpu roles [show | reset | NODE=ROLE ...]    (ROLE: render, inference or both)
+       waydesk-admin ai [show | endpoint HOST:PORT | endpoint off]
        waydesk-admin access [show | local | lan [--address IP] [--allow LIST] | vpn | custom --bind ADDR:PORT [--allow LIST]]
        waydesk-admin cert [status | local-ca [--san NAME] | reissue | export-ca | install --cert FILE --key FILE | self-signed]
        waydesk-admin vpn [status | init [--endpoint HOST] | add NAME | show NAME | list | remove NAME]
@@ -680,6 +688,125 @@ fn parse_watch(rest: &[&str]) -> Result<Option<std::time::Duration>> {
 fn server_setting(key: &str) -> Option<String> {
     let prefix = format!("{key}=");
     std::fs::read_to_string("/etc/default/waydesk").unwrap_or_default().lines().filter_map(|l| l.trim().strip_prefix(prefix.as_str())).map(|v| v.trim().trim_matches(|c| c == '"' || c == '\'').to_owned()).filter(|v| !v.is_empty()).last()
+}
+
+/// Sets (`Some`) or removes (`None`) one `KEY=` line of `/etc/default/waydesk`, keeping every other line and the file's permissions: written next to it and renamed over it.
+fn write_server_setting(key: &str, value: Option<&str>) -> Result<()> {
+    if let Some(v) = value {
+        ensure!(serversettings::is_plain_value(v), "{v:?} cannot be written to {}", serversettings::FILE);
+    }
+    let path = Path::new(serversettings::FILE);
+    let old = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => bail!("cannot read {}: {e}", path.display()),
+    };
+    let new = serversettings::edit(&old, key, value);
+    if new == old {
+        return Ok(());
+    }
+    let tmp = path.with_extension("waydesk-admin.tmp");
+    std::fs::write(&tmp, &new).with_context(|| format!("cannot write {}", tmp.display()))?;
+    let mode = std::fs::metadata(path).map(|m| m.permissions()).unwrap_or_else(|_| {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::Permissions::from_mode(0o644)
+    });
+    std::fs::set_permissions(&tmp, mode)?;
+    std::fs::rename(&tmp, path).with_context(|| format!("cannot write {}", path.display()))?;
+    Ok(())
+}
+
+/// `waydesk-admin gpu roles [show | reset | NODE=ROLE ...]`: what each GPU is for. Writes `WAYDESK_GPU_ROLES` (docs/GPU.md); sessions that start afterwards follow it.
+/// `NODE=ROLE` changes the named cards and keeps the others; `reset` removes the setting (every card is for sessions again).
+fn gpu_roles(args: &[&str]) -> Result<()> {
+    let gpus = gpuinfo::list();
+    let mut roles = gpuroles::effective_roles(server_setting("WAYDESK_GPU_ROLES").as_deref());
+    let mut changed = false;
+    match args {
+        [] | ["show"] => {}
+        ["reset"] => {
+            require_root()?;
+            write_server_setting("WAYDESK_GPU_ROLES", None)?;
+            roles.clear();
+            changed = true;
+        }
+        specs => {
+            require_root()?;
+            let nodes: Vec<String> = gpus.iter().map(|g| gpuroles::short_name(&g.node).to_owned()).collect();
+            ensure!(!gpus.is_empty(), "this machine has no GPU (no render node): there is nothing to give a role to");
+            for spec in specs {
+                let (node, role) = spec.split_once('=').with_context(|| format!("{spec:?}: write NODE=ROLE, for example renderD129=inference"))?;
+                let node = gpuroles::short_name(node.trim());
+                ensure!(nodes.iter().any(|n| n == node), "{node:?} is not a render node of this machine (it has: {})", nodes.join(", "));
+                let role = gpuroles::parse_role(role).with_context(|| format!("{role:?} is not a role: render (sessions), inference (a local model) or both"))?;
+                roles.insert(node.to_owned(), role);
+            }
+            // only the cards that exist, in node order, so that the line stays readable and a card that was taken out does not stay in it
+            let value = nodes.iter().filter_map(|n| roles.get(n).map(|r| format!("{n}={}", r.word()))).collect::<Vec<_>>().join(",");
+            write_server_setting("WAYDESK_GPU_ROLES", Some(&value))?;
+            changed = true;
+        }
+    }
+    if gpus.is_empty() {
+        println!("this machine has no GPU (no render node)");
+        return Ok(());
+    }
+    println!("{:<12} {:<9} {}", "CARD", "ROLE", "GPU");
+    for g in &gpus {
+        let node = gpuroles::short_name(&g.node);
+        let role = roles.get(node).map(|r| r.word().to_owned()).unwrap_or_else(|| "render (not listed)".to_owned());
+        println!("{node:<12} {:<9} {} {} ({})", role.split(' ').next().unwrap_or(""), g.vendor, g.model, g.driver);
+    }
+    let listed: Vec<String> = gpus.iter().filter_map(|g| roles.get(gpuroles::short_name(&g.node)).map(|r| format!("{}={}", gpuroles::short_name(&g.node), r.word()))).collect();
+    if listed.is_empty() {
+        println!("WAYDESK_GPU_ROLES is not set: every card is for sessions");
+    } else {
+        println!("WAYDESK_GPU_ROLES={}", listed.join(","));
+    }
+    let for_sessions = gpus.iter().any(|g| !matches!(roles.get(gpuroles::short_name(&g.node)), Some(gpuroles::Role::Inference)));
+    if !for_sessions {
+        eprintln!("note: every card is kept for inference: new sessions draw on the CPU (give a card the role render or both to change that)");
+    }
+    if changed {
+        println!("it applies to sessions that start from now on; a running session keeps its card until it is restarted (waydesk-admin sessions end NAME)");
+    }
+    Ok(())
+}
+
+/// `waydesk-admin ai [show | endpoint HOST:PORT | endpoint off]`: the local inference service (Ollama, vLLM, llama.cpp) that `status` reports on. Writes `WAYDESK_AI_ENDPOINT`.
+/// Waydesk neither installs nor starts the service and does not proxy to it: it only reads what listens on that port.
+fn ai_command(args: &[&str]) -> Result<()> {
+    match args {
+        [] | ["show"] => {}
+        ["endpoint", "off"] => {
+            require_root()?;
+            write_server_setting("WAYDESK_AI_ENDPOINT", None)?;
+            println!("WAYDESK_AI_ENDPOINT removed: status no longer reports on a local model");
+            return Ok(());
+        }
+        ["endpoint", ep] => {
+            require_root()?;
+            let ep = ep.trim();
+            ensure!(aistatus::parse_endpoint(ep).is_some(), "{ep:?} is not HOST:PORT (for example 127.0.0.1:11434)");
+            ensure!(serversettings::is_plain_value(ep), "{ep:?} cannot be used as an endpoint");
+            write_server_setting("WAYDESK_AI_ENDPOINT", Some(ep))?;
+            println!("WAYDESK_AI_ENDPOINT={ep}");
+        }
+        _ => bail!("usage: waydesk-admin ai [show | endpoint HOST:PORT | endpoint off]"),
+    }
+    match server_setting("WAYDESK_AI_ENDPOINT") {
+        None => println!("no local inference service is set: `waydesk-admin ai endpoint 127.0.0.1:11434` for Ollama's default port"),
+        Some(ep) => {
+            let open: usize = aistatus::parse_endpoint(&ep)
+                .map(|(addr, port)| aistatus::connections_by_uid(&aistatus::parse_proc_net_tcp(&std::fs::read_to_string("/proc/net/tcp").unwrap_or_default()), addr, port).values().sum())
+                .unwrap_or(0);
+            println!("{}", aistatus::describe(&ep, &aistatus::probe(&ep), open));
+            if aistatus::probe(&ep) == aistatus::Probe::Down {
+                println!("nothing answers there now: start the service, or check the address");
+            }
+        }
+    }
+    Ok(())
 }
 
 /// `WAYDESK_GPU` as `/etc/default/waydesk` sets it (what the sessions that start next will use): `auto`, `off` or a render node.

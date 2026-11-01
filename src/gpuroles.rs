@@ -30,7 +30,7 @@ impl Role {
     }
 }
 
-fn parse_role(s: &str) -> Option<Role> {
+pub fn parse_role(s: &str) -> Option<Role> {
     match s.trim().to_ascii_lowercase().as_str() {
         "render" | "rendering" | "sessions" | "desktops" => Some(Role::Render),
         "inference" | "ai" | "model" | "models" | "compute" | "reserved" => Some(Role::Inference),

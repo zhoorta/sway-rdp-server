@@ -76,7 +76,7 @@ WAYDESK_SESSION_ARGS=
 #WAYDESK_VA_MAX_QP=40
 # Takes effect for sessions that start after the change (end the session or log out first).
 #WAYDESK_GPU=auto
-#WAYDESK_GPU_ROLES=renderD128=render,renderD129=inference,renderD130=both
+#WAYDESK_GPU_ROLES=renderD128=render,renderD129=inference,renderD130=both   (or: waydesk-admin gpu roles renderD129=inference)
 #                                        what each card is for: render = sessions only; inference = a model only (`auto` never picks it, and no other card's session
 #                                        encodes on it; an account pinned there by hand still can); both = sessions and a model. Cards not listed are render.
 #                                        `waydesk-admin status` prints the CUDA_VISIBLE_DEVICES for the inference and both cards; point the model service at those.

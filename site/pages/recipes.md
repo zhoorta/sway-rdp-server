@@ -44,8 +44,8 @@ Desktops on the Intel card, the NVIDIA card kept for a local model (Ollama, vLLM
 
 ```console
 $ sudo waydesk-admin status                 # note the card names and the Inference line (CUDA_VISIBLE_DEVICES=GPU-...)
-$ sudoedit /etc/default/waydesk             # WAYDESK_GPU_ROLES=renderD128=render,renderD129=inference
-                                            # WAYDESK_AI_ENDPOINT=127.0.0.1:11434
+$ sudo waydesk-admin gpu roles renderD128=render renderD129=inference   # what each card is for
+$ sudo waydesk-admin ai endpoint 127.0.0.1:11434                        # where the model listens, for the AI line and column
 $ sudo systemctl edit ollama                # Environment="CUDA_VISIBLE_DEVICES=GPU-..." (the value from status)
 $ sudo waydesk-admin users set alice --gpu renderD128   # optional: pin an account to the Intel card; auto already skips the inference card
 $ sudo waydesk-admin status --watch         # the card's role, the model and its VRAM, an AI column per account

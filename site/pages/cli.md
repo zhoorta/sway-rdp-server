@@ -11,6 +11,8 @@ description: Every waydesk-admin command with its real output: accounts, session
 | `users list \| add \| remove \| passwd \| enable \| disable \| admin \| sudo \| limit` | accounts, passwords, rights and per-account limits |
 | `sessions list \| end NAME` | who has a running session; end one |
 | `status [--json] [--watch [SECONDS]]` | memory, swap, load, the GPUs, and what each account uses and runs |
+| `gpu roles [show \| reset \| NODE=ROLE ...]` | what each GPU is for: sessions (`render`), a local model (`inference`) or `both` |
+| `ai [show \| endpoint HOST:PORT \| endpoint off]` | the local model service that `status` reports on |
 | `access [show \| local \| lan \| vpn \| custom]` | where the RDP port listens and who may connect |
 | `cert [status \| local-ca \| reissue \| export-ca \| install \| self-signed]` | the certificate clients check |
 | `vpn [status \| init \| add \| show \| list \| remove]` | a WireGuard VPN for the port (see [the VPN page](/docs/vpn/)) |
