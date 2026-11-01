@@ -71,19 +71,25 @@ Clients that were tried: the **Windows App on macOS**, **mstsc on Windows 11** (
 ## See what it does {bar: terminal}
 ```console
 $ sudo waydesk-admin status
-Memory    62.6 GB in all, 53.5 GB available
-Swap      sda1 8.0 GB (0 MB used), zram0 16.0 GB (1.7 GB used)
-Load      2.55 1.95 1.79 (8 cores)
-GPU       Intel HD Graphics 630 (i915, renderD128): 61 % busy, 1100 MHz
-          new sessions use: off
-Sessions  2 running; a new one would be accepted (needs 9.4 GB available)
+Memory    62.6 GB in all, 54.6 GB available
+Swap      none
+Load      1.00 1.41 1.45 (8 cores)
+System    Omarchy, kernel 7.2.11-arch1-1
+GPU       Intel Kaby Lake-S GT2 [HD Graphics 630] (i915, renderD128): 2 % busy
+            sessions and inference; 4 sessions: alice, bob, carol, dave
+          new sessions use: auto
+AI        127.0.0.1:11434: answering, no model loaded; 0 connections open
+Desktop   sway for new sessions (WAYDESK_COMPOSITOR: sway, or hyprland, which needs a GPU)
+Sessions  4 running; a new one would be accepted (needs 9.4 GB available)
 
-ACCOUNT  SESSION  MEMORY  SWAP  CPU  LIMIT    RENDER  ENCODER          PROGRAMS (resident)
-lt1      running  860 MB  -     29%  31.3 GB  gpu     vaapi q40 20fps  chromium 1066 MB, qs 329 MB, sway 104 MB
-lt2      running  736 MB  -     10%  31.3 GB  cpu     openh264 5fps    chromium 1109 MB, qs 399 MB, waydesk-server 77 MB
+ACCOUNT            DESKTOP   SESSION     MEMORY    SWAP    CPU    LIMIT RENDER     ENCODER                      AI   PROGRAMS (resident)
+alice              sway      running     230 MB       -     4%  31.3 GB renderD128 vaapi@renderD128 q18 2fps    -    sway 273 MB, waydesk-server 172 MB, foot 32 MB
+bob                plasma    running     660 MB       -     3%  31.3 GB renderD128 vaapi@renderD128             -    Xwayland 506 MB, plasmashell 473 MB, kwin_wayland 409 MB
+carol              cosmic    running     920 MB       -     3%  31.3 GB renderD128 vaapi@renderD128             -    Xwayland 508 MB, cosmic-app-libr 313 MB, cosmic-launcher 313 MB
+dave               hyprland  running     866 MB       -     6%  31.3 GB renderD128 vaapi@renderD128             -    quickshell 567 MB, Hyprland 363 MB, Xwayland 253 MB
 ```
 
-Real output, trimmed: Debian 13 on a Core i7-7700 with its HD 630, two accounts: one session on the GPU (VAAPI), one with the GPU off (OpenH264 on the CPU). The systems and clients that were tried are on [Limits and status](/docs/limits/).
+Real output from the Intel test server (an i7-7700 with an HD 630, running Arch): four accounts, one on each desktop, all drawn on the GPU and encoded by VAAPI. The `DESKTOP` column says which desktop each account runs. The systems and clients that were tried are on [Limits and status](/docs/limits/).
 
 ## What you get {bar: desktop}
 - **A desktop of your own for every account**, with a shell, a dock, a file manager and your applications. Reconnect and the windows are where you left them: closing the RDP window does not end the session.

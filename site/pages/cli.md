@@ -8,7 +8,8 @@ description: Every waydesk-admin command with its real output: accounts, session
 ## At a glance {bar: table}
 | command | what it does |
 |---|---|
-| `users list \| add \| remove \| passwd \| enable \| disable \| admin \| sudo \| limit` | accounts, passwords, rights and per-account limits |
+| `users list \| add \| remove \| passwd \| enable \| disable \| admin \| sudo \| limit \| set` | accounts, passwords, rights, per-account limits, and the desktop and GPU of an account |
+| `config check NAME` | whether an account's own sway or Hyprland setup will work as a session |
 | `sessions list \| end NAME` | who has a running session; end one |
 | `status [--json] [--watch [SECONDS]]` | memory, swap, load, the GPUs, and what each account uses and runs |
 | `gpu roles [show \| reset \| NODE=ROLE ...]` | what each GPU is for: sessions (`render`), a local model (`inference`) or `both` |
@@ -22,31 +23,65 @@ description: Every waydesk-admin command with its real output: accounts, session
 ## Accounts {bar: terminal}
 ```console
 $ sudo waydesk-admin users add alice
-made alice (uid 1000), groups: waydesk-users
+made alice (uid 1021), groups: waydesk-users
 temporary password (shown once): ************
 The account should change it at once: Change password, in the desktop's power menu.
-$ sudo waydesk-admin users add bob --admin
-made bob (uid 1001), groups: waydesk-users, waydesk-admins
+$ sudo waydesk-admin users add bob
+made bob (uid 1022), groups: waydesk-users
 temporary password (shown once): ************
 The account should change it at once: Change password, in the desktop's power menu.
-$ waydesk-admin users list
-ACCOUNT                UID  RDP  FLATPAK  SUDO  SHELL   SESSION
-alice                 1000  yes  -        -     yes     none
-bob                   1001  yes  yes      -     yes     none
 ```
 
-`RDP` is the right to log in over RDP (the group `waydesk-users`), `FLATPAK` installing applications without a password (`waydesk-admins`), `SUDO` the administrator panels of the desktop. `--sudo` and `--admin` give them when the account is made; `--no-rdp` makes an account that cannot log in.
+On a server with four accounts, each on a different desktop (the next section sets that):
+
+```console
+$ waydesk-admin users list
+ACCOUNT                UID  RDP  FLATPAK  SUDO  SHELL   DESKTOP    GPU          SESSION
+alice                 1021  yes  -        -     yes     sway       auto         running on sway
+bob                   1022  yes  -        -     yes     plasma*    auto         running on plasma
+carol                 1023  yes  -        -     yes     cosmic*    auto         running on cosmic
+dave                  1024  yes  -        -     yes     hyprland*  auto         running on hyprland
+```
+
+`RDP` is the right to log in over RDP (the group `waydesk-users`), `FLATPAK` installing applications without a password (`waydesk-admins`), `SUDO` the administrator panels of the desktop. `DESKTOP` is the desktop the account's sessions start with (a `*` means it is set for this account; without it the server's setting applies), `GPU` the card they draw on, and `SESSION` what is running now. `--sudo` and `--admin` give them when the account is made; `--no-rdp` makes an account that cannot log in.
 
 ```console
 $ sudo waydesk-admin users disable bob
 bob may no longer log in, and the session was ended
-$ waydesk-admin users list
-ACCOUNT                UID  RDP  FLATPAK  SUDO  SHELL   SESSION
-alice                 1000  yes  -        -     yes     none
-bob                   1001  -    yes      -     yes     none
+$ waydesk-admin users list          # two of the four rows
+ACCOUNT                UID  RDP  FLATPAK  SUDO  SHELL   DESKTOP    GPU          SESSION
+alice                 1021  yes  -        -     yes     sway       auto         running on sway
+bob                   1022  -    -        -     yes     plasma*    auto         none
 ```
 
 `users enable NAME` gives the right back, `users disable NAME --keep-session` leaves a running session alone, `users passwd NAME` sets a new temporary password (`--stdin` reads it from a pipe, never from an argument), `users admin NAME on|off` and `users sudo NAME on|off` change the rights, and `users remove NAME [--delete-home]` removes the account. Accounts below uid 1000 and root are never touched.
+
+## Desktop and GPU of an account {bar: terminal}
+```console
+$ sudo waydesk-admin users set bob --desktop plasma
+bob: sessions start with plasma (set for this account)
+bob: new sessions use the first usable GPU (the server's setting)
+check the account's own configuration with: waydesk-admin config check bob
+$ sudo waydesk-admin users set alice --gpu renderD128
+alice: sessions start with sway (the server's setting)
+alice: new sessions use /dev/dri/renderD128 (set for this account)
+alice has a session running; its GPU changes when that session is restarted (waydesk-admin sessions end alice)
+check the account's own configuration with: waydesk-admin config check alice
+$ sudo waydesk-admin config check dave
+waydesk config check for dave (hyprland)
+
+INFO  sessions start with hyprland (set for this account)
+OK    dave may log in over RDP (group waydesk-users)
+OK    the account has a runtime directory (its user manager is running)
+OK    Hyprland 0.57.0
+OK    the account has a Lua configuration (~/.config/hypr/hyprland.lua)
+OK    Hyprland accepts the configuration (--verify-config)
+OK    the account can open /dev/dri/renderD128 and /dev/dri/card1 (Intel Kaby Lake-S GT2 [HD Graphics 630])
+
+0 problems, 0 warnings
+```
+
+`--desktop` takes `sway` (the default), `plasma`, `cosmic` or `hyprland`, or `default` to follow the server; `--gpu` takes `auto`, `off`, a render node such as `renderD128`, or `default`. Both are read when a session starts, so end the account's session first (`sessions end`). `config check` only reads: it looks at the account's own configuration and exits with status 1 when something is a problem. More on each: [Other desktops](/docs/desktops/) and [Using a GPU](/docs/gpu/).
 
 ## Sessions {bar: terminal}
 ```console
@@ -76,21 +111,29 @@ limits of alice set: MemoryHigh=3865470561 MemoryMax=4294967296 MemorySwapMax=10
 `--cpu-weight N` and `--tasks N` work the same way, and `users limit NAME reset` puts the defaults back. A new session is refused when less than the larger of 900 MB and 15 % of the memory is available (or the optional limit of active users is reached); an account that already has a session just reconnects.
 
 ## Status {bar: terminal}
-`status` shows the machine and every session. On a server without a GPU:
+`status` shows the machine and every session. On an Intel machine with one account on each desktop (the machine runs Omarchy, which names itself that way in `/etc/os-release`):
 
 ```console
 $ waydesk-admin status
-Memory    7.6 GB in all, 7.0 GB available
-Swap      zram0 7.6 GB (0 MB used)
-Load      0.33 0.28 0.12 (4 cores)
-GPU       none (no render node: sessions render and encode on the CPU)
-Sessions  1 running; a new one would be accepted (needs 1.1 GB available)
+Memory    62.6 GB in all, 54.6 GB available
+Swap      none
+Load      1.00 1.41 1.45 (8 cores)
+System    Omarchy, kernel 7.2.11-arch1-1
+GPU       Intel Kaby Lake-S GT2 [HD Graphics 630] (i915, renderD128): 2 % busy
+            sessions and inference; 4 sessions: alice, bob, carol, dave
+          new sessions use: auto
+AI        127.0.0.1:11434: answering, no model loaded; 0 connections open
+Desktop   sway for new sessions (WAYDESK_COMPOSITOR: sway, or hyprland, which needs a GPU)
+Sessions  4 running; a new one would be accepted (needs 9.4 GB available)
 
-ACCOUNT            SESSION     MEMORY    SWAP    CPU    LIMIT RENDER ENCODER            PROGRAMS (resident)
-lt1                running     570 MB       -     3%   3.8 GB cpu    openh264 0fps      qs 481 MB, sway 73 MB, waydesk-server 70 MB
+ACCOUNT            DESKTOP   SESSION     MEMORY    SWAP    CPU    LIMIT RENDER     ENCODER                      AI   PROGRAMS (resident)
+alice              sway      running     230 MB       -     4%  31.3 GB renderD128 vaapi@renderD128 q18 2fps    -    sway 273 MB, waydesk-server 172 MB, foot 32 MB
+bob                plasma    running     660 MB       -     3%  31.3 GB renderD128 vaapi@renderD128             -    Xwayland 506 MB, plasmashell 473 MB, kwin_wayland 409 MB
+carol              cosmic    running     920 MB       -     3%  31.3 GB renderD128 vaapi@renderD128             -    Xwayland 508 MB, cosmic-app-libr 313 MB, cosmic-launcher 313 MB
+dave               hyprland  running     866 MB       -     6%  31.3 GB renderD128 vaapi@renderD128             -    quickshell 567 MB, Hyprland 363 MB, Xwayland 253 MB
 ```
 
-`RENDER` says whether the session's desktop is drawn on a GPU or on the CPU, and `ENCODER` which video encoder it runs (`vaapi`, `nvenc` or `openh264`), with the quantiser and the frame rate once frames flow: `vaapi q18 12fps`, `nvenc q25 17fps`. A GPU encoder that cannot start falls back to OpenH264 on the CPU, and this is where you see it. The [GPU page](/docs/gpu/) has a status from a machine with a card.
+`RENDER` says whether the session's desktop is drawn on a GPU (the card's node) or on the CPU, and `ENCODER` which video encoder it runs (`vaapi`, `nvenc` or `openh264`), with the quantiser and the frame rate once frames flow: `vaapi@renderD128 q18 2fps`. A GPU encoder that cannot start falls back to OpenH264 on the CPU, and this is where you see it. `DESKTOP` is the desktop each session runs: `sway`, `plasma`, `cosmic` or `hyprland`. `AI` counts the connections each account has open to a local model, and shows only when `WAYDESK_AI_ENDPOINT` names one ([the GPU page](/docs/gpu/)). `PROGRAMS` lists the biggest programs of the session. On a server without a GPU the `GPU` line reads `none (no render node: sessions render and encode on the CPU)`, `RENDER` says `cpu` and `ENCODER` says `openh264`.
 
 Two more forms, for watching a machine under load and for scripts:
 

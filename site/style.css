@@ -387,3 +387,9 @@ body.sans .gtext pre, body.sans .gtext pre * { font-size: 11px; }
   box-shadow: var(--shadow);
 }
 #who .win.card > .body, #fast + .grid .win.card > .body, #ai + .grid .win.card > .body, #apps + .grid .win.card > .body { padding: var(--s4); }
+
+/* The architecture page: the three components are panels, with what they may do in the title bar (the documentation's other cards stay flat). */
+.doc .grid.panels .win.card { background: var(--panel); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, .11); border-radius: var(--r-win); box-shadow: var(--shadow); padding-left: 0; }
+.doc .grid.panels .card > .bar { display: flex; }
+.doc .grid.panels .win.card > .body { padding: var(--s4); }
+@media (min-width: 1000px) { .doc .grid.panels { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

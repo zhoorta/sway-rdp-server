@@ -47,7 +47,7 @@
 </ul>
 <h2>Run it</h2>
 <ul>
-<li><a href="/docs/cli/" aria-current="page">Command line</a><ul><li><a href="#at-a-glance">At a glance</a></li><li><a href="#accounts">Accounts</a></li><li><a href="#sessions">Sessions</a></li><li><a href="#limits">Limits</a></li><li><a href="#status">Status</a></li><li><a href="#access-and-certificates">Access and certificates</a></li><li><a href="#everything-is-scriptable">Everything is scriptable</a></li></ul></li>
+<li><a href="/docs/cli/" aria-current="page">Command line</a><ul><li><a href="#at-a-glance">At a glance</a></li><li><a href="#accounts">Accounts</a></li><li><a href="#desktop-and-gpu-of-an-account">Desktop and GPU of an account</a></li><li><a href="#sessions">Sessions</a></li><li><a href="#limits">Limits</a></li><li><a href="#status">Status</a></li><li><a href="#access-and-certificates">Access and certificates</a></li><li><a href="#everything-is-scriptable">Everything is scriptable</a></li></ul></li>
 <li><a href="/docs/recipes/">Recipes</a></li>
 <li><a href="/docs/gpu/">GPU</a></li>
 <li><a href="/docs/desktops/">Desktops</a></li>
@@ -74,30 +74,58 @@
 </div>
 <section id="at-a-glance">
 <h2>At a glance</h2>
-<div class="tw"><table><tr><th>command</th><th>what it does</th></tr><tr><td><code>users list | add | remove | passwd | enable | disable | admin | sudo | limit</code></td><td>accounts, passwords, rights and per-account limits</td></tr><tr><td><code>sessions list | end NAME</code></td><td>who has a running session; end one</td></tr><tr><td><code>status [--json] [--watch [SECONDS]]</code></td><td>memory, swap, load, the GPUs, and what each account uses and runs</td></tr><tr><td><code>gpu roles [show | reset | NODE=ROLE ...]</code></td><td>what each GPU is for: sessions (<code>render</code>), a local model (<code>inference</code>) or <code>both</code></td></tr><tr><td><code>ai [show | endpoint HOST:PORT | endpoint off]</code></td><td>the local model service that <code>status</code> reports on</td></tr><tr><td><code>access [show | local | lan | vpn | custom]</code></td><td>where the RDP port listens and who may connect</td></tr><tr><td><code>cert [status | local-ca | reissue | export-ca | install | self-signed]</code></td><td>the certificate clients check</td></tr><tr><td><code>vpn [status | init | add | show | list | remove]</code></td><td>a WireGuard VPN for the port (see <a href="/docs/vpn/">the VPN page</a>)</td></tr><tr><td><code>waydesk-setup-admin</code></td><td>the first administrator, and how clients connect</td></tr><tr><td><code>waydesk-setup</code></td><td>as your own account: choose browsers, office, developer and creative applications</td></tr></table></div>
+<div class="tw"><table><tr><th>command</th><th>what it does</th></tr><tr><td><code>users list | add | remove | passwd | enable | disable | admin | sudo | limit | set</code></td><td>accounts, passwords, rights, per-account limits, and the desktop and GPU of an account</td></tr><tr><td><code>config check NAME</code></td><td>whether an account's own sway or Hyprland setup will work as a session</td></tr><tr><td><code>sessions list | end NAME</code></td><td>who has a running session; end one</td></tr><tr><td><code>status [--json] [--watch [SECONDS]]</code></td><td>memory, swap, load, the GPUs, and what each account uses and runs</td></tr><tr><td><code>gpu roles [show | reset | NODE=ROLE ...]</code></td><td>what each GPU is for: sessions (<code>render</code>), a local model (<code>inference</code>) or <code>both</code></td></tr><tr><td><code>ai [show | endpoint HOST:PORT | endpoint off]</code></td><td>the local model service that <code>status</code> reports on</td></tr><tr><td><code>access [show | local | lan | vpn | custom]</code></td><td>where the RDP port listens and who may connect</td></tr><tr><td><code>cert [status | local-ca | reissue | export-ca | install | self-signed]</code></td><td>the certificate clients check</td></tr><tr><td><code>vpn [status | init | add | show | list | remove]</code></td><td>a WireGuard VPN for the port (see <a href="/docs/vpn/">the VPN page</a>)</td></tr><tr><td><code>waydesk-setup-admin</code></td><td>the first administrator, and how clients connect</td></tr><tr><td><code>waydesk-setup</code></td><td>as your own account: choose browsers, office, developer and creative applications</td></tr></table></div>
 </section>
 <section id="accounts">
 <h2>Accounts</h2>
 <pre><code><span class="p">$</span> sudo waydesk-admin users add alice
-made alice (uid 1000), groups: waydesk-users
+made alice (uid 1021), groups: waydesk-users
 temporary password (shown once): ************
 The account should change it at once: Change password, in the desktop's power menu.
-<span class="p">$</span> sudo waydesk-admin users add bob --admin
-made bob (uid 1001), groups: waydesk-users, waydesk-admins
+<span class="p">$</span> sudo waydesk-admin users add bob
+made bob (uid 1022), groups: waydesk-users
 temporary password (shown once): ************
-The account should change it at once: Change password, in the desktop's power menu.
-<span class="p">$</span> waydesk-admin users list
-ACCOUNT                UID  RDP  FLATPAK  SUDO  SHELL   SESSION
-alice                 1000  yes  -        -     yes     none
-bob                   1001  yes  yes      -     yes     none</code></pre>
-<p><code>RDP</code> is the right to log in over RDP (the group <code>waydesk-users</code>), <code>FLATPAK</code> installing applications without a password (<code>waydesk-admins</code>), <code>SUDO</code> the administrator panels of the desktop. <code>--sudo</code> and <code>--admin</code> give them when the account is made; <code>--no-rdp</code> makes an account that cannot log in.</p>
+The account should change it at once: Change password, in the desktop's power menu.</code></pre>
+<p>On a server with four accounts, each on a different desktop (the next section sets that):</p>
+<pre><code><span class="p">$</span> waydesk-admin users list
+ACCOUNT                UID  RDP  FLATPAK  SUDO  SHELL   DESKTOP    GPU          SESSION
+alice                 1021  yes  -        -     yes     sway       auto         running on sway
+bob                   1022  yes  -        -     yes     plasma*    auto         running on plasma
+carol                 1023  yes  -        -     yes     cosmic*    auto         running on cosmic
+dave                  1024  yes  -        -     yes     hyprland*  auto         running on hyprland</code></pre>
+<p><code>RDP</code> is the right to log in over RDP (the group <code>waydesk-users</code>), <code>FLATPAK</code> installing applications without a password (<code>waydesk-admins</code>), <code>SUDO</code> the administrator panels of the desktop. <code>DESKTOP</code> is the desktop the account's sessions start with (a <code>*</code> means it is set for this account; without it the server's setting applies), <code>GPU</code> the card they draw on, and <code>SESSION</code> what is running now. <code>--sudo</code> and <code>--admin</code> give them when the account is made; <code>--no-rdp</code> makes an account that cannot log in.</p>
 <pre><code><span class="p">$</span> sudo waydesk-admin users disable bob
 bob may no longer log in, and the session was ended
-<span class="p">$</span> waydesk-admin users list
-ACCOUNT                UID  RDP  FLATPAK  SUDO  SHELL   SESSION
-alice                 1000  yes  -        -     yes     none
-bob                   1001  -    yes      -     yes     none</code></pre>
+<span class="p">$</span> waydesk-admin users list          <span class="c"># two of the four rows</span>
+ACCOUNT                UID  RDP  FLATPAK  SUDO  SHELL   DESKTOP    GPU          SESSION
+alice                 1021  yes  -        -     yes     sway       auto         running on sway
+bob                   1022  -    -        -     yes     plasma*    auto         none</code></pre>
 <p><code>users enable NAME</code> gives the right back, <code>users disable NAME --keep-session</code> leaves a running session alone, <code>users passwd NAME</code> sets a new temporary password (<code>--stdin</code> reads it from a pipe, never from an argument), <code>users admin NAME on|off</code> and <code>users sudo NAME on|off</code> change the rights, and <code>users remove NAME [--delete-home]</code> removes the account. Accounts below uid 1000 and root are never touched.</p>
+</section>
+<section id="desktop-and-gpu-of-an-account">
+<h2>Desktop and GPU of an account</h2>
+<pre><code><span class="p">$</span> sudo waydesk-admin users set bob --desktop plasma
+bob: sessions start with plasma (set for this account)
+bob: new sessions use the first usable GPU (the server's setting)
+check the account's own configuration with: waydesk-admin config check bob
+<span class="p">$</span> sudo waydesk-admin users set alice --gpu renderD128
+alice: sessions start with sway (the server's setting)
+alice: new sessions use /dev/dri/renderD128 (set for this account)
+alice has a session running; its GPU changes when that session is restarted (waydesk-admin sessions end alice)
+check the account's own configuration with: waydesk-admin config check alice
+<span class="p">$</span> sudo waydesk-admin config check dave
+waydesk config check for dave (hyprland)
+
+INFO  sessions start with hyprland (set for this account)
+OK    dave may log in over RDP (group waydesk-users)
+OK    the account has a runtime directory (its user manager is running)
+OK    Hyprland 0.57.0
+OK    the account has a Lua configuration (~/.config/hypr/hyprland.lua)
+OK    Hyprland accepts the configuration (--verify-config)
+OK    the account can open /dev/dri/renderD128 and /dev/dri/card1 (Intel Kaby Lake-S GT2 [HD Graphics 630])
+
+0 problems, 0 warnings</code></pre>
+<p><code>--desktop</code> takes <code>sway</code> (the default), <code>plasma</code>, <code>cosmic</code> or <code>hyprland</code>, or <code>default</code> to follow the server; <code>--gpu</code> takes <code>auto</code>, <code>off</code>, a render node such as <code>renderD128</code>, or <code>default</code>. Both are read when a session starts, so end the account's session first (<code>sessions end</code>). <code>config check</code> only reads: it looks at the account's own configuration and exits with status 1 when something is a problem. More on each: <a href="/docs/desktops/">Other desktops</a> and <a href="/docs/gpu/">Using a GPU</a>.</p>
 </section>
 <section id="sessions">
 <h2>Sessions</h2>
@@ -123,17 +151,25 @@ limits of alice set: MemoryHigh=3865470561 MemoryMax=4294967296 MemorySwapMax=10
 </section>
 <section id="status">
 <h2>Status</h2>
-<p><code>status</code> shows the machine and every session. On a server without a GPU:</p>
+<p><code>status</code> shows the machine and every session. On an Intel machine with one account on each desktop (the machine runs Omarchy, which names itself that way in <code>/etc/os-release</code>):</p>
 <pre><code><span class="p">$</span> waydesk-admin status
-Memory    7.6 GB in all, 7.0 GB available
-Swap      zram0 7.6 GB (0 MB used)
-Load      0.33 0.28 0.12 (4 cores)
-GPU       none (no render node: sessions render and encode on the CPU)
-Sessions  1 running; a new one would be accepted (needs 1.1 GB available)
+Memory    62.6 GB in all, 54.6 GB available
+Swap      none
+Load      1.00 1.41 1.45 (8 cores)
+System    Omarchy, kernel 7.2.11-arch1-1
+GPU       Intel Kaby Lake-S GT2 [HD Graphics 630] (i915, renderD128): 2 % busy
+            sessions and inference; 4 sessions: alice, bob, carol, dave
+          new sessions use: auto
+AI        127.0.0.1:11434: answering, no model loaded; 0 connections open
+Desktop   sway for new sessions (WAYDESK_COMPOSITOR: sway, or hyprland, which needs a GPU)
+Sessions  4 running; a new one would be accepted (needs 9.4 GB available)
 
-ACCOUNT            SESSION     MEMORY    SWAP    CPU    LIMIT RENDER ENCODER            PROGRAMS (resident)
-lt1                running     570 MB       -     3%   3.8 GB cpu    openh264 0fps      qs 481 MB, sway 73 MB, waydesk-server 70 MB</code></pre>
-<p><code>RENDER</code> says whether the session's desktop is drawn on a GPU or on the CPU, and <code>ENCODER</code> which video encoder it runs (<code>vaapi</code>, <code>nvenc</code> or <code>openh264</code>), with the quantiser and the frame rate once frames flow: <code>vaapi q18 12fps</code>, <code>nvenc q25 17fps</code>. A GPU encoder that cannot start falls back to OpenH264 on the CPU, and this is where you see it. The <a href="/docs/gpu/">GPU page</a> has a status from a machine with a card.</p>
+ACCOUNT            DESKTOP   SESSION     MEMORY    SWAP    CPU    LIMIT RENDER     ENCODER                      AI   PROGRAMS (resident)
+alice              sway      running     230 MB       -     4%  31.3 GB renderD128 vaapi@renderD128 q18 2fps    -    sway 273 MB, waydesk-server 172 MB, foot 32 MB
+bob                plasma    running     660 MB       -     3%  31.3 GB renderD128 vaapi@renderD128             -    Xwayland 506 MB, plasmashell 473 MB, kwin_wayland 409 MB
+carol              cosmic    running     920 MB       -     3%  31.3 GB renderD128 vaapi@renderD128             -    Xwayland 508 MB, cosmic-app-libr 313 MB, cosmic-launcher 313 MB
+dave               hyprland  running     866 MB       -     6%  31.3 GB renderD128 vaapi@renderD128             -    quickshell 567 MB, Hyprland 363 MB, Xwayland 253 MB</code></pre>
+<p><code>RENDER</code> says whether the session's desktop is drawn on a GPU (the card's node) or on the CPU, and <code>ENCODER</code> which video encoder it runs (<code>vaapi</code>, <code>nvenc</code> or <code>openh264</code>), with the quantiser and the frame rate once frames flow: <code>vaapi@renderD128 q18 2fps</code>. A GPU encoder that cannot start falls back to OpenH264 on the CPU, and this is where you see it. <code>DESKTOP</code> is the desktop each session runs: <code>sway</code>, <code>plasma</code>, <code>cosmic</code> or <code>hyprland</code>. <code>AI</code> counts the connections each account has open to a local model, and shows only when <code>WAYDESK_AI_ENDPOINT</code> names one (<a href="/docs/gpu/">the GPU page</a>). <code>PROGRAMS</code> lists the biggest programs of the session. On a server without a GPU the <code>GPU</code> line reads <code>none (no render node: sessions render and encode on the CPU)</code>, <code>RENDER</code> says <code>cpu</code> and <code>ENCODER</code> says <code>openh264</code>.</p>
 <p>Two more forms, for watching a machine under load and for scripts:</p>
 <pre><code><span class="p">$</span> waydesk-admin status --watch        <span class="c"># redraws every 2 seconds; --watch 5 for 5 seconds</span>
 <span class="p">$</span> waydesk-admin status --json         <span class="c"># the same as JSON</span>
