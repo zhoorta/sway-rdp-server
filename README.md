@@ -12,14 +12,9 @@
   <a href="https://waydesk.dev"><img alt="Website" src="https://img.shields.io/badge/website-waydesk.dev-orange"></a>
 </p>
 
-# Waydesk: a Linux desktop over RDP, out of the box
+# Multi-user Linux desktops over RDP, out of the box
 
-One `apt install` on Debian 13 or Ubuntu 26.04 (or a `pacman -S waydesk-server` on Arch Linux) gives every account on the server its own desktop (sway, a shell, a dock and apps) over RDP. Sessions are kept
-alive between connections, the picture is H.264 and a GPU is used for drawing and encoding when there is one (Intel, AMD or NVIDIA; without one, software). Connect with the Windows App, Remmina or any RDP client: nothing to install on the client.
-
-<p align="center">
-  <img src="docs/img/desktop.png" alt="A Waydesk session in the Windows App: the bar, desktop icons, a browser, a terminal showing waydesk-admin status, and the dock" width="860">
-</p>
+One `apt install` on Debian 13 or Ubuntu 26.04, or a signed pacman repository on Arch Linux. Every account that logs in gets its own desktop, kept alive between connections. The picture is H.264, and a GPU is used for drawing and encoding when there is one (Intel, AMD or NVIDIA; without one, software). No client to install: use the Windows App, Remmina or any RDP client.
 
 <table align="center">
   <tr>
