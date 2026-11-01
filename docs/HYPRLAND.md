@@ -81,8 +81,8 @@ Nesting it in a wlroots compositor fails too (it wants `xdg_wm_base` version 6, 
 
 ## Not verified
 
-- Audio (the per-user daemon mode has none; it needs the root helper), the mouse wheel, three or more accounts, real applications, the systemd units
-  (`waydesk-session@`).
+- Audio in the per-user daemon mode (it has none; it needs the root helper), and real applications (Chromium, an office suite, an editor) under Hyprland. Checked since this list was written: the mouse wheel
+  (2026-11-01, Windows App on macOS), nine sessions at once (below), twelve sessions of four kinds at once (below), the systemd units (above), sound through the helper (above).
 - The pointer: without the `waydesk-blank` cursor theme (the Waydesk package installs it) Hyprland draws its own cursor into the picture; the Arch package needs it too.
 - The Waydesk desktop (shell, launcher, title-bar buttons) is sway-specific and is not part of a Hyprland session: the account gets
   whatever its own Hyprland configuration (`~/.config/hypr/hyprland.lua`) gives it.
@@ -113,6 +113,12 @@ VT or login screen to switch to). What it costs, with what was measured and what
 - Accounts of one session group trust each other no more than before; nothing here changes the Unix permissions between accounts.
 
 Use it on a GPU server without displays, install the card rule only there, and keep sway for everything else.
+
+## Checked again with the package (2026-11-01, i7-7700 with an HD 630, 62 GB, Arch 7.2.11, `waydesk-server` 0.5.0-1 installed from the repository)
+
+The services and the polkit socket came up by themselves after a reboot. An Omarchy 4.0.6 account (Hyprland 0.57) was used from the Windows App on macOS: the bar and notifications, clipboard both ways, live resize, the mouse wheel, Logout (ends the session and disconnects the client) all worked; reboot and shutdown were refused by the system (`Access denied`), and the stand-ins' `PATH` order held. Two Omarchy accounts ran together with ten other sessions (below). Found: the account's Omarchy theme was never set (see BRING-YOUR-OWN-CONFIG.md), and the scale cannot be changed from Omarchy's display settings.
+
+Twelve sessions at once, all on the one GPU with the VAAPI encoder: four sway, three KDE Plasma, three COSMIC and two Omarchy. All were drawing, each account's compositor ran as that account, the log had no warnings, and 53 GB of 62 GB were still free. The sessions were idle apart from what the test clients did at login; this is not a load test.
 
 ## Several accounts (measured 2026-10-30, Intel HD 630, 4 cores / 8 threads, 62 GB, Arch, Hyprland 0.57)
 

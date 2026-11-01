@@ -9,4 +9,4 @@ What Waydesk does for it:
 - **Keyboard layout:** the layout Waydesk applies is also set in Plasma's own keyboard settings (`kxkbrc`, with `kwriteconfig6 --notify` so that KWin applies it at once), because KWin reads sway's raw key codes with its own layout. Needs `kwriteconfig6` (part of Plasma).
 - **Cursor:** nothing special: KWin gives sway the cursor image and the client draws it.
 
-Measured on the i7-7700 test server, Plasma 6.8.2: about 750 MB and 46 processes for an idle session. Not measured under load.
+Measured on the i7-7700 test server, Plasma 6.8.2: about 750 MB and 46 processes for an idle session. Not measured under load. Several accounts at once: four on a 4-core Debian 13 server (Plasma 6.3.6), and three on the i7 beside nine other sessions (sway, COSMIC, Omarchy), all drawing, on the hardware encoder (2026-11-01).
