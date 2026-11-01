@@ -157,7 +157,7 @@ matugen 4.2.0 (GPL-2.0-or-later), quickshell 0.3.0 (LGPL-3.0-only) and our patch
 
 ## Licence
 
-Waydesk is licensed under the GNU Affero General Public License, version 3 or later ([LICENSE](../LICENSE)); up to commit `b429e5f` (2026-11-01) it was published under MIT or Apache-2.0, and copies obtained under those terms stay under them. `patches/ironrdp-server` is a
+Waydesk is licensed under the GNU Affero General Public License, version 3 or later ([LICENSE](../LICENSE)). `patches/ironrdp-server` is a
 modified copy of IronRDP's `ironrdp-server` crate and stays under its own licence (MIT or Apache-2.0, files included there).
 
 ## Sizing
