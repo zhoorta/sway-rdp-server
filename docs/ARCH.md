@@ -1,6 +1,25 @@
 # Waydesk on Arch Linux (2026-10-30)
 
-Waydesk builds and runs on Arch. There is a `PKGBUILD` in `packaging/arch/`; there is no repository (AUR or other) yet.
+Waydesk builds and runs on Arch. There is a `PKGBUILD` in `packaging/arch/`; there is no AUR package yet. A signed pacman repository can be made from the packages (below).
+
+## A pacman repository
+
+`packaging/repo/make-arch-repo.sh OUTDIR` builds a signed repository from the packages in `packaging/out/arch` (`x86_64`, and `aarch64` for Arch Linux ARM; every package and the databases get a detached signature from the key in `WAYDESK_REPO_KEY`). `packaging/repo/publish-arch.sh OUTDIR` uploads it (dry run first; `--really --key FINGERPRINT` to publish; it never deletes files on the server). For a user:
+
+```
+curl -fsSL https://waydesk.dev/arch/waydesk.gpg | sudo pacman-key --add -
+sudo pacman-key --lsign-key FINGERPRINT
+```
+
+then add to `/etc/pacman.conf`
+
+```
+[waydesk]
+SigLevel = Required DatabaseRequired
+Server = https://waydesk.dev/arch/$arch
+```
+
+and `sudo pacman -Syu waydesk-server`. Tested in a clean Arch Linux ARM container against a local copy: the database and the package verify, and a package that was changed afterwards is refused. Only the installation was tested on the two architectures, not a running session.
 
 ## Build and install
 
