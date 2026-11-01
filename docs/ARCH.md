@@ -62,5 +62,4 @@ buttons, the patched sway) is not packaged for Arch.
 ## Checked
 
 Built with `makepkg` and run on Arch x86_64 (kernel 7.2, Intel HD 630, sway 1.12, Hyprland 0.57): login through the helper and the daemon, a session unit per account,
-resize and scale, clipboard, sound, hardware H.264 (VAAPI), the same with Hyprland. Not checked: aarch64, AMD and NVIDIA GPUs on Arch, upgrades from one package version
-to the next, `waydesk-admin vpn` (it installs `wireguard-tools` with `apt-get`; install it with pacman first), the certificate renewal timer.
+resize and scale, clipboard, sound, hardware H.264 (VAAPI), the same with Hyprland. On 2026-11-01 the 0.5.0-1 package from the repository was also installed and given an RDP login and a sway session on Arch x86_64 (systemd container) and Arch Linux ARM aarch64 (OrbStack), without a GPU. Not checked: AMD and NVIDIA GPUs on Arch, `waydesk-admin vpn` (it installs `wireguard-tools` with `apt-get`; install it with pacman first), the certificate renewal timer.
