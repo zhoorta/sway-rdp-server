@@ -1,6 +1,6 @@
 # Waydesk on Arch Linux (2026-10-30)
 
-Waydesk builds and runs on Arch. There is a `PKGBUILD` in `packaging/arch/`; there is no AUR package yet. A signed pacman repository can be made from the packages (below).
+Waydesk builds and runs on Arch. **Tested (2026-11-01):** the package installed from the signed repository below on Arch (x86_64, in a systemd container on a Debian kernel) and Arch Linux ARM (aarch64, OrbStack), with the services started, an RDP login and a sway session with its terminal, PipeWire and session bus, on the CPU path (no GPU). **Experimental:** Hyprland sessions (need a GPU; last run on 0.4.0) and everything that needs a GPU on Arch. There is a `PKGBUILD` in `packaging/arch/`; there is no AUR package yet. A signed pacman repository can be made from the packages (below).
 
 ## A pacman repository
 
