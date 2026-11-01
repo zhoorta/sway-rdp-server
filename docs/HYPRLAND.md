@@ -1,4 +1,4 @@
-# Hyprland sessions (experimental, 2026-10-30)
+# Hyprland sessions (tested on Arch with an Intel GPU, 2026-11-01)
 
 Waydesk can run each account's desktop on Hyprland instead of sway, for example the Omarchy desktop on Arch. It is off by default and
 needs a GPU. This records how it works, what was verified and what was not.

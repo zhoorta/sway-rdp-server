@@ -1,6 +1,6 @@
 # Waydesk on Arch Linux (2026-10-30)
 
-Waydesk builds and runs on Arch. **Tested (2026-11-01):** the package installed from the signed repository below on Arch (x86_64, in a systemd container on a Debian kernel) and Arch Linux ARM (aarch64, OrbStack), with the services started, an RDP login and a sway session with its terminal, PipeWire and session bus, on the CPU path (no GPU). **Experimental:** Hyprland sessions (need a GPU; last run on 0.4.0) and everything that needs a GPU on Arch. There is a `PKGBUILD` in `packaging/arch/`; there is no AUR package yet. A signed pacman repository can be made from the packages (below).
+Waydesk builds and runs on Arch. **Tested (2026-11-01):** the package installed from the signed repository below on Arch (x86_64, in a systemd container on a Debian kernel) and Arch Linux ARM (aarch64, OrbStack), with the services started, an RDP login and a sway session with its terminal, PipeWire and session bus, on the CPU path (no GPU). **On real hardware (2026-11-01, i7-7700, Intel HD 630, kernel 7.2):** the same package, a reboot (services and the polkit socket come up by themselves), sway sessions on the GPU with the VAAPI encoder, Hyprland with Omarchy 4.0.6, KDE Plasma and COSMIC, twelve sessions at once, driven from the Windows App on macOS (clipboard, sound, resize, wheel, reconnect, logout). Not tried: AMD and NVIDIA GPUs on Arch. COSMIC and Plasma stay experimental. There is a `PKGBUILD` in `packaging/arch/`; there is no AUR package yet. A signed pacman repository can be made from the packages (below).
 
 ## A pacman repository
 
@@ -41,7 +41,7 @@ log in) and a self-signed certificate, and prints the fingerprint to check in yo
 ## What a session is
 
 Sway (Arch's own, with `/usr/share/waydesk/sway-minimal.conf`: a bar, a terminal and nothing else), or Hyprland with `WAYDESK_COMPOSITOR=hyprland` in
-`/etc/default/waydesk` (experimental, needs a GPU: [HYPRLAND.md](HYPRLAND.md)). The desktop of the Debian packages (the shell, launcher, title-bar
+`/etc/default/waydesk` (tested with an Intel GPU, needs a GPU: [HYPRLAND.md](HYPRLAND.md)). The desktop of the Debian packages (the shell, launcher, title-bar
 buttons, the patched sway) is not packaged for Arch.
 
 ## What each account needs

@@ -7,7 +7,7 @@ Waydesk is early, free software, written and tested by one person on real server
 
 ## Status {bar: notes}
 - **Early software.** Version 0.5.0. Expect rough edges; [open an issue](https://github.com/zhoorta/waydesk/issues) when you find one.
-- **Systems:** Debian 13 and Ubuntu 26.04, on amd64 and arm64 (the table below). Clean installs of the 0.5.0 packages from the repository passed on both systems and both architectures (the packages were installed in clean containers on 2026-11-01; the sessions were checked on the earlier versions). Arch Linux has a package and a pacman repository ([Other desktops](/docs/desktops/#arch-linux)). COSMIC, KDE Plasma and Hyprland sessions are experimental: tested on Arch, and Plasma also on Debian 13 ([Other desktops](/docs/desktops/)).
+- **Systems:** Debian 13 and Ubuntu 26.04, on amd64 and arm64 (the table below). Clean installs of the 0.5.0 packages from the repository passed on both systems and both architectures (the packages were installed in clean containers on 2026-11-01; the sessions were checked on the earlier versions). Arch Linux has a package and a pacman repository ([Other desktops](/docs/desktops/#arch-linux)). Hyprland sessions are tested on Arch with an Intel GPU; COSMIC and KDE Plasma sessions are experimental (tested on Arch, Plasma also on Debian 13): [Other desktops](/docs/desktops/).
 - **No second factor.** The login is the account's password inside TLS: keep the port behind an SSH tunnel or a [VPN](/docs/vpn/#security-what-protects-the-login).
 - **Not an audited product.** Four internal review passes are written down, with what is still open.
 
@@ -16,7 +16,7 @@ Waydesk is early, free software, written and tested by one person on real server
 |---|---|---|---|
 | Debian 13 (trixie) | tested | tested | clean install from the repository, a session with the shell, Chromium, LibreOffice, VS Code |
 | Ubuntu 26.04 LTS | tested | tested | Chromium and Firefox come from Flathub (no Chromium deb) |
-| Arch Linux | tested | tested (Arch Linux ARM) | the server and a sway session from the pacman repository; no desktop shell packages; Hyprland experimental |
+| Arch Linux | tested, on real hardware | tested (Arch Linux ARM, container) | the server and its sessions from the pacman repository; no desktop shell packages; Hyprland tested with an Intel GPU, COSMIC and Plasma experimental |
 | Ubuntu 24.04, Fedora | not yet | not yet | different Qt and wlroots; no rpm yet |
 
 Tested means a clean server, SSH hardened first, the install steps, an RDP login from FreeRDP and a look at the session. Ubuntu's own `xfreerdp3` (3.32) cannot decode our H.264 stream; Debian 13's client (3.15) can. The Windows App on macOS was also used, and mstsc on Windows 11 (ARM, in a VM) with the GPU encoders; older Windows clients were not tested.
