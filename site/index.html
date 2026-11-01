@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Waydesk: multi-user Linux desktop over RDP for Debian and Ubuntu</title>
+<title>Waydesk: multi-user Linux desktops over RDP for Debian, Ubuntu and Arch</title>
 <meta name="description" content="Waydesk gives every account on a Debian 13 or Ubuntu 26.04 server its own desktop over RDP, out of the box: one apt install, no GPU needed (it uses one when there is one), tuned for slow links. Signed apt repository, measurements with methods, threat model.">
 <link rel="canonical" href="https://waydesk.dev/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#06121c">
-<meta property="og:title" content="Waydesk: multi-user Linux desktop over RDP for Debian and Ubuntu">
-<meta property="og:description" content="A Linux desktop over RDP, out of the box. One apt install on Debian or Ubuntu, no GPU needed (it uses one when there is one), tuned for slow links. Measured, documented, free software.">
+<meta property="og:title" content="Waydesk: multi-user Linux desktops over RDP for Debian, Ubuntu and Arch">
+<meta property="og:description" content="Multi-user Linux desktops over RDP, out of the box. One apt install on Debian or Ubuntu, no GPU needed (it uses one when there is one), tuned for slow links. Measured, documented, free software.">
 <meta property="og:url" content="https://waydesk.dev/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Waydesk">
@@ -19,7 +19,7 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Waydesk: multi-user Linux desktop over RDP for Debian and Ubuntu">
+<meta name="twitter:title" content="Waydesk: multi-user Linux desktops over RDP for Debian, Ubuntu and Arch">
 <meta name="twitter:description" content="A Linux desktop over RDP, out of the box. One apt install on Debian or Ubuntu, no GPU needed (it uses one when there is one), tuned for slow links. Measured, documented, free software.">
 <meta name="twitter:image" content="https://waydesk.dev/og.jpg">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Waydesk", "description": "A Linux desktop over RDP, out of the box: every account on a Debian or Ubuntu server gets its own desktop session.", "url": "https://waydesk.dev/", "applicationCategory": "DeveloperApplication", "operatingSystem": "Debian 13, Ubuntu 26.04", "softwareVersion": "0.5.0", "license": "https://spdx.org/licenses/MIT.html", "downloadUrl": "https://waydesk.dev/docs/install/", "softwareHelp": "https://waydesk.dev/docs/", "codeRepository": "https://github.com/zhoorta/waydesk", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "author": {"@type": "Organization", "name": "StackCare", "url": "https://stackcare.pt"}}</script>
@@ -31,6 +31,7 @@
   <a class="logo" href="/"><img src="logo-dark.svg" alt="Waydesk" width="159" height="35"></a>
   <nav aria-label="Sections">
     <a href="#who">who for</a>
+    <a href="#desktops">desktops</a>
     <a href="#fast">fast</a>
     <a href="#ai">ai</a>
     <a href="#apps">apps</a>
@@ -44,7 +45,7 @@
 <main>
 <div class="hero">
   <div>
-    <h1>A Linux desktop over RDP, <em>out of the box.</em></h1>
+    <h1>Multi-user Linux desktops over RDP, <em>out of the box.</em></h1>
     <p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04. Every account that logs in gets its own desktop, kept alive between connections. No GPU needed, no client to install: use the Windows App, Remmina or any RDP client.</p>
     <div class="win">
       <div class="bar"><span class="t">install</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
@@ -54,10 +55,22 @@
 <span class="p">$</span> sudo apt install waydesk
 <span class="p">$</span> sudo waydesk-setup-admin</code></pre></div>
     </div>
-    <p class="note">Free software, early. Tested with FreeRDP and the Windows App on macOS.</p>
+    <p class="note">Waydesk's own desktop, KDE Plasma, COSMIC, or Hyprland with Omarchy or ML4W: <a href="#desktops">pick one for each account</a>. Free software, early. Tested with FreeRDP and the Windows App on macOS.</p>
   </div>
   <div class="shot"><picture><source srcset="desktop.webp" type="image/webp"><img src="desktop.png" width="1680" height="1050" alt="A Waydesk desktop seen from the Windows App: the shell bar and dock, a browser showing this site, Text Editor and a terminal"></picture></div>
 </div>
+
+<section class="band" id="desktops">
+<h2>Pick the desktop for each account</h2>
+<p>Every account gets the Waydesk desktop unless you choose another with one command, <code>waydesk-admin users set NAME --desktop plasma</code> (or <code>cosmic</code>, <code>hyprland</code>). Waydesk does not install the others: you do, with your system's package manager. <a href="/docs/desktops/">What was tested, and where</a>.</p>
+<div class="gallery">
+  <a class="win gtile" href="/docs/desktops/#waydesk"><div class="bar"><span class="t">Waydesk desktop</span></div><img src="gallery/waydesk-sm.webp" width="840" height="525" loading="lazy" alt="Waydesk desktop with the shell bar, the dock, a browser showing this site and a terminal"><div class="body"><p>The default: a shell, a launcher and a dock. Debian 13 and Ubuntu 26.04 (amd64 and arm64) and Arch. An idle session takes about 0.7 GB.</p></div></a>
+  <a class="win gtile" href="/docs/desktops/#plasma"><div class="bar"><span class="t">KDE Plasma</span></div><img src="gallery/plasma-sm.webp" width="840" height="525" loading="lazy" alt="KDE Plasma desktop with a terminal showing waydesk-admin status"><div class="body"><p>Tested on Arch with an Intel GPU, and on Debian 13. You install Plasma yourself. An idle session takes about 0.65 GB.</p></div></a>
+  <a class="win gtile" href="/docs/desktops/#cosmic"><div class="bar"><span class="t">COSMIC</span></div><img src="gallery/cosmic-sm.webp" width="840" height="525" loading="lazy" alt="COSMIC desktop with a browser showing this site and the dock"><div class="body"><p>Tested on Arch with an Intel GPU. You install COSMIC yourself. An idle session takes about 0.9 GB.</p></div></a>
+  <a class="win gtile" href="/docs/desktops/#omarchy"><div class="bar"><span class="t">Omarchy (Hyprland)</span></div><img src="gallery/omarchy-sm.webp" width="840" height="525" loading="lazy" alt="Omarchy on Hyprland: a terminal showing waydesk-admin status next to a browser showing this site"><div class="body"><p>Tested on Arch with an Intel GPU; Hyprland needs a GPU. An idle session takes about 0.75 GB.</p></div></a>
+  <a class="win gtile" href="/docs/desktops/#ml4w"><div class="bar"><span class="t">ML4W (Hyprland)</span></div><img src="gallery/ml4w-sm.webp" width="840" height="525" loading="lazy" alt="ML4W on Hyprland: a terminal and a browser showing this site, with the bar and the dock"><div class="body"><p>Tested on Arch with an Intel GPU; Hyprland needs a GPU. An idle session takes about 1.0 GB.</p></div></a>
+</div>
+</section>
 
 <section class="band" id="who">
 <h2>Who it is for</h2>

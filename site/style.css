@@ -363,3 +363,12 @@ body.sans p, body.sans li, body.sans figcaption, body.sans td, body.sans .lede {
 body.sans p, body.sans li, body.sans td { font-size: 16px; line-height: 1.65; }
 body.sans .card p, body.sans .lede { font-size: 16px; }
 body.sans code, body.sans pre, body.sans pre * { font-family: var(--mono); font-size: 14px; }
+
+/* The gallery of desktops (home page and the desktops page): one tile per desktop, the picture first. */
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--s4); margin-top: var(--s3); }
+.gtile { display: block; color: inherit; text-decoration: none; }
+.gtile img { display: block; width: 100%; height: auto; }
+.gtile .body { padding: var(--s3) var(--s4) var(--s4); }
+.gtile .body p { margin: 0; font-size: var(--fs-s); }
+.gtile:hover, .gtile:focus-visible { border-color: rgba(255, 255, 255, .3); }
+.gallery.wide { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
