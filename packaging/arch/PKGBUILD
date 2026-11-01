@@ -6,8 +6,8 @@
 # the account's own Hyprland (docs/HYPRLAND.md).
 pkgname=waydesk-server
 pkgver=0.5.0
-pkgrel=1
-pkgdesc='RDP server giving each account its own headless Wayland desktop (sway; Hyprland experimental)'
+pkgrel=2
+pkgdesc='RDP server giving each account its own headless Wayland desktop (sway; Hyprland, KDE Plasma and COSMIC optional)'
 arch=(x86_64 aarch64)
 url='https://waydesk.stackcare.pt'
 license=(MIT Apache-2.0)
