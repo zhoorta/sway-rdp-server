@@ -81,6 +81,9 @@ Not built yet: a `--try` that starts a real short session to prove the configura
   turns the client's picture black; a lock screen can be unlocked by typing the account's password in the RDP client.
 - **Restart and Shutdown ended the session** before the system refused them (`hyprshutdown`; Omarchy's menu announced a reboot and failed two seconds later). The stand-ins above.
 - **Omarchy's theme switch asked for an administrator password** (it writes a shared browser policy). The stand-in above.
+- **The display scale cannot be changed from inside the session.** The output is made by Waydesk and its size and scale come from the client (resize the window or change the client's scale setting); Waydesk keeps that rule through configuration reloads. Omarchy's `omarchy-hyprland-monitor-scaling 2` left the output at scale 1 (checked on 0.5.0, 2026-11-01). Set it in the client.
+- **An account has no Omarchy theme until one is set.** Omarchy sets its first theme in its own installer; an account made by `waydesk-admin users add` never goes through that, so `~/.local/state/omarchy/current/theme` is missing, the terminal prints a `foot.ini` include error and the Style and Background menus do not open. One command as that account fixes it: `OMARCHY_PATH=/usr/share/omarchy omarchy-theme-set "Tokyo Night"` (inside the session, where `OMARCHY_PATH` is already set, plain `omarchy-theme-set "Tokyo Night"`).
+- **A Mac client keeps Cmd+Space for Spotlight**, which is Super+Space in the session: Omarchy's menu or launcher cannot be opened that way (free the shortcut on the Mac, or use `Super+Escape` for the system menu).
 - Omarchy's own configuration puts its `bin` first on `PATH`, behind which a stand-in is never found; the wrapper puts Waydesk's directory back in front.
 
 Tried and working: Omarchy 4.0.6 and ML4W 2.16.1 on Hyprland 0.57, the default configurations of sway on Arch, Debian and Ubuntu, and the Waydesk desktop. Not tried: a sway setup

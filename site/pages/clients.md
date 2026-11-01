@@ -26,7 +26,7 @@ Tried, works, with the Retina display sharp and the window resizing live.
 3. Give it the Waydesk account's name and password.
 4. Connect. The first time, the app shows the server's certificate: compare its fingerprint with the one from `waydesk-admin cert status`, then accept.
 
-A MacBook's keyboard sends some keys to other places than a PC's. Waydesk follows the client's layout, and there is a Keyboard window in the desktop if a key arrives wrong.
+A Mac keeps some shortcuts for itself: **Cmd+Space opens Spotlight** and never reaches the session, so a desktop that uses Super+Space (Omarchy's menu or launcher) cannot be opened that way. Turn Spotlight's shortcut off or move it (System Settings, Keyboard, Keyboard Shortcuts, Spotlight), or use another binding of the desktop. A MacBook's keyboard sends some keys to other places than a PC's. Waydesk follows the client's layout, and there is a Keyboard window in the desktop if a key arrives wrong.
 
 ## mstsc on Windows {bar: notes}
 Tried on Windows 11 for ARM in a virtual machine, through an SSH tunnel; the VPN was not tried with it.
