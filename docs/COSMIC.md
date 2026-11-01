@@ -21,4 +21,6 @@ An account's own `~/.config/waydesk/config` replaces the package's file, as for 
 ## Cost and limits
 
 - Two compositors per session: memory and render time are those of sway plus COSMIC's (see `docs/measure-data/` for the measured capacity).
-- Not tried: locking the screen, `Super` shortcuts (sway has no bindings in this configuration, so the keys go to COSMIC).
+- **Log out ends the session.** The session's sway exits when COSMIC does, and the client is disconnected; the next login starts a fresh desktop. (Before 2026-11-01 the client was left with an empty sway: a dark screen, and a reconnection went back to it.)
+- **Lock screen:** locked from the power menu and unlocked by typing the account's password in the RDP client (Windows App on macOS, 2026-11-01, Intel i7-7700).
+- Not tried: `Super` shortcuts (sway has no bindings in this configuration, so the keys go to COSMIC). COSMIC's idle manager tries to suspend the server after a while; the system refuses it for an RDP account (it is logged as `systemctl suspend failed`).

@@ -18,7 +18,6 @@ The setting is read when the session starts: end the session or log out first. `
 - **The Waydesk desktop** (sway) is the default and the one that is measured most: 21 heavy users on the same i7-7700, limited by memory.
 
 ## What was not tested {bar: notes}
-- The lock screen of COSMIC.
 - COSMIC and Plasma under load, and on Debian or Ubuntu.
 - Hyprland without a GPU (it has no software renderer and the session will not start).
 
