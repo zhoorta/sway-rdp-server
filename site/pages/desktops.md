@@ -3,7 +3,7 @@ nav: Desktops
 seo_title: COSMIC, KDE Plasma and Hyprland over RDP on a Linux server · Waydesk
 description: Waydesk gives every account the Waydesk desktop by default. An account can have COSMIC, KDE Plasma or Hyprland instead (experimental): how each one runs, what you install, what was tested and what was not.
 ---
-Every account gets the Waydesk desktop (sway with a shell, a launcher and a dock) unless you choose otherwise. Three other desktops can be given to an account with one command. All three are **experimental** and were tested on Arch Linux; they have not been tested on Debian or Ubuntu.
+Every account gets the Waydesk desktop (sway with a shell, a launcher and a dock) unless you choose otherwise. Three other desktops can be given to an account with one command. All three are **experimental** and were tested on Arch Linux. Plasma was also run on Debian 13 (four accounts at once on a 4-core server); COSMIC and Hyprland were not tested on Debian or Ubuntu.
 
 ## Choose one {bar: terminal}
 ```console
@@ -23,4 +23,4 @@ The setting is read when the session starts: end the session or log out first. `
 - Hyprland without a GPU (it has no software renderer and the session will not start).
 
 ## Arch Linux {bar: notes}
-There is a package for Arch (a `PKGBUILD` in the source, `docs/ARCH.md`), but no Arch repository yet. It has the server and the session; the Waydesk desktop packages are for Debian and Ubuntu. It was last tested on a real Arch machine before this release.
+There is a package for Arch and a signed pacman repository at `https://waydesk.dev/arch` for x86_64 and Arch Linux ARM (aarch64); the steps are in `docs/ARCH.md`. It has the server and the session; the Waydesk desktop packages are for Debian and Ubuntu. On 2026-11-01 the package was installed from that repository on Arch (x86_64, in a container with systemd) and on Arch Linux ARM (aarch64), the services were started and an RDP login got a sway session. Hyprland, COSMIC and Plasma sessions were last run on a real Arch machine with the previous version (0.4.0).

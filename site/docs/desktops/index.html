@@ -70,7 +70,7 @@
 <main class="doc">
 <div class="pagehead">
 <h1>Other desktops</h1>
-<p class="lede">Every account gets the Waydesk desktop (sway with a shell, a launcher and a dock) unless you choose otherwise. Three other desktops can be given to an account with one command. All three are <strong>experimental</strong> and were tested on Arch Linux; they have not been tested on Debian or Ubuntu.</p>
+<p class="lede">Every account gets the Waydesk desktop (sway with a shell, a launcher and a dock) unless you choose otherwise. Three other desktops can be given to an account with one command. All three are <strong>experimental</strong> and were tested on Arch Linux. Plasma was also run on Debian 13 (four accounts at once on a 4-core server); COSMIC and Hyprland were not tested on Debian or Ubuntu.</p>
 </div>
 <section id="choose-one">
 <h2>Choose one</h2>
@@ -88,7 +88,7 @@
 </section>
 <section id="arch-linux">
 <h2>Arch Linux</h2>
-<p>There is a package for Arch (a <code>PKGBUILD</code> in the source, <code>docs/ARCH.md</code>), but no Arch repository yet. It has the server and the session; the Waydesk desktop packages are for Debian and Ubuntu. It was last tested on a real Arch machine before this release.</p>
+<p>There is a package for Arch and a signed pacman repository at <code>https://waydesk.dev/arch</code> for x86_64 and Arch Linux ARM (aarch64); the steps are in <code>docs/ARCH.md</code>. It has the server and the session; the Waydesk desktop packages are for Debian and Ubuntu. On 2026-11-01 the package was installed from that repository on Arch (x86_64, in a container with systemd) and on Arch Linux ARM (aarch64), the services were started and an RDP login got a sway session. Hyprland, COSMIC and Plasma sessions were last run on a real Arch machine with the previous version (0.4.0).</p>
 </section>
 <nav class="prevnext" aria-label="Previous and next page"><a class="prev" href="/docs/gpu/"><span>previous</span>Using a GPU</a><a class="next" href="/docs/reference/"><span>next</span>Files and settings</a></nav>
 <p class="method">This page is <a href="https://github.com/zhoorta/waydesk/blob/main/site/pages/desktops.md">a file in the repository</a>: corrections are welcome.</p>
