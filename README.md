@@ -8,18 +8,31 @@
 <p align="center">
   <a href="https://github.com/zhoorta/waydesk/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/zhoorta/waydesk?label=release"></a>
   <img alt="License: AGPL-3.0-or-later" src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue">
-  <img alt="Debian 13 and Ubuntu 26.04, amd64 and arm64" src="https://img.shields.io/badge/Debian%2013%20%7C%20Ubuntu%2026.04-amd64%20%7C%20arm64-informational">
+  <img alt="Debian 13, Ubuntu 26.04 and Arch Linux, x86_64 and arm64" src="https://img.shields.io/badge/Debian%2013%20%7C%20Ubuntu%2026.04%20%7C%20Arch-x86__64%20%7C%20arm64-informational">
   <a href="https://waydesk.dev"><img alt="Website" src="https://img.shields.io/badge/website-waydesk.dev-orange"></a>
 </p>
 
 # Waydesk: a Linux desktop over RDP, out of the box
 
-One `apt install` on Debian 13 or Ubuntu 26.04 gives every account on the server its own desktop (sway, a shell, a dock and apps) over RDP. Sessions are kept
-alive between connections, the picture is H.264 and no GPU is needed (an Intel, AMD or NVIDIA one is used when there is one). Connect with the Windows App, Remmina or any RDP client: nothing to install on the client.
+One `apt install` on Debian 13 or Ubuntu 26.04 (or a `pacman -S waydesk-server` on Arch Linux) gives every account on the server its own desktop (sway, a shell, a dock and apps) over RDP. Sessions are kept
+alive between connections, the picture is H.264 and a GPU is used for drawing and encoding when there is one (Intel, AMD or NVIDIA; without one, software). Connect with the Windows App, Remmina or any RDP client: nothing to install on the client.
 
 <p align="center">
   <img src="docs/img/desktop.png" alt="A Waydesk session in the Windows App: the bar, desktop icons, a browser, a terminal showing waydesk-admin status, and the dock" width="860">
 </p>
+
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/img/gallery/waydesk.webp" alt="The Waydesk desktop" width="280"><br>Waydesk desktop (sway)</td>
+    <td align="center"><img src="docs/img/gallery/plasma.webp" alt="KDE Plasma" width="280"><br>KDE Plasma</td>
+    <td align="center"><img src="docs/img/gallery/cosmic.webp" alt="COSMIC" width="280"><br>COSMIC</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/img/gallery/omarchy.webp" alt="Omarchy on Hyprland" width="280"><br>Omarchy (Hyprland)</td>
+    <td align="center"><img src="docs/img/gallery/ml4w.webp" alt="ML4W on Hyprland" width="280"><br>ML4W (Hyprland)</td>
+    <td align="center"><br>Or your own sway or Hyprland configuration</td>
+  </tr>
+</table>
 
 - **One desktop per account.** Each login gets its own headless sway, sized and scaled from what the client asks for (a Retina Mac or a laptop at 200 % scaling gets a sharp picture, and the window resizes live). Reconnect and the windows are where you left them.
 - **Your choice of desktop.** The Waydesk desktop (sway) is the default; `waydesk-admin users set NAME --desktop cosmic|plasma|hyprland` gives an account [COSMIC](docs/COSMIC.md), [KDE Plasma](docs/PLASMA.md) or [Hyprland](docs/HYPRLAND.md) instead (tested on Arch with an Intel GPU, Omarchy and ML4W for Hyprland, which needs a GPU; COSMIC and Plasma run inside the session's sway). An Arch Linux package is in `packaging/arch` ([notes](docs/ARCH.md)).
@@ -30,7 +43,7 @@ alive between connections, the picture is H.264 and no GPU is needed (an Intel, 
 
 ## Install
 
-Debian 13 or Ubuntu 26.04 LTS, amd64 or arm64, as an administrator of the server:
+Debian 13 or Ubuntu 26.04 LTS, amd64 or arm64, as an administrator of the server (Arch Linux: see [docs/ARCH.md](docs/ARCH.md)):
 
 ```
 curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
@@ -48,8 +61,7 @@ Then connect an RDP client to the server (through the tunnel) with the administr
 ## Status
 
 Early. Tested with FreeRDP and the Windows App on macOS. Not independently reviewed: four internal security passes are in
-[docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md), and the open items are in the [threat model](docs/THREAT-MODEL.md). Other distributions are not supported yet (the packages are `.deb` only).
-The clipboard is text only, and there is no hardware encoding yet; the [roadmap](docs/ROADMAP.md) lists what is next. To report a vulnerability, see [SECURITY.md](SECURITY.md).
+[docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md), and the open items are in the [threat model](docs/THREAT-MODEL.md). Supported: Debian 13, Ubuntu 26.04 and Arch Linux (x86_64 and aarch64); other distributions are not. The Waydesk desktop (sway) is packaged for Debian and Ubuntu; on Arch the other desktops are ordinary packages you install. The clipboard is text only; the [roadmap](docs/ROADMAP.md) lists what is next. To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
