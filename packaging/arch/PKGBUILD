@@ -5,13 +5,13 @@
 # title-bar buttons) is not part of this: a session gets plain sway (/usr/share/waydesk/sway-minimal.conf) or, with WAYDESK_COMPOSITOR=hyprland,
 # the account's own Hyprland (docs/HYPRLAND.md).
 pkgname=waydesk-server
-pkgver=0.4.0
-pkgrel=3
+pkgver=0.5.0
+pkgrel=1
 pkgdesc='RDP server giving each account its own headless Wayland desktop (sway; Hyprland experimental)'
 arch=(x86_64 aarch64)
 url='https://waydesk.stackcare.pt'
 license=(MIT Apache-2.0)
-depends=(acl foot sway pam polkit libva libdrm mesa libxkbcommon openssl logrotate systemd
+depends=(acl foot sway pam polkit libva libdrm mesa libxkbcommon openssl systemd
          pipewire pipewire-pulse libpulse wireplumber wl-clipboard openh264)
 makedepends=(cargo clang pkgconf)
 optdepends=('plasma-desktop: KDE Plasma sessions (waydesk-admin users set NAME --desktop plasma, see /usr/share/doc/waydesk-server/PLASMA.md)'
@@ -24,7 +24,7 @@ optdepends=('plasma-desktop: KDE Plasma sessions (waydesk-admin users set NAME -
             'qrencode: waydesk-admin vpn shows a QR code')
 # makepkg's default LTO breaks the link of Rust crates that build C code (aws-lc-sys, under rustls): undefined aws_lc_* symbols
 options=(!lto)
-backup=(etc/default/waydesk etc/pam.d/waydesk-server etc/pam.d/waydesk-session etc/logrotate.d/waydesk)
+backup=(etc/default/waydesk etc/pam.d/waydesk-server etc/pam.d/waydesk-session)
 install=waydesk-server.install
 source=("$pkgname-$pkgver.tar.gz"
         waydesk.sysusers
@@ -75,7 +75,6 @@ package() {
   install -Dm644 packaging/default-waydesk "$pkgdir/etc/default/waydesk"
   install -Dm644 packaging/arch/pam-waydesk-server "$pkgdir/etc/pam.d/waydesk-server"
   install -Dm644 packaging/pam-waydesk-session "$pkgdir/etc/pam.d/waydesk-session"
-  install -Dm644 packaging/logrotate-waydesk "$pkgdir/etc/logrotate.d/waydesk"
 
   # sessions: a minimal sway configuration, the blank cursor theme, the Mac keyboard layout, the GPU rules
   install -Dm644 packaging/sway-minimal.conf "$pkgdir/usr/share/waydesk/sway-minimal.conf"
