@@ -90,6 +90,37 @@ lt1                running     860 MB       -     29%  31.3 GB renderD128 vaapi@
 lt2                running     736 MB       -     10%  31.3 GB renderD128 vaapi@renderD128 q40 20fps  -   sway       code 1109 MB, qs 399 MB
 ```
 
+A capture from the Intel test server (i7-7700, HD 630, Arch, `waydesk-server` 0.5.0), with thirteen sessions of four desktops at once and a small model (`qwen2.5:0.5b`) in Ollama on the CPU, two accounts with a request open to it. The card has the role `both` (`WAYDESK_GPU_ROLES=renderD128=both`) and `WAYDESK_AI_ENDPOINT=127.0.0.1:11434` names the model. The Intel card cannot hold a model, so the line says `0 MB ... in video memory (the rest on the CPU)`; the account `t1` has one connection to it. The `System` line says Omarchy because Omarchy's package replaces `/etc/os-release`. Not edited:
+
+```console
+$ waydesk-admin status
+Memory    62.6 GB in all, 52.3 GB available
+Swap      none
+Load      2.06 1.37 0.99 (8 cores)
+System    Omarchy, kernel 7.2.11-arch1-1
+GPU       Intel Kaby Lake-S GT2 [HD Graphics 630] (i915, renderD128): 17 % busy, 450 MHz
+            sessions and inference; 13 sessions: jose, t1, t2, t3, om1, p1, c1, p2, p3, c2, c3, om2, om3
+          new sessions use: auto
+AI        127.0.0.1:11434: qwen2.5:0.5b 0 MB of 463 MB in video memory (the rest on the CPU); 2 connections open
+Desktop   sway for new sessions (WAYDESK_COMPOSITOR: sway, or hyprland, which needs a GPU)
+Sessions  13 running; a new one would be accepted (needs 9.4 GB available)
+
+ACCOUNT            SESSION     MEMORY    SWAP    CPU    LIMIT RENDER     ENCODER                      AI  DESKTOP    PROGRAMS (resident)
+jose               running     174 MB       -     0%  31.3 GB renderD128 vaapi@renderD128             -   sway       waydesk-server 129 MB, sway 88 MB, foot 20 MB
+t1                 running     289 MB       -     0%  31.3 GB renderD128 vaapi@renderD128             1   sway       sway 76 MB, waydesk-server 45 MB, foot 20 MB
+t2                 running     145 MB       -     0%  31.3 GB renderD128 vaapi@renderD128             -   sway       sway 76 MB, waydesk-server 44 MB, foot 20 MB
+t3                 running     143 MB       -     0%  31.3 GB renderD128 vaapi@renderD128             -   sway       sway 76 MB, waydesk-server 45 MB, foot 20 MB
+om1                running     655 MB       -     1%  31.3 GB renderD128 vaapi@renderD128             -   hyprland   quickshell 549 MB, Hyprland 359 MB, Xwayland 253 MB
+p1                 running     1.3 GB       -     0%  31.3 GB renderD128 vaapi@renderD128             -   sway       plasmashell 548 MB, Xwayland 511 MB, systemsettings 438 MB
+c1                 running     1.1 GB       -     0%  31.3 GB renderD128 vaapi@renderD128             -   sway       Xwayland 514 MB, cosmic-settings 363 MB, cosmic-edit 323 MB
+p2                 running     645 MB       -     2%  31.3 GB renderD128 vaapi@renderD128             -   sway       Xwayland 510 MB, plasmashell 479 MB, kwin_wayland 417 MB
+p3                 running     647 MB       -     2%  31.3 GB renderD128 vaapi@renderD128             -   sway       Xwayland 510 MB, plasmashell 478 MB, kwin_wayland 417 MB
+c2                 running     923 MB       -     2%  31.3 GB renderD128 vaapi@renderD128 q18 0fps    -   sway       Xwayland 511 MB, cosmic-launcher 319 MB, cosmic-app-libr 318 MB
+c3                 running     929 MB       -     2%  31.3 GB renderD128 vaapi@renderD128 q18 0fps    -   sway       Xwayland 511 MB, cosmic-app-libr 319 MB, cosmic-launcher 317 MB
+om2                running     738 MB       -     3%  31.3 GB renderD128 vaapi@renderD128 q18 3fps    1   hyprland   quickshell 488 MB, Hyprland 364 MB, Xwayland 257 MB
+om3                running     741 MB       -     4%  31.3 GB renderD128 vaapi@renderD128 q18 3fps    -   hyprland   quickshell 495 MB, Hyprland 363 MB, Xwayland 256 MB
+```
+
 How busy a card is comes from NVIDIA's management library for NVIDIA, from `gpu_busy_percent` for AMD, and, on Intel, from the share of time the card is out of its idle state (not the split between its render and video engines). `--watch` keeps it on the screen.
 
 ## Settings {bar: terminal}
