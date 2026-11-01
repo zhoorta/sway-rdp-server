@@ -4,6 +4,8 @@ if [ "$1" = configure ]; then
     getent passwd waydesk >/dev/null || adduser --system --group --no-create-home --home /nonexistent --shell /usr/sbin/nologin --gecos "waydesk daemon" waydesk
     # The group whose members may log in over RDP. On a first install the account that ran the installation joins it, or nobody could.
     getent group waydesk-users >/dev/null || addgroup --system waydesk-users >/dev/null
+    # The group of the administrators (Flatpak installs without a password; `waydesk-admin users add NAME --admin` needs it). The desktop package made it before: a server without a desktop had none.
+    getent group waydesk-admins >/dev/null || addgroup --system waydesk-admins >/dev/null
     if [ -z "$2" ] && [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ] && id "$SUDO_USER" >/dev/null 2>&1; then
         adduser "$SUDO_USER" waydesk-users >/dev/null 2>&1 || true
     fi
