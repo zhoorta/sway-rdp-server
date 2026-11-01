@@ -1046,13 +1046,15 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
         println!("\nNobody is logged in.");
         return Ok(());
     }
-    println!("\n{:<18} {:<8} {:>9} {:>7} {:>6} {:>8} {:<10} {:<28} {}{:<9}  PROGRAMS (resident)", "ACCOUNT", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT", "RENDER", "ENCODER", if ai.is_some() { "AI  " } else { "" }, "DESKTOP");
+    // The desktop comes right after the account (who runs what, and it stays in view on a narrow screen); the programs, which are long, come last.
+    println!("\n{:<18} {:<9} {:<8} {:>9} {:>7} {:>6} {:>8} {:<10} {:<28} {}PROGRAMS (resident)", "ACCOUNT", "DESKTOP", "SESSION", "MEMORY", "SWAP", "CPU", "LIMIT", "RENDER", "ENCODER", if ai.is_some() { "AI   " } else { "" });
     for u in &usage {
         let top: Vec<String> = u.top.iter().map(|(n, mb)| format!("{n} {mb} MB")).collect();
         let (render, encoder) = video_cells(u.video.as_ref());
         println!(
-            "{:<18} {:<8} {:>9} {:>7} {:>5.0}% {:>8} {:<10} {:<28} {}{:<9}  {}",
+            "{:<18} {:<9} {:<8} {:>9} {:>7} {:>5.0}% {:>8} {:<10} {:<28} {}{}",
             u.name,
+            u.video.as_ref().and_then(|v| v.compositor.clone()).unwrap_or_else(|| "-".into()),
             if u.session { "running" } else { "-" },
             human_mb(u.mem_mb),
             if u.swap_mb > 0 { human_mb(u.swap_mb) } else { "-".into() },
@@ -1060,8 +1062,7 @@ fn status_once(json_out: bool, compact: bool) -> Result<()> {
             u.cap_mb.map(human_mb).unwrap_or_else(|| "none".into()),
             render,
             encoder,
-            ai_of(u.uid).map(|n| format!("{:<4}", if n == 0 { "-".to_owned() } else { n.to_string() })).unwrap_or_default(),
-            u.video.as_ref().and_then(|v| v.compositor.clone()).unwrap_or_else(|| "-".into()),
+            ai_of(u.uid).map(|n| format!("{:<4} ", if n == 0 { "-".to_owned() } else { n.to_string() })).unwrap_or_default(),
             top.join(", ")
         );
     }
