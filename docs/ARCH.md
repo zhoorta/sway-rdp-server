@@ -8,7 +8,7 @@ Waydesk builds and runs on Arch. There is a `PKGBUILD` in `packaging/arch/`; the
 
 ```
 curl -fsSL https://waydesk.dev/arch/waydesk.gpg | sudo pacman-key --add -
-sudo pacman-key --lsign-key FINGERPRINT
+sudo pacman-key --lsign-key C64672B25ECD4773196C39589D8E8874E67617F4
 ```
 
 then add to `/etc/pacman.conf`
