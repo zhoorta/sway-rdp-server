@@ -372,3 +372,7 @@ body.sans code, body.sans pre, body.sans pre * { font-family: var(--mono); font-
 .gtile .body p { margin: 0; font-size: var(--fs-s); }
 .gtile:hover, .gtile:focus-visible { border-color: rgba(255, 255, 255, .3); }
 .gallery.wide { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
+.gtext pre { margin: 0; padding: var(--s3) var(--s4); border: 0; background: transparent; box-shadow: none; font-size: 11px; line-height: 1.6; white-space: pre; overflow: hidden; }
+.gtext .body { padding-top: 0; }
+.gtext .body p { margin-top: var(--s2); }
+body.sans .gtext pre, body.sans .gtext pre * { font-size: 11px; }

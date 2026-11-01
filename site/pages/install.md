@@ -1,7 +1,7 @@
 title: Install and first login
 nav: Install
 seo_title: Install a Linux RDP desktop on Debian 13 or Ubuntu 26.04 · Waydesk
-description: Install Waydesk on Debian 13 or Ubuntu 26.04, make the first administrator, connect, and add more people. About ten minutes from a fresh server.
+description: Install Waydesk on Debian 13, Ubuntu 26.04 or Arch Linux, make the first administrator, connect, and add more people. About ten minutes from a fresh server.
 ---
 From a fresh server to a desktop in about ten minutes: one package, one command to make the first administrator, and an RDP client. Everything below was run on a clean Debian 13 server.
 
@@ -28,6 +28,19 @@ $ sudo apt install waydesk
 ```
 
 `waydesk` is the server and the desktop (the shell, the dock, a file manager and a terminal). On a server that should only run the RDP part, `waydesk-server` alone is enough. The RDP port is **closed to the network** until you open it.
+
+## On Arch Linux {bar: terminal}
+Arch (x86_64 and Arch Linux ARM) has its own signed repository, with the same key. It installs the server and its sessions (plain sway, or the desktop you set for an account); the Waydesk shell, launcher and dock are Debian and Ubuntu packages.
+
+```console
+$ curl -fsSL https://waydesk.dev/arch/waydesk.gpg | sudo pacman-key --add -
+$ sudo pacman-key --lsign-key C64672B25ECD4773196C39589D8E8874E67617F4
+$ printf '[waydesk]\nSigLevel = Required DatabaseRequired\nServer = https://waydesk.dev/arch/$arch\n' | sudo tee -a /etc/pacman.conf
+$ sudo pacman -Syu waydesk-server
+$ sudo systemctl enable --now waydesk-helper.service waydesk.service
+```
+
+Then make the first administrator as below. What was tested on Arch, and what was not: [Other desktops](/docs/desktops/#arch-linux).
 
 ## The first administrator {bar: terminal}
 There is no default account or password. `waydesk-setup-admin` makes the first administrator, the account that connects over RDP and manages the others:

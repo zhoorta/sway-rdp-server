@@ -46,29 +46,32 @@
 <div class="hero">
   <div>
     <h1>Multi-user Linux desktops over RDP, <em>out of the box.</em></h1>
-    <p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04. Every account that logs in gets its own desktop, kept alive between connections. No GPU needed, no client to install: use the Windows App, Remmina or any RDP client.</p>
-    <div class="win">
+    <p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04, or a signed pacman repository on Arch. Every account that logs in gets its own desktop, kept alive between connections. No client to install: use the Windows App, Remmina or any RDP client.</p>
+  </div>
+  <div class="win">
       <div class="bar"><span class="t">install</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
       <div class="body"><pre><code><span class="p">$</span> curl -fsSLO https://waydesk.dev/apt/waydesk-repo.deb
 <span class="p">$</span> sudo apt install ./waydesk-repo.deb
 <span class="p">$</span> sudo apt update
 <span class="p">$</span> sudo apt install waydesk
 <span class="p">$</span> sudo waydesk-setup-admin</code></pre></div>
-    </div>
-    <p class="note">Waydesk's own desktop, KDE Plasma, COSMIC, or Hyprland with Omarchy or ML4W: <a href="#desktops">pick one for each account</a>. Free software, early. Tested with FreeRDP and the Windows App on macOS.</p>
   </div>
-  <div class="shot"><picture><source srcset="desktop.webp" type="image/webp"><img src="desktop.png" width="1680" height="1050" alt="A Waydesk desktop seen from the Windows App: the shell bar and dock, a browser showing this site, Text Editor and a terminal"></picture></div>
 </div>
 
 <section class="band" id="desktops">
 <h2>Pick the desktop for each account</h2>
 <p>Every account gets the Waydesk desktop unless you choose another with one command, <code>waydesk-admin users set NAME --desktop plasma</code> (or <code>cosmic</code>, <code>hyprland</code>). Waydesk does not install the others: you do, with your system's package manager. <a href="/docs/desktops/">What was tested, and where</a>.</p>
 <div class="gallery">
-  <a class="win gtile" href="/docs/desktops/#waydesk"><div class="bar"><span class="t">Waydesk desktop</span></div><img src="gallery/waydesk-sm.webp" width="840" height="525" loading="lazy" alt="Waydesk desktop with the shell bar, the dock, a browser showing this site and a terminal"><div class="body"><p>The default: a shell, a launcher and a dock. Debian 13 and Ubuntu 26.04 (amd64 and arm64) and Arch. An idle session takes about 0.7 GB.</p></div></a>
+  <a class="win gtile" href="/docs/desktops/#waydesk"><div class="bar"><span class="t">Waydesk desktop</span></div><img src="gallery/waydesk-sm.webp" width="840" height="525" loading="lazy" alt="Waydesk desktop with the shell bar, the dock, a browser showing this site and a terminal"><div class="body"><p>The default: a shell, a launcher and a dock. Debian 13 and Ubuntu 26.04, amd64 and arm64. An idle session takes about 0.7 GB.</p></div></a>
   <a class="win gtile" href="/docs/desktops/#plasma"><div class="bar"><span class="t">KDE Plasma</span></div><img src="gallery/plasma-sm.webp" width="840" height="525" loading="lazy" alt="KDE Plasma desktop with a terminal showing waydesk-admin status"><div class="body"><p>Tested on Arch with an Intel GPU, and on Debian 13. You install Plasma yourself. An idle session takes about 0.65 GB.</p></div></a>
   <a class="win gtile" href="/docs/desktops/#cosmic"><div class="bar"><span class="t">COSMIC</span></div><img src="gallery/cosmic-sm.webp" width="840" height="525" loading="lazy" alt="COSMIC desktop with a browser showing this site and the dock"><div class="body"><p>Tested on Arch with an Intel GPU. You install COSMIC yourself. An idle session takes about 0.9 GB.</p></div></a>
   <a class="win gtile" href="/docs/desktops/#omarchy"><div class="bar"><span class="t">Omarchy (Hyprland)</span></div><img src="gallery/omarchy-sm.webp" width="840" height="525" loading="lazy" alt="Omarchy on Hyprland: a terminal showing waydesk-admin status next to a browser showing this site"><div class="body"><p>Tested on Arch with an Intel GPU; Hyprland needs a GPU. An idle session takes about 0.75 GB.</p></div></a>
   <a class="win gtile" href="/docs/desktops/#ml4w"><div class="bar"><span class="t">ML4W (Hyprland)</span></div><img src="gallery/ml4w-sm.webp" width="840" height="525" loading="lazy" alt="ML4W on Hyprland: a terminal and a browser showing this site, with the bar and the dock"><div class="body"><p>Tested on Arch with an Intel GPU; Hyprland needs a GPU. An idle session takes about 1.0 GB.</p></div></a>
+  <a class="win gtile gtext" href="https://github.com/zhoorta/waydesk/blob/main/docs/BRING-YOUR-OWN-CONFIG.md"><div class="bar"><span class="t">your own configuration</span></div><div class="body"><pre><code><span class="p">$</span> sudo waydesk-admin config check ml1
+OK    Hyprland accepts it
+OK    the GPU can be opened
+<span class="c">WARN  hypridle: display off, 11 min</span>
+0 problems, 1 warnings</code></pre><p>Or keep your own sway or Hyprland setup: <code>config check</code> says whether it will work as a session. Omarchy and ML4W are tried; other dotfiles are not.</p></div></a>
 </div>
 </section>
 
@@ -173,6 +176,13 @@
 <span class="p">$</span> sudo apt install waydesk
 <span class="p">$</span> sudo waydesk-setup-admin       <span class="c"># asks how you will connect; there is no default account or password</span>
 <span class="p">$</span> waydesk-setup                  <span class="c"># optional, as your own account: choose browsers, office, developer and creative apps</span></code></pre>
+<h3>On Arch Linux (x86_64 or Arch Linux ARM)</h3>
+<pre><code><span class="p">$</span> curl -fsSL https://waydesk.dev/arch/waydesk.gpg | sudo pacman-key --add -
+<span class="p">$</span> sudo pacman-key --lsign-key C64672B25ECD4773196C39589D8E8874E67617F4   <span class="c"># the same key as above</span>
+<span class="p">$</span> printf '[waydesk]\nSigLevel = Required DatabaseRequired\nServer = https://waydesk.dev/arch/$arch\n' | sudo tee -a /etc/pacman.conf
+<span class="p">$</span> sudo pacman -Syu waydesk-server
+<span class="p">$</span> sudo waydesk-setup-admin</code></pre>
+<p>Arch gets the server and its sessions (plain sway, or the desktop you choose for an account); the Waydesk shell, launcher and dock are Debian and Ubuntu packages. <a href="/docs/desktops/#arch-linux">What was tested on Arch</a>.</p>
 <p>That is the whole install. Next: <a href="/docs/install/">the first administrator and a first connection</a>, <a href="/docs/connect/">how to connect</a>, and <a href="/docs/limits/">the systems and clients that were tested</a>.</p>
 </section>
 
