@@ -168,3 +168,49 @@ for the housekeeping of its own local repository during every install, update an
 `install-bundle`, and the parental-controls actions. The privilege of a member does not grow in a way that matters: a member could already deploy any app of the configured
 remotes system-wide without a password, which is the larger power. Checked on the VM: an install of Sublime Text (and its runtime) from the member's own session finished
 without a prompt (`flatpak install --noninteractive`, exit 0), where before it failed with "GetRevokefsFd not allowed for user".
+
+---
+
+# Fifth pass (2026-11-01): what 0.4 and 0.5 added
+
+Who wrote it: the author of the code, with an AI assistant. **Still not an independent review**, and no active testing on a server: code reading,
+and unit tests run in a build container. It covers what the first four passes did not see (the GPU, GPU roles, the local model, the other desktops,
+`users set`, `config check`, `gpu roles` and `ai` in `waydesk-admin`, the status files, the polkit rule for power, the udev rules) and reads the
+login path, the helper and the units again. Nothing here changes the stated deployment (loopback, an SSH tunnel or a VPN).
+
+## Fixed in this pass
+
+| # | Finding | Fix | Checked |
+|---|---|---|---|
+| 19 | **The time of a failed login told which names may log in.** An unknown name, an account outside the required group or without a login shell was refused before PAM and answered after the fixed 2 s; a wrong password for an account that may log in went through PAM first (pam_unix's own delay of about 2 s, and the hash), so it was answered about twice as late. That contradicted the threat model ("answered identically") and let a guesser keep to the names worth guessing. Not measured on a server: expected from pam_unix's default delay. | `FAILED_ANSWER` in `auth.rs`: every failed attempt is answered 4 s after it began, whatever failed. A PAM stack slower than that (a remote account database) can still be told apart. | Unit test `a_failure_is_answered_at_the_same_moment_however_long_the_check_took`. |
+| 20 | **An account could take another account's status file names.** `/run/waydesk/status` was sticky and open to every account, and each session wrote `UID.json.tmp` and renamed it to `UID.json`. Another account could create those names first: with the kernel's link protections (on by default on Debian, Ubuntu and Arch) that only hid the victim's session from `waydesk-admin status`; with them off, the victim's session would have written, and set the mode of, a file its own account owns, through the other account's link. | The helper (root) makes `status` writable by root only and, before a session starts and when one registers, a folder `status/UID` owned by that account, mode 0700; the file is `status/UID/status.json`. Root reads it with `O_NOFOLLOW` and takes only a plain file the account owns, at most 64 KB. Sessions started before the upgrade show their status again once they restart. | Unit tests `prepare_makes_a_folder_of_the_account_that_only_it_can_use`, `a_link_in_the_folder_is_not_followed`, `only_a_file_of_the_account_counts`. The helper has no CAP_FOWNER, so the mode is set while root still owns the folder; not yet run under the packaged unit. |
+| 21 | **The power rule let only the group wheel through.** `50-waydesk-no-power.rules` refuses reboot, power-off and suspend to members of `waydesk-users`, except members of `wheel`; Debian's and Ubuntu's administrators are in `sudo`, so an administrator who also logs in over RDP was refused too. It failed closed (nothing was opened), but did not do what the changelog of 0.5.0 says. | Administrators are members of `sudo` or `wheel` (`isAdmin`), in both rules of the file. | The rules evaluated in Node with stub subjects: an RDP account is refused, a member of `sudo` or of `wheel` is not handled (logind and polkit decide as before). Not tried with polkitd. |
+| 22 | **A full table of failure counters forgot how often a key had been locked.** At 4096 keys every key that was not locked at that moment was dropped, including keys whose lockout had just ended: someone who filled the table with new names (many addresses are needed: one address is locked after 20 failures) brought every lockout back to one minute. | Keys locked within the last hour (`DECAY`) are kept as well as the ones locked now, so the next lockout of such a key is still longer. | Unit test `a_full_table_keeps_what_makes_the_next_lockout_longer`. |
+
+## Checked and found as intended
+
+- The helper: SO_PEERCRED on both sockets, one login and one session per connection, root never, the shell and group rules, no program, path or
+  argument taken from the daemon. The daemon: every message of a session checked, the new pointer pictures included (`cursors::valid_image`, a
+  fixed 32 x 32 picture out); the address allowlist takes IPv4-mapped IPv6 addresses as IPv4.
+- `waydesk-admin users set`: the desktop and the GPU are normalised to known values (a render node only if the machine has it) before they reach
+  `/etc/default/waydesk.d/UID.env`, which root writes next to it and renames over it. `gpu roles` and `ai` write one line of `/etc/default/waydesk`
+  through the same checked path as before. `config check` reads and runs everything of the account as the account (`runuser`, 20 s at most).
+- The scripts behind `access`, `cert` and `vpn` check every value from the command line (peer names, addresses, ports, host names) and keep the
+  VPN keys and the client configurations under umask 077.
+- `users disable` ends the account's running session unless told to keep it.
+- The installer adds no third-party repositories when the Waydesk repository is configured (`dms.sh`): open item 7 of the second pass only applies
+  to an installation without it.
+
+## Open
+
+1. **`config check` runs the account's Hyprland check in the administrator's terminal.** `Hyprland --verify-config` reads the account's own Lua
+   configuration, through `runuser`, which keeps the administrator's controlling terminal. If checking the configuration runs its code, and the kernel
+   still allows TIOCSTI on a terminal (`dev.tty.legacy_tiocsti`), the account could type into the administrator's root shell. Neither condition was
+   confirmed. Starting it with `setsid --wait` (no controlling terminal) would close it.
+2. **GPU roles are placement, not isolation.** The udev rule gives `waydesk-users` every render node, the cards kept for inference included: any account
+   can use the model's card (its video memory, its compute), and the local model answers every account on localhost without authentication (said on
+   the GPU page). Leaving the inference cards out of the rule would make the role a boundary; what one process can see of another's GPU memory is the
+   driver's matter.
+3. Still open from before: plain TLS login, the daemon-supplied source address, passwords not wiped from memory, one binary for daemon and helper,
+   no second factor, no limit per address on connections that have not logged in yet (one address can hold the 64 slots for 30 s each), no
+   fuzzing of the RDP side, and no review by someone else.

@@ -55,7 +55,7 @@ Then connect an RDP client to the server (through the tunnel) with the administr
 
 ## Status
 
-Early. Tested with FreeRDP and the Windows App on macOS. Not independently reviewed: four internal security passes are in
+Early. Tested with FreeRDP and the Windows App on macOS. Not independently reviewed: five internal security passes are in
 [docs/SECURITY-REVIEW.md](docs/SECURITY-REVIEW.md), and the open items are in the [threat model](docs/THREAT-MODEL.md). Supported: Debian 13, Ubuntu 26.04 and Arch Linux (x86_64 and aarch64); other distributions are not. The Waydesk desktop (sway) is packaged for Debian and Ubuntu; on Arch the other desktops are ordinary packages you install. The clipboard is text only; the [roadmap](docs/ROADMAP.md) lists what is next. To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Documentation

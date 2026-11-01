@@ -110,13 +110,13 @@ pub fn run(cfg: Config) -> Result<()> {
     let dir = cfg.socket.parent().context("--helper-socket needs a directory")?.to_path_buf();
     std::fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
     let register_path = dir.join("sessions.sock");
-    // Where the session processes say what they run (src/sessionstatus.rs): sticky and open to every account, like /tmp, so that an account can write
-    // its own file and cannot replace another's. The files themselves are readable by their account and root only.
+    // Where the session processes say what they run (src/sessionstatus.rs): written by root only, with a folder of its own for every account that has a
+    // session (made in `session_for` and at registration), so no account can take another's file names.
     {
         use std::os::unix::fs::PermissionsExt as _;
         let status_dir = dir.join("status");
         std::fs::create_dir_all(&status_dir).with_context(|| format!("creating {}", status_dir.display()))?;
-        std::fs::set_permissions(&status_dir, std::fs::Permissions::from_mode(0o1777)).with_context(|| format!("setting the mode of {}", status_dir.display()))?;
+        std::fs::set_permissions(&status_dir, std::fs::Permissions::from_mode(0o755)).with_context(|| format!("setting the mode of {}", status_dir.display()))?;
     }
 
     // The daemon's socket: owner only from the first moment, then handed to the daemon's account.
@@ -223,6 +223,8 @@ fn registration(mut conn: UnixStream, sessions: &Sessions) {
         *mine += 1;
     }
     let _count = CountGuard { sessions, uid };
+    // A session that was running when the helper restarted lost its status folder with the runtime directory: it gets it back here.
+    prepare_status(uid);
     let Ok(sock) = conn.try_clone() else { return };
     let generation = sessions.next_generation.fetch_add(1, Ordering::Relaxed);
     sessions.by_uid.lock().unwrap().insert(uid, Registered { sock, generation });
@@ -252,6 +254,13 @@ impl Drop for CountGuard<'_> {
                 counts.remove(&self.uid);
             }
         }
+    }
+}
+
+/// The account's own status folder (src/sessionstatus.rs). A failure only costs `waydesk-admin status` its line about this session.
+fn prepare_status(uid: u32) {
+    if let Err(e) = crate::sessionstatus::prepare(std::path::Path::new(crate::sessionstatus::DIR), uid) {
+        warn!(uid, "cannot make the status folder of the account: {e}");
     }
 }
 
@@ -327,6 +336,7 @@ fn session_for(user: &UserInfo, cfg: &Config, sessions: &Sessions, register_path
         }
     }
     ensure_runtime_dir(user)?;
+    prepare_status(user.uid);
     if cfg.systemd_sessions {
         let unit = format!("waydesk-session@{}.service", user.uid);
         let status = std::process::Command::new("systemctl").arg("start").arg(&unit).stdin(std::process::Stdio::null()).status().context("cannot run systemctl")?;

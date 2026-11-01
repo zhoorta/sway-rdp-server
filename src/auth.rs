@@ -133,6 +133,11 @@ struct Guard {
     last: Instant,
 }
 
+/// How much longer a failed attempt that has taken `elapsed` so far waits before it is answered.
+fn failed_wait(elapsed: Duration) -> Duration {
+    FAILED_ANSWER.saturating_sub(elapsed)
+}
+
 /// How long the `lockouts`-th lockout of a key lasts.
 fn lockout_for(lockouts: u32) -> Duration {
     LOCKOUT.saturating_mul(1u32 << lockouts.saturating_sub(1).min(16)).min(LOCKOUT_MAX)
@@ -179,7 +184,11 @@ pub struct PamPolicy {
     watch: Mutex<HashMap<String, (Instant, u32, bool)>>,
 }
 
-const FAIL_DELAY: Duration = Duration::from_secs(2);
+/// When a failed login is answered, counted from the start of the attempt, whatever failed: an unknown account, one outside the required group or
+/// without a login shell (refused before PAM), or a wrong password (PAM adds a delay of its own, about 2 s with pam_unix, and the time of the hash).
+/// Answering all of them at the same moment keeps the time from telling which names are accounts that may log in. A PAM stack slower than this
+/// (a remote account database) can still be told apart.
+const FAILED_ANSWER: Duration = Duration::from_secs(4);
 /// Failures in a row for one account from one source address, and for one source address in all (higher: an office may share
 /// one address). A lockout lasts `LOCKOUT` and doubles each time the same key is locked again, up to `LOCKOUT_MAX`; a key that
 /// has been quiet for `DECAY` starts again from the beginning.
@@ -253,7 +262,9 @@ impl PamPolicy {
     fn begin_attempt_at(&self, key: &str, max_failures: u32, now: Instant) -> bool {
         let mut guards = self.guards.lock().unwrap();
         if guards.len() >= MAX_TRACKED {
-            guards.retain(|_, g| g.locked_until.is_some_and(|t| t > now));
+            // Keys that are locked, and keys that were locked within the last `DECAY` (so the next lockout is still longer): dropping those let
+            // someone who filled the table with new names start every lockout again from a minute.
+            guards.retain(|_, g| g.locked_until.is_some_and(|t| t > now) || (g.lockouts > 0 && now.duration_since(g.last) < DECAY));
         }
         let g = guards.entry(key.to_owned()).or_insert(Guard { failures: 0, locked_until: None, lockouts: 0, last: now });
         if let Some(t) = g.locked_until {
@@ -311,8 +322,9 @@ impl PamPolicy {
 
     /// Checks `password` for the account `name`, coming from `source` (an address, for the failure counters).
     /// Blocking: PAM can take a while and a failed attempt is delayed on purpose. Unknown accounts and wrong
-    /// passwords get the same answer and the same delay.
+    /// passwords get the same answer at the same moment (`FAILED_ANSWER` after the attempt began).
     pub fn authenticate(&self, name: &str, password: &str, source: &str) -> Option<UserInfo> {
+        let started = Instant::now();
         // Per account and address together (with the length of the name, so no two pairs can be written the same way), and per
         // address: someone who guesses at an account from elsewhere cannot lock its owner out of their own address.
         let (pair_key, source_key) = (format!("pair:{}:{name}:{source}", name.len()), format!("ip:{source}"));
@@ -330,7 +342,7 @@ impl PamPolicy {
             None => {
                 self.note_failure(name, Instant::now());
                 warn!(user = ?name, source = ?source, "login rejected (PAM)");
-                std::thread::sleep(FAIL_DELAY);
+                std::thread::sleep(failed_wait(started.elapsed()));
             }
         }
         accepted
@@ -461,6 +473,36 @@ mod tests {
         policy.eased("ip:a");
         assert_eq!(policy.guards.lock().unwrap()["ip:a"].failures, 9);
         policy.eased("ip:unknown"); // nothing tracked: nothing happens
+    }
+
+    #[test]
+    fn a_failure_is_answered_at_the_same_moment_however_long_the_check_took() {
+        // Refused before PAM (no time spent) and refused by PAM (its own delay and the hash): the answer comes at the same moment.
+        assert_eq!(failed_wait(Duration::ZERO), FAILED_ANSWER);
+        assert_eq!(Duration::from_millis(2300) + failed_wait(Duration::from_millis(2300)), FAILED_ANSWER);
+        assert_eq!(failed_wait(FAILED_ANSWER + Duration::from_secs(3)), Duration::ZERO, "a slower check is not delayed more");
+    }
+
+    #[test]
+    fn a_full_table_keeps_what_makes_the_next_lockout_longer() {
+        let policy = PamPolicy::new("waydesk-server", None, None).unwrap();
+        let t0 = Instant::now();
+        // A key locked once, whose minute has passed.
+        for _ in 0..6 {
+            policy.begin_attempt_at("pair:victim", 5, t0);
+        }
+        let later = t0 + LOCKOUT + Duration::from_secs(1);
+        // The table filled with names of no consequence.
+        for i in 0..MAX_TRACKED {
+            policy.begin_attempt_at(&format!("pair:filler{i}"), 5, later);
+        }
+        assert_eq!(policy.guards.lock().unwrap().get("pair:victim").map(|g| g.lockouts), Some(1), "the lockout history survives the clean-up");
+        assert!(!policy.guards.lock().unwrap().contains_key("pair:filler0"), "keys with nothing to remember are dropped");
+        // So the next lockout of that key lasts two minutes, not one.
+        for _ in 0..6 {
+            policy.begin_attempt_at("pair:victim", 5, later);
+        }
+        assert_eq!(policy.guards.lock().unwrap()["pair:victim"].lockouts, 2);
     }
 
     #[test]

@@ -2,6 +2,10 @@
 
 What changed, newest first. The numbered releases are the ones in the apt repository.
 
+## Unreleased
+
+**A fifth security pass** (`docs/SECURITY-REVIEW.md`, findings 19 to 22), on what 0.4 and 0.5 added. Every failed login is now answered 4 s after it began, whatever failed: an unknown account was answered sooner than a wrong password, which told a guesser which names may log in. The status files of the sessions move from one directory open to every account (`/run/waydesk/status/UID.json`, sticky) to a folder per account that the helper makes (`/run/waydesk/status/UID/status.json`, 0700), so an account can no longer take another's file names first; sessions started before the upgrade show their status in `waydesk-admin status` once they restart. The power rule lets administrators through on Debian and Ubuntu too (the group `sudo`; it knew only `wheel`). A full table of failed-login counters keeps how often a key was locked, so lockouts keep getting longer.
+
 ## 2026-11-01 · 0.5.0
 
 **Licence.** Waydesk is now licensed under the GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later), with the full text in `LICENSE`; the MIT and Apache-2.0 files are gone. The third-party code in the repository (`patches/ironrdp-server` and the other patches) keeps its own licences, and the 411 Rust crates the server builds on are all permissive (MIT, Apache-2.0, BSD, ISC and the like), which the AGPL can include. The Debian packages carry the licence text in their `copyright` file, the Arch package in `/usr/share/licenses`.

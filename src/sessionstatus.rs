@@ -1,9 +1,11 @@
 //! What a session says about itself for `waydesk-admin status`: whether it renders on a GPU, which encoder it runs (VAAPI, NVENC, or OpenH264 on the
 //! CPU, which a failed GPU start falls back to with nothing but a line in the log), the quantiser and the frame rate it reaches.
 //!
-//! The session worker writes it to `/run/waydesk/status/UID.json`, a directory the helper makes sticky (like `/tmp`: an account can write its own
-//! file and cannot replace another's). The file is readable by its account and by root, so `status` shows the rest of the accounts' sessions to
-//! root only. It holds nothing about the client. Shared with the admin tool, which reads it.
+//! The session worker writes it to `/run/waydesk/status/UID/status.json`. The helper (root) makes `status` open to root only for writing and, for
+//! every account that has a session, a folder `UID` of that account's own (0700), so no account can create, squat on or replace another's files
+//! (an earlier version had one sticky directory, like `/tmp`, where an account could take another's file names first). The file is readable by its
+//! account and by root, so `status` shows the rest of the accounts' sessions to root only. It holds nothing about the client. Shared with the admin
+//! tool, which reads it.
 #![allow(dead_code)]
 
 use std::path::{Path, PathBuf};
@@ -41,8 +43,38 @@ fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
+/// The account's own folder.
+pub fn dir_for(dir: &Path, uid: u32) -> PathBuf {
+    dir.join(uid.to_string())
+}
+
 pub fn path_for(dir: &Path, uid: u32) -> PathBuf {
-    dir.join(format!("{uid}.json"))
+    dir_for(dir, uid).join("status.json")
+}
+
+/// Root (the helper): `dir` writable by root only, and the account's own folder in it, owned by the account and closed to the others. Called before a
+/// session starts and when one registers (the folders go with the runtime directory when the helper restarts).
+pub fn prepare(dir: &Path, uid: u32) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt as _;
+    std::fs::create_dir_all(dir)?;
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o755))?;
+    let mine = dir_for(dir, uid);
+    // Only root can make entries in `dir`, so what is there was made here. One that is already the account's is left as it is (the helper has no
+    // CAP_FOWNER, so it could not change the mode of a folder it no longer owns). Otherwise the mode is set while root still owns it, then it is
+    // handed over (lchown, should it ever be a link).
+    match std::fs::create_dir(&mine) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            use std::os::unix::fs::MetadataExt as _;
+            let meta = std::fs::symlink_metadata(&mine)?;
+            if meta.is_dir() && meta.uid() == uid {
+                return Ok(());
+            }
+        }
+        Err(e) => return Err(e),
+    }
+    std::fs::set_permissions(&mine, std::fs::Permissions::from_mode(0o700))?;
+    std::os::unix::fs::lchown(&mine, Some(uid), None)
 }
 
 pub fn to_json(s: &Status) -> Value {
@@ -62,16 +94,18 @@ pub fn from_json(v: &Value) -> Status {
     }
 }
 
-/// The status of the account's session, if it wrote one that the account really owns.
+/// The status of the account's session, if it wrote one that the account really owns. Root reads it: the file is opened without following a link
+/// (the account could put one in its folder, pointing anywhere), and only a plain file of the account itself counts.
 pub fn read(dir: &Path, uid: u32) -> Option<Status> {
-    use std::os::unix::fs::MetadataExt as _;
-    let path = path_for(dir, uid);
-    let meta = std::fs::metadata(&path).ok()?;
-    // The directory is sticky and anyone can create files in it: only a file of the account itself counts.
-    if meta.uid() != uid {
+    use std::io::Read as _;
+    use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
+    let mut file = std::fs::OpenOptions::new().read(true).custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK).open(path_for(dir, uid)).ok()?;
+    let meta = file.metadata().ok()?;
+    if !meta.is_file() || meta.uid() != uid {
         return None;
     }
-    let text = std::fs::read_to_string(&path).ok()?;
+    let mut text = String::new();
+    file.by_ref().take(64 * 1024).read_to_string(&mut text).ok()?;
     Some(from_json(&serde_json::from_str::<Value>(&text).ok()?))
 }
 
@@ -83,14 +117,15 @@ pub fn is_fresh(s: &Status) -> bool {
 static CURRENT: Mutex<Status> = Mutex::new(Status { render: None, encoder: None, encoder_node: None, compositor: None, qp: None, fps: None, kbps: None, stats_at: 0 });
 
 fn publish(s: &Status) {
-    let dir = Path::new(DIR);
-    // Not under the helper (a session started by hand, a test): nothing to write to, and nothing to complain about.
+    let uid = unsafe { libc::geteuid() };
+    let dir = dir_for(Path::new(DIR), uid);
+    // Not under the helper (a session started by hand, a test), or the helper has not made the folder yet: nothing to write to, and nothing to
+    // complain about (the next update writes it).
     if !dir.is_dir() {
         return;
     }
-    let uid = unsafe { libc::geteuid() };
-    let path = path_for(dir, uid);
-    let tmp = dir.join(format!("{uid}.json.tmp"));
+    let path = path_for(Path::new(DIR), uid);
+    let tmp = dir.join("status.json.tmp");
     let Ok(text) = serde_json::to_string(&to_json(s)) else { return };
     use std::os::unix::fs::PermissionsExt as _;
     if std::fs::write(&tmp, text).is_ok() {
@@ -179,13 +214,39 @@ mod tests {
     #[test]
     fn only_a_file_of_the_account_counts() {
         let dir = std::env::temp_dir().join(format!("waydesk-status-test-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
         let mine = unsafe { libc::geteuid() };
+        std::fs::create_dir_all(dir_for(&dir, mine)).unwrap();
         std::fs::write(path_for(&dir, mine), serde_json::to_string(&to_json(&Status { encoder: Some("vaapi".into()), ..Default::default() })).unwrap()).unwrap();
         assert_eq!(read(&dir, mine).and_then(|s| s.encoder), Some("vaapi".into()));
         // The same file, asked for as the account of another uid, is not that account's.
+        std::fs::create_dir_all(dir_for(&dir, mine + 1)).unwrap();
         std::fs::copy(path_for(&dir, mine), path_for(&dir, mine + 1)).unwrap();
         assert!(read(&dir, mine + 1).is_none(), "a file owned by someone else is not shown for this uid");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_link_in_the_folder_is_not_followed() {
+        let dir = std::env::temp_dir().join(format!("waydesk-status-link-{}", std::process::id()));
+        let mine = unsafe { libc::geteuid() };
+        std::fs::create_dir_all(dir_for(&dir, mine)).unwrap();
+        let elsewhere = dir.join("elsewhere.json");
+        std::fs::write(&elsewhere, serde_json::to_string(&to_json(&Status { encoder: Some("vaapi".into()), ..Default::default() })).unwrap()).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, path_for(&dir, mine)).unwrap();
+        assert!(read(&dir, mine).is_none(), "a link is not read, even to a file of the same account");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn prepare_makes_a_folder_of_the_account_that_only_it_can_use() {
+        use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+        let dir = std::env::temp_dir().join(format!("waydesk-status-prepare-{}", std::process::id()));
+        let mine = unsafe { libc::geteuid() };
+        prepare(&dir, mine).unwrap();
+        prepare(&dir, mine).unwrap(); // again: nothing changes, no error
+        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o7777, 0o755, "nobody but root makes entries in it");
+        let own = std::fs::metadata(dir_for(&dir, mine)).unwrap();
+        assert_eq!((own.uid(), own.permissions().mode() & 0o7777), (mine, 0o700));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

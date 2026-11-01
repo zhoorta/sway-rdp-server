@@ -2,20 +2,24 @@
 //
 // Without this an ordinary account is already refused (logind asks for an administrator's authentication, which it cannot give, and says that
 // other users are logged in), but it gets a password dialog that a known administrator password would satisfy. This answers no, at once.
-// Administrators (members of the group wheel) are not affected: they keep whatever logind and polkit allow them. To let another group through,
-// add it to the exceptions below.
+// Administrators (members of the group sudo on Debian and Ubuntu, wheel on Arch) are not affected: they keep whatever logind and polkit allow
+// them. To let another group through, add it to `isAdmin` below.
+function isAdmin(subject) {
+    return subject.isInGroup("sudo") || subject.isInGroup("wheel");
+}
+
 polkit.addRule(function(action, subject) {
     if (!/^org\.freedesktop\.login1\.(reboot|power-off|halt|suspend|hibernate|hybrid-sleep)/.test(action.id)) {
         return polkit.Result.NOT_HANDLED;
     }
-    if (subject.isInGroup("waydesk-users") && !subject.isInGroup("wheel")) {
+    if (subject.isInGroup("waydesk-users") && !isAdmin(subject)) {
         return polkit.Result.NO;
     }
     return polkit.Result.NOT_HANDLED;
 });
 
 // Omarchy's theme switch (and its first start, which sets the first theme) writes the theme colour into the system-wide managed policy of Chromium, Chrome, Edge and
-// Brave through `pkexec /usr/bin/omarchy-theme-set-browser-policy`. An account outside the group wheel gets a password dialog for a password it does not have, and
+// Brave through `pkexec /usr/bin/omarchy-theme-set-browser-policy`. An account that is not an administrator gets a password dialog for a password it does not have, and
 // Omarchy's first start waits on that dialog for good: the account never gets a theme (no Style or Background menu, an include error in the terminal). One account's
 // colour would also recolour every account's browser. This answers no, at once, so that the theme itself (Hyprland, the bar, the terminal, the wallpaper, which is
 // per account) is applied and only the browser policy is skipped; the helper's own failure is not fatal to the theme switch.
@@ -26,7 +30,7 @@ polkit.addRule(function(action, subject) {
     if (action.lookup("program") !== "/usr/bin/omarchy-theme-set-browser-policy") {
         return polkit.Result.NOT_HANDLED;
     }
-    if (subject.isInGroup("waydesk-users") && !subject.isInGroup("wheel")) {
+    if (subject.isInGroup("waydesk-users") && !isAdmin(subject)) {
         return polkit.Result.NO;
     }
     return polkit.Result.NOT_HANDLED;
