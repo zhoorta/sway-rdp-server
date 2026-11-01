@@ -26,7 +26,7 @@ pub struct Status {
     pub encoder: Option<String>,
     /// The render node of the card the encoder runs on (`None`: the CPU, or not known). It can differ from `render`: Intel draws and NVENC encodes.
     pub encoder_node: Option<String>,
-    /// The compositor the session runs on: `sway` or `hyprland` (a session keeps it until it restarts, whatever the setting says now).
+    /// The desktop the session runs: `sway`, `cosmic`, `plasma` or `hyprland` (COSMIC and Plasma run inside a sway; a session keeps it until it restarts, whatever the setting says now).
     pub compositor: Option<String>,
     /// The quantiser of a GPU encoder.
     pub qp: Option<u32>,
@@ -111,7 +111,7 @@ pub fn set_render(node: Option<&Path>) {
     update(|s| s.render = node.map(|n| n.display().to_string()));
 }
 
-/// The compositor the session runs on (`sway` or `hyprland`).
+/// The desktop the session runs (`sway`, `cosmic`, `plasma` or `hyprland`).
 pub fn set_compositor(name: &str) {
     update(|s| s.compositor = Some(name.to_owned()));
 }

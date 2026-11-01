@@ -139,7 +139,8 @@ pub async fn run(cfg: Config) -> Result<()> {
     };
     // Declared before the session so that it is dropped after it: the session's cleanup still needs the sway.
     let mut sway = if cfg.own_sway { Some(OwnCompositor::start_preferring_gpu().await?) } else { None };
-    crate::sessionstatus::set_compositor(crate::compositor::name(crate::compositor::kind()));
+    // What `status` and `users list` show as the session's desktop: sway, cosmic, plasma or hyprland (COSMIC and Plasma run inside a sway, but the desktop is what the account chose).
+    crate::sessionstatus::set_compositor(if crate::compositor::is_nested() { crate::compositor::desktop_name() } else { crate::compositor::name(crate::compositor::kind()) });
 
     let mut session: Option<Session> = None;
     let mut pending: Option<std::os::unix::net::UnixStream> = None;
