@@ -77,7 +77,7 @@ $ ssh -N -L 3389:127.0.0.1:3389 you@your-server
 
 Connect the RDP client to `localhost`. The tunnel lives only as long as that command runs; `ServerAliveInterval 30` in `~/.ssh/config`, or `autossh`, keeps it up across short drops.
 
-> A tunnel runs TCP inside TCP, which stalls on a link with a long round trip (about 100 ms, another country): the picture follows the link down as far as it must, but a VPN is better there.
+> A tunnel runs TCP inside TCP, which stalls on a link with a long round trip (about 100 ms, another country): image quality drops as far as it must to keep up, but a VPN is better there.
 
 ## The local network {bar: terminal}
 ```console

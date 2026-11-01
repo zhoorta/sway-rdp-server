@@ -3,7 +3,7 @@ nav: RDP clients
 seo_title: Connect to a Linux RDP desktop from macOS, Windows or Linux: Waydesk clients
 description: Step by step for the Windows App on macOS, mstsc on Windows and FreeRDP on Linux: the tunnel, the account, the certificate and the first connection.
 ---
-Waydesk speaks standard RDP, so any RDP client can connect. This page shows the ones that were tried, in the order a first connection goes. Remmina, iOS and Android clients were not tried.
+Waydesk speaks standard RDP, so any RDP client can connect. This page shows the ones tried so far, in the order a first connection goes. Remmina, iOS and Android clients were not tried.
 
 ## What you need first {bar: notes}
 - **An account.** The one `waydesk-setup-admin` made, or one an administrator made with `waydesk-admin users add NAME`.

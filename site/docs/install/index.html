@@ -94,7 +94,7 @@
 </section>
 <section id="on-arch-linux">
 <h2>On Arch Linux</h2>
-<p>Arch (x86_64 and Arch Linux ARM) has its own signed repository, with the same key. It installs the server and its sessions (plain sway, or the desktop you set for an account); the Waydesk shell, launcher and dock are Debian and Ubuntu packages.</p>
+<p>Arch (x86_64 and Arch Linux ARM) has its own signed repository, with the same key. It installs the server and its sessions (plain Sway, or the desktop you set for an account); the Waydesk shell, launcher and dock are Debian and Ubuntu packages.</p>
 <pre><code><span class="p">$</span> curl -fsSL https://waydesk.dev/arch/waydesk.gpg | sudo pacman-key --add -
 <span class="p">$</span> sudo pacman-key --lsign-key C64672B25ECD4773196C39589D8E8874E67617F4
 <span class="p">$</span> printf '[waydesk]\nSigLevel = Required DatabaseRequired\nServer = https://waydesk.dev/arch/$arch\n' | sudo tee -a /etc/pacman.conf
@@ -136,7 +136,7 @@ alice              sway      running     230 MB       -     4%  31.3 GB renderD1
 bob                plasma    running     660 MB       -     3%  31.3 GB renderD128 vaapi@renderD128             -    Xwayland 506 MB, plasmashell 473 MB, kwin_wayland 409 MB
 carol              cosmic    running     920 MB       -     3%  31.3 GB renderD128 vaapi@renderD128             -    Xwayland 508 MB, cosmic-app-libr 313 MB, cosmic-launcher 313 MB
 dave               hyprland  running     866 MB       -     6%  31.3 GB renderD128 vaapi@renderD128             -    quickshell 567 MB, Hyprland 363 MB, Xwayland 253 MB</code></pre>
-<p>Real output from the Intel test server (an i7-7700 with an HD 630, running Arch): four accounts, one on each desktop, all drawn on the GPU and encoded by VAAPI. The <code>DESKTOP</code> column says which desktop each account runs. The systems and clients that were tried are on <a href="/docs/limits/">Limits and status</a>.</p>
+<p>Real output from the Intel test server (an i7-7700 with an HD 630, running Arch): four accounts, one on each desktop, all drawn on the GPU and encoded by VAAPI. The <code>DESKTOP</code> column says which desktop each account runs. The systems and clients tried so far are on <a href="/docs/limits/">Limits and status</a>.</p>
 </section>
 <section id="what-you-get">
 <h2>What you get</h2>

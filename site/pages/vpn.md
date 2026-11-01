@@ -3,7 +3,7 @@ nav: VPN and security
 seo_title: WireGuard VPN for the RDP port, and securing access · Waydesk
 description: What protects the RDP login, and how to put the port behind a WireGuard VPN with three commands: init, add a client, scan the QR code.
 ---
-The RDP port is closed until you open it, and there are two good ways to open it to people who are not on the machine: an SSH tunnel and a WireGuard VPN. This page says what protects the login, then makes the VPN.
+The RDP port is closed until you open it, and there are two good ways to open it to people who are not on the machine: an SSH tunnel and a WireGuard VPN. This page explains what protects the login, then sets up the VPN.
 
 ## Security: what protects the login {bar: notes}
 The login is the account's **password inside TLS**, with no second factor. Everything else is about making sure only the right people get as far as typing it:

@@ -46,7 +46,7 @@
 <div class="hero">
   <div>
     <h1>Multi-user Linux desktops over RDP, <em>out of the box.</em></h1>
-    <p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04, or a signed pacman repository on Arch. Every account that logs in gets its own desktop, kept alive between connections. No client to install: use the Windows App, Remmina or any RDP client.</p>
+    <p class="lede">One <code>apt install</code> on Debian 13 or Ubuntu 26.04, or a signed pacman repository on Arch. Every account that logs in gets its own desktop, kept alive between connections. Nothing extra to install on the client: use the Windows App, Remmina or any RDP client.</p>
   </div>
   <div class="win">
       <div class="bar"><span class="t">install</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
@@ -60,10 +60,12 @@
 
 <section class="band" id="desktops">
 <h2>Pick the desktop for each account</h2>
-<p>Every account gets the Waydesk desktop unless you choose another with one command, <code>waydesk-admin users set NAME --desktop plasma</code> (or <code>cosmic</code>, <code>hyprland</code>). The other desktops are ordinary packages of your distribution: install the one you want, then give it to the account. <a href="/docs/desktops/">What was tested, and where</a>.</p>
+<p>Every account gets the Waydesk desktop unless you choose another, with one command:</p>
+<pre><code><span class="p">$</span> sudo waydesk-admin users set NAME --desktop plasma</code></pre>
+<p>Or <code>cosmic</code>, <code>hyprland</code>, <code>sway</code>. The other desktops are ordinary packages of your distribution: install the one you want, then give it to the account. <a href="/docs/desktops/">What was tested, and where</a>.</p>
 <div class="gallery">
   <a class="win gtile" href="/docs/desktops/#waydesk"><div class="bar"><span class="t">Waydesk desktop</span></div><img src="gallery/waydesk-sm.webp" width="840" height="525" loading="lazy" alt="Waydesk desktop with the shell bar, the dock, a browser showing this site and a terminal"><div class="body"><p>The default: a shell, a launcher and a dock. Debian 13 and Ubuntu 26.04, amd64 and arm64. An idle session takes about 0.7 GB.</p></div></a>
-  <a class="win gtile" href="/docs/desktops/#plasma"><div class="bar"><span class="t">KDE Plasma</span></div><img src="gallery/plasma-sm.webp" width="840" height="525" loading="lazy" alt="KDE Plasma desktop with a terminal showing waydesk-admin status"><div class="body"><p>Tested on Arch with an Intel GPU, and on Debian 13. Install it from your distribution. An idle session takes about 0.65 GB.</p></div></a>
+  <a class="win gtile" href="/docs/desktops/#plasma"><div class="bar"><span class="t">KDE Plasma</span></div><img src="gallery/plasma-sm.webp" width="840" height="525" loading="lazy" alt="KDE Plasma desktop with a terminal showing waydesk-admin status"><div class="body"><p>Tested on Arch with an Intel GPU, and on Debian 13. Install it from your distribution. An idle session takes about 0.75 GB.</p></div></a>
   <a class="win gtile" href="/docs/desktops/#cosmic"><div class="bar"><span class="t">COSMIC</span></div><img src="gallery/cosmic-sm.webp" width="840" height="525" loading="lazy" alt="COSMIC desktop with a browser showing this site and the dock"><div class="body"><p>Tested on Arch with an Intel GPU. Install it from your distribution. An idle session takes about 0.9 GB.</p></div></a>
   <a class="win gtile" href="/docs/desktops/#omarchy"><div class="bar"><span class="t">Omarchy (Hyprland)</span></div><img src="gallery/omarchy-sm.webp" width="840" height="525" loading="lazy" alt="Omarchy on Hyprland: a terminal showing waydesk-admin status next to a browser showing this site"><div class="body"><p>Tested on Arch with an Intel GPU; Hyprland needs a GPU. An idle session takes about 0.75 GB.</p></div></a>
   <a class="win gtile" href="/docs/desktops/#ml4w"><div class="bar"><span class="t">ML4W (Hyprland)</span></div><img src="gallery/ml4w-sm.webp" width="840" height="525" loading="lazy" alt="ML4W on Hyprland: a terminal and a browser showing this site, with the bar and the dock"><div class="body"><p>Tested on Arch with an Intel GPU; Hyprland needs a GPU. An idle session takes about 1.0 GB.</p></div></a>
@@ -71,7 +73,7 @@
 OK    Hyprland accepts it
 OK    the GPU can be opened
 <span class="c">WARN  hypridle: display off, 11 min</span>
-0 problems, 1 warnings</code></pre><p>Or keep your own sway or Hyprland setup: <code>config check</code> says whether it will work as a session. Omarchy and ML4W are tried; other dotfiles are not.</p></div></a>
+0 problems, 1 warnings</code></pre><p>Or keep your own Sway or Hyprland setup: <code>config check</code> tells you whether it will work as a session. Omarchy and ML4W have been tried; other dotfiles have not.</p></div></a>
 </div>
 </section>
 
@@ -80,8 +82,8 @@ OK    the GPU can be opened
 <div class="grid">
   <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>A small team on one server</h3><p>Each person gets a desktop of their own on a shared Debian or Ubuntu machine, with memory limits, and one RDP client is all they need.</p></div></div>
   <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>Developers on a bigger machine</h3><p>Work in a browser, an editor and a terminal that live on the server, from a laptop or a Mac, and pick the session up again where you left it.</p></div></div>
-  <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>Labs, courses and support desks</h3><p>A ready desktop per account with a few applications, made with <code>waydesk-admin users add</code>, on a server you already run.</p></div></div>
-  <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>Anyone on a slow or distant link</h3><p>The picture follows what the link delivers, so a session across a long or lossy connection stays usable.</p></div></div>
+  <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>Labs, courses and support desks</h3><p>A ready desktop per account with a few applications, created with <code>waydesk-admin users add</code>, on a server you already run.</p></div></div>
+  <div class="win card"><div class="bar"><span class="t">who</span></div><div class="body"><h3>Anyone on a slow or distant link</h3><p>Image quality adapts to what the connection can carry, so a session across a long or lossy connection stays usable.</p></div></div>
 </div>
 </section>
 
@@ -92,11 +94,11 @@ OK    the GPU can be opened
 <div class="grid">
   <div class="win card">
     <div class="bar"><span class="t">slow or lossy links</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>TCP BBR for the connection</h3><p>On a distant link with about 4&nbsp;% loss the connection went from 0.3 to <span class="num">2 to 4 Mbit/s</span>, and typing stopped arriving in bursts.</p></div>
+    <div class="body"><h3>Usable on lossy links</h3><p>Each connection uses TCP BBR. On a distant link with about 4&nbsp;% loss, throughput rose from 0.3 Mbit/s to <span class="num">2 to 4 Mbit/s</span>, and typing stopped arriving in bursts.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">flow control</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>The picture follows the link</h3><p>Frames and bytes in flight follow the path; the video bitrate follows what the link delivers, from <span class="num">300 kbit/s</span> to 10 Mbit/s.</p></div>
+    <div class="body"><h3>Quality adapts to the connection</h3><p>Frames and bytes in flight follow the path; the video bitrate follows what the connection delivers, from <span class="num">300 kbit/s</span> to 10 Mbit/s.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">H.264</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
@@ -104,11 +106,11 @@ OK    the GPU can be opened
   </div>
   <div class="win card">
     <div class="bar"><span class="t">pointer</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>The pointer has no delay</h3><p>The client draws it with its real shape, so it moves at once; only the shape arrives a round trip late.</p></div>
+    <div class="body"><h3>The pointer moves without delay</h3><p>The client draws it with its real shape, so it moves at once; only a change of shape arrives a round trip late.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">memory</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Ceilings, compressed swap, a refusal</h3><p>A memory ceiling per account, compressed swap, and a refusal when the machine is full: <span class="num">7 to 8 users</span> with Chromium, Calc and VS Code open fit on 8 GB.</p></div>
+    <div class="body"><h3>A full server says no instead of slowing down</h3><p>A memory ceiling per account, compressed swap, and new logins refused when the machine is full: <span class="num">7 to 8 users</span> with Chromium, Calc and VS Code open fit on 8 GB.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">isolation</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
@@ -117,13 +119,13 @@ OK    the GPU can be opened
 </div>
 
 <section class="band" id="ai">
-<h2>One GPU, one shared model, a desktop for everyone</h2>
-<p>A local model (Ollama, vLLM or another service) that every account reaches on <code>localhost</code>, so the code and the documents stay on your server. Waydesk does not install or run the model: it keeps the desktops off its card and shows who is using it. <a href="/docs/recipes/#a-gpu-server-that-also-runs-a-shared-model">The recipe</a> &middot; <a href="/docs/recipes/#workstations-that-use-the-server-s-model">for workstations</a>. A hosted model works too, without anyone sharing a login: one key per account behind a gateway on the server, with budgets and revocation (<a href="/docs/recipes/#hosted-ai-for-every-account-one-key-each">the recipe</a>).</p>
+<h2>A shared model on your own server</h2>
+<p>A local model (Ollama, vLLM or another service) that every account reaches on <code>localhost</code>, so the code and the documents stay on your server. Waydesk does not install or run the model: it keeps the desktops off its card and shows who is using it. Recipes: <a href="/docs/recipes/#a-gpu-server-that-also-runs-a-shared-model">a server that runs the model</a>, and <a href="/docs/recipes/#workstations-that-use-the-server-s-model">workstations that use it</a>. A hosted model works too, without anyone sharing a login: one key per account behind a gateway on the server, with budgets and revocation (<a href="/docs/recipes/#hosted-ai-for-every-account-one-key-each">the recipe</a>).</p>
 </section>
 <div class="grid">
   <div class="win card">
     <div class="bar"><span class="t">GPU roles</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Desktops on one card, the model on the other</h3><p>Give a card the role <code>inference</code> and sessions are rendered and encoded on the Intel or AMD card. Measured with 8B and 14B models and up to 10 sessions: the model's speed <span class="num">did not change</span>.</p></div>
+    <div class="body"><h3>Desktops on one card, the model on the other</h3><p>Mark the NVIDIA card for <code>inference</code>, and sessions render and encode on the Intel or AMD card instead. Measured with 8B and 14B models and up to 10 sessions: the model's speed <span class="num">did not change</span>.</p></div>
   </div>
   <div class="win card">
     <div class="bar"><span class="t">localhost</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
@@ -154,13 +156,13 @@ OK    the GPU can be opened
   </div>
   <div class="win card">
     <div class="bar"><span class="t">keyboard</span><span class="cap" aria-hidden="true"><i>&#x2013;</i><i>&#x25a1;</i><i>&#x2715;</i></span></div>
-    <div class="body"><h3>Your own keyboard layout</h3><p>The layout follows the client. A keyboard that sends its keys to other places, such as a MacBook's through the Windows App, gets its own in the Keyboard window, and the session follows at once.</p></div>
+    <div class="body"><h3>Your own keyboard layout</h3><p>The layout follows the client. Some keyboards map keys differently, such as a MacBook's through the Windows App: pick its layout in the Keyboard window, and the session switches at once.</p></div>
   </div>
 </div>
 
 <section class="band" id="connect">
 <h2>Connect your way</h2>
-<p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect: through an SSH tunnel (the default), from the local network, or over a WireGuard VPN that Waydesk sets up for you. Clients that were tried: the Windows App on macOS, mstsc on Windows 11 and FreeRDP. <a href="/docs/connect/">How to connect</a> &middot; <a href="/docs/vpn/">VPN and security</a>.</p>
+<p>The port is closed to the network until you open it. <code>waydesk-setup-admin</code> asks how you will connect: through an SSH tunnel (the default), from the local network, or over a WireGuard VPN that Waydesk sets up for you. Clients tried so far: the Windows App on macOS, mstsc on Windows 11 and FreeRDP. <a href="/docs/connect/">How to connect</a> &middot; <a href="/docs/vpn/">VPN and security</a>.</p>
 </section>
 
 <section class="band" id="install">
@@ -182,13 +184,20 @@ OK    the GPU can be opened
 <span class="p">$</span> printf '[waydesk]\nSigLevel = Required DatabaseRequired\nServer = https://waydesk.dev/arch/$arch\n' | sudo tee -a /etc/pacman.conf
 <span class="p">$</span> sudo pacman -Syu waydesk-server
 <span class="p">$</span> sudo waydesk-setup-admin</code></pre>
-<p>Arch gets the server and its sessions (plain sway, or the desktop you choose for an account); the Waydesk shell, launcher and dock are Debian and Ubuntu packages. <a href="/docs/desktops/#arch-linux">What was tested on Arch</a>.</p>
+<p>Arch gets the server and its sessions (plain Sway, or the desktop you choose for an account); the Waydesk shell, launcher and dock are Debian and Ubuntu packages. <a href="/docs/desktops/#arch-linux">What was tested on Arch</a>.</p>
 <p>That is the whole install. Next: <a href="/docs/install/">the first administrator and a first connection</a>, <a href="/docs/connect/">how to connect</a>, and <a href="/docs/limits/">the systems and clients that were tested</a>.</p>
 </section>
 
 <section class="band" id="support">
 <h2>Set up for your team</h2>
-<p>Waydesk is free software, and everything on this site is enough to run it yourself. If you would rather have it done, <a href="https://stackcare.pt/en">StackCare</a>, which writes Waydesk, offers commercial setup and support: installing a server for a team, its accounts and access (SSH tunnel, local network or WireGuard), GPU roles and a local model, and keeping it updated afterwards. Write to <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>.</p>
+<p>Waydesk is free software, and everything on this site is enough to run it yourself. If you would rather have it done, <a href="https://stackcare.pt/en">StackCare</a>, which writes Waydesk, offers commercial setup and support:</p>
+<ul>
+  <li>a server installed for your team, with its accounts</li>
+  <li>access through an SSH tunnel, the local network or WireGuard</li>
+  <li>GPU roles and a local model</li>
+  <li>updates and support afterwards</li>
+</ul>
+<p>Write to <a href="mailto:jose@stackcare.pt">jose@stackcare.pt</a>.</p>
 </section>
 
 <section class="band" id="docs">

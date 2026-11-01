@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Troubleshooting Waydesk: connection, session, slow picture, GPU</title>
-<meta name="description" content="What to check when a client cannot connect, a session is refused, the picture is slow or wrong, or the GPU is not used. Where the logs are.">
+<title>Troubleshooting Waydesk: connection, session, slow or poor image, GPU</title>
+<meta name="description" content="What to check when a client cannot connect, a session is refused, the image is slow or wrong, or the GPU is not used. Where the logs are.">
 <link rel="canonical" href="https://waydesk.dev/docs/help/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#06121c">
-<meta property="og:title" content="Troubleshooting Waydesk: connection, session, slow picture, GPU">
-<meta property="og:description" content="What to check when a client cannot connect, a session is refused, the picture is slow or wrong, or the GPU is not used. Where the logs are.">
+<meta property="og:title" content="Troubleshooting Waydesk: connection, session, slow or poor image, GPU">
+<meta property="og:description" content="What to check when a client cannot connect, a session is refused, the image is slow or wrong, or the GPU is not used. Where the logs are.">
 <meta property="og:url" content="https://waydesk.dev/docs/help/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Waydesk">
@@ -19,8 +19,8 @@
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Troubleshooting Waydesk: connection, session, slow picture, GPU">
-<meta name="twitter:description" content="What to check when a client cannot connect, a session is refused, the picture is slow or wrong, or the GPU is not used. Where the logs are.">
+<meta name="twitter:title" content="Troubleshooting Waydesk: connection, session, slow or poor image, GPU">
+<meta name="twitter:description" content="What to check when a client cannot connect, a session is refused, the image is slow or wrong, or the GPU is not used. Where the logs are.">
 <meta name="twitter:image" content="https://waydesk.dev/og.jpg">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Waydesk", "item": "https://waydesk.dev/"}, {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://waydesk.dev/docs/"}, {"@type": "ListItem", "position": 3, "name": "When something is wrong", "item": "https://waydesk.dev/docs/help/"}]}</script>
 <link rel="stylesheet" href="/style.css">
@@ -62,7 +62,7 @@
 </ul>
 <h2>Help</h2>
 <ul>
-<li><a href="/docs/help/" aria-current="page">Troubleshooting</a><ul><li><a href="#where-the-logs-are">Where the logs are</a></li><li><a href="#the-client-cannot-connect">The client cannot connect</a></li><li><a href="#the-login-is-accepted-but-there-is-no-desktop">The login is accepted but there is no desktop</a></li><li><a href="#it-is-slow-or-the-picture-is-poor">It is slow, or the picture is poor</a></li><li><a href="#the-gpu-is-not-used">The GPU is not used</a></li><li><a href="#a-window-is-out-of-reach">A window is out of reach</a></li><li><a href="#kdenlive-says-it-crashed-on-its-last-start">Kdenlive says it crashed on its last start</a></li><li><a href="#still-stuck">Still stuck</a></li></ul></li>
+<li><a href="/docs/help/" aria-current="page">Troubleshooting</a><ul><li><a href="#where-the-logs-are">Where the logs are</a></li><li><a href="#the-client-cannot-connect">The client cannot connect</a></li><li><a href="#the-login-is-accepted-but-there-is-no-desktop">The login is accepted but there is no desktop</a></li><li><a href="#it-is-slow-or-the-image-is-poor">It is slow, or the image is poor</a></li><li><a href="#the-gpu-is-not-used">The GPU is not used</a></li><li><a href="#a-window-is-out-of-reach">A window is out of reach</a></li><li><a href="#kdenlive-says-it-crashed-on-its-last-start">Kdenlive says it crashed on its last start</a></li><li><a href="#still-stuck">Still stuck</a></li></ul></li>
 <li><a href="/docs/faq/">FAQ</a></li>
 </ul>
 </nav>
@@ -85,9 +85,9 @@
 <h2>The login is accepted but there is no desktop</h2>
 <ul class="plain"><li><strong>The session was refused for memory.</strong> <code>waydesk-admin status</code> ends its summary with "a new one would be REFUSED: 504 MB available, 1161 MB needed" when the machine is full (a new session needs the larger of 900 MB and 15 % of the memory). End an idle session (<code>sessions end NAME</code>), add memory, or lower another account's <code>users limit</code>. An account that already has a session just reconnects.</li><li><strong>The GPU could not give the desktop its buffers.</strong> On NVIDIA with Debian's driver 550 this used to leave no desktop; since 0.4.0 the session is made again in software. If you see <code>the session could not be made on the GPU (...): software rendering</code> in the journal, the GPU path failed and the session runs on the CPU: see <a href="/docs/gpu/">the GPU page</a>.</li></ul>
 </section>
-<section id="it-is-slow-or-the-picture-is-poor">
-<h2>It is slow, or the picture is poor</h2>
-<ul class="plain"><li><strong>Check the link first.</strong> The encoder follows what the link delivers, from 300 kbit/s to the maximum, and raises the quantiser (a blockier picture) when the link cannot carry the picture. A full-screen noise or video page asks for tens of Mbit/s; a mostly still desktop needs very little. A link of 4 Mbit/s will make a busy screen coarse, and it goes back to full quality within about half a minute of the screen settling.</li><li><strong>An SSH tunnel on a long round trip</strong> (about 100 ms, another country) stalls, because TCP runs inside TCP. A <a href="/docs/vpn/">WireGuard VPN</a> copes with it.</li><li>**<code>waydesk-admin status --watch</code>** shows the encoder, its quantiser and frame rate per session while you look at the picture.</li></ul>
+<section id="it-is-slow-or-the-image-is-poor">
+<h2>It is slow, or the image is poor</h2>
+<ul class="plain"><li><strong>Check the connection first.</strong> The encoder follows what the connection delivers, from 300 kbit/s to the maximum, and raises the quantiser (a blockier image) when the connection cannot carry the video. A full-screen noise or video page asks for tens of Mbit/s; a mostly still desktop needs very little. A link of 4 Mbit/s will make a busy screen coarse, and it goes back to full quality within about half a minute of the screen settling.</li><li><strong>An SSH tunnel on a long round trip</strong> (about 100 ms, another country) stalls, because TCP runs inside TCP. A <a href="/docs/vpn/">WireGuard VPN</a> copes with it.</li><li>**<code>waydesk-admin status --watch</code>** shows the encoder, its quantiser and frame rate per session while you watch the screen.</li></ul>
 </section>
 <section id="the-gpu-is-not-used">
 <h2>The GPU is not used</h2>

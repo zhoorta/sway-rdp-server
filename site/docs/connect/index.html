@@ -130,7 +130,7 @@ Connect: from your computer run  ssh -N -L 3389:127.0.0.1:3389 ACCOUNT@THIS-SERV
 <p>One user, no setup on the server. Leave the port on <code>127.0.0.1</code> and, from your computer:</p>
 <pre><code><span class="p">$</span> ssh -N -L 3389:127.0.0.1:3389 you@your-server</code></pre>
 <p>Connect the RDP client to <code>localhost</code>. The tunnel lives only as long as that command runs; <code>ServerAliveInterval 30</code> in <code>~/.ssh/config</code>, or <code>autossh</code>, keeps it up across short drops.</p>
-<blockquote>A tunnel runs TCP inside TCP, which stalls on a link with a long round trip (about 100 ms, another country): the picture follows the link down as far as it must, but a VPN is better there.</blockquote>
+<blockquote>A tunnel runs TCP inside TCP, which stalls on a link with a long round trip (about 100 ms, another country): image quality drops as far as it must to keep up, but a VPN is better there.</blockquote>
 </section>
 <section id="the-local-network">
 <h2>The local network</h2>

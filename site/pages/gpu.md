@@ -3,11 +3,11 @@ nav: GPU
 seo_title: GPU acceleration for a remote Linux desktop: Intel, NVIDIA, AMD · Waydesk
 description: What Waydesk does with a GPU (Intel, AMD, NVIDIA), how to set it up, how to see what each session runs, what happens when it fails, and what was measured.
 ---
-No GPU is needed. When the machine has one, every session draws its desktop on it and encodes the H.264 picture with the chip's own encoder, which leaves the CPU to the programs, and Chromium gets WebGL. If anything about the GPU fails, the session carries on in software.
+No GPU is needed. When the machine has one, every session draws its desktop on it and encodes the H.264 video with the chip's own encoder, which leaves the CPU to the programs, and Chromium gets WebGL. If anything about the GPU fails, the session carries on in software.
 
 ## What it changes {bar: notes}
 - **The desktop** (sway, the shell, the applications' windows) is drawn on the GPU through a render node in `/dev/dri`. OpenGL and WebGL applications run on it; without a GPU they run on the CPU, and a WebGL page in the browser does not animate (see below).
-- **The picture** is converted and encoded on the chip (VAAPI on Intel and AMD, NVENC on NVIDIA). On Intel the capture is also zero-copy: the compositor draws into GPU buffers and the GPU's video processor converts them, so the picture never passes through the CPU.
+- **The video** is converted and encoded on the chip (VAAPI on Intel and AMD, NVENC on NVIDIA). On Intel the capture is also zero-copy: the compositor draws into GPU buffers and the GPU's video processor converts them, so the image never passes through the CPU.
 - **Without a GPU** OpenGL and Vulkan applications still open, drawn by Mesa's software drivers on the CPU (`glxgears`, `vkcube` and Zed opened on a server with no render node). The browser is the exception: Waydesk starts Chromium with `--disable-gpu` there, which saves memory but leaves WebGL out, so a WebGL page does not animate. `--use-angle=swiftshader --enable-unsafe-swiftshader` brings it back at about 8 fps for a full-screen page, using three of four cores. A server that has a render node while `WAYDESK_GPU=off` is a different case: `vkcube` failed there.
 - **Nothing to configure** in the usual case: the package gives the accounts of `waydesk-users` the render node with a udev rule, and `WAYDESK_GPU=auto` picks the first one.
 
@@ -107,10 +107,10 @@ All of these go in `/etc/default/waydesk` and take effect for sessions that star
 | `WAYDESK_GPU_ROLES=renderD128=render,renderD129=inference` | what each card is for, by render node: `render` (sessions only), `inference` (a local model only: `auto` never picks it and no other card's session encodes on it; an account pinned there by hand still can) or `both`. Cards not listed are `render`. Set it with `sudo waydesk-admin gpu roles renderD129=inference` (only the named cards change; `gpu roles` alone shows the cards and their roles; `gpu roles reset` removes the setting). `waydesk-admin status` then prints the `CUDA_VISIBLE_DEVICES` to give the model service. A role starts nothing and moves nothing: you point the model service at its card yourself, and `inference` on an Intel or AMD card only keeps sessions off it |
 | `WAYDESK_ENCODER=software` | keep the GPU for drawing but encode on the CPU. `auto` (the default: VAAPI, then NVENC), `vaapi` and `nvenc` are the others |
 | `WAYDESK_NVENC_DEVICE=1` | the NVIDIA card (CUDA number) that encodes; by default the card the session draws on, else the first |
-| `WAYDESK_DMABUF=0` | go back to copying the picture through shared memory instead of the zero-copy capture |
+| `WAYDESK_DMABUF=0` | go back to copying the image through shared memory instead of the zero-copy capture |
 | `WAYDESK_VA_MIN_QP`, `WAYDESK_VA_MAX_QP` | the two ends of the quantiser (default 18 and 40): the quality wanted, and what a slow link may cost |
 
-The GPU encoders run at a constant quantiser and move it as the link allows, one step at a time. A step is only a number in the next picture's header: no keyframe and no new parameter sets, which matters because a client can show a washed-out picture when it meets several in a row (a first version did, before this release).
+The GPU encoders run at a constant quantiser and move it as the link allows, one step at a time. A step is only a number in the next frame's header: no keyframe and no new parameter sets, which matters because a client can show a washed-out image when it meets several in a row (a first version did, before this release).
 
 ## When it fails {bar: notes}
 - **A session that cannot be made on the GPU is made again in software**, once, and the log says so (`the session could not be made on the GPU (...): software rendering`). Before this, Debian's NVIDIA driver left the account without a desktop.
@@ -129,7 +129,7 @@ On a Core i7-7700 with its integrated HD 630, 64 GB, users added one at a time, 
 | 24 | refused at 22 (memory) | 94 % | – / 21.1 % |
 
 - **The GPU flattens the CPU, but on this machine it did not add users:** 21 fit with it and 24 without, because an integrated GPU takes system memory (2.24 GB a user against 1.95 GB) and memory ended both runs.
-- **Full-screen WebGL** (the heaviest picture) holds 60 fps for two users on the HD 630, 47 for three, 20 for six and 13 for ten: the card is the limit and the CPU stays under 40 %. With the GPU off the page does not animate.
+- **Full-screen WebGL** (the heaviest image) holds 60 fps for two users on the HD 630, 47 for three, 20 for six and 13 for ten: the card is the limit and the CPU stays under 40 %. With the GPU off the page does not animate.
 - **NVIDIA:** 61 fps on the same page, 4 to 9 ms per encoded frame, the card's encoder engine 4 % busy.
 
 The method, every table and the scripts are in [`docs/MEASUREMENTS.md`](https://github.com/zhoorta/waydesk/blob/main/docs/MEASUREMENTS.md); the notes behind the NVIDIA work in [`docs/GPU-PLAN.md`](https://github.com/zhoorta/waydesk/blob/main/docs/GPU-PLAN.md). Not measured: AMD, several users on one NVIDIA card, a card with its own memory under many users.

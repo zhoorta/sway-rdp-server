@@ -30,7 +30,7 @@ $ sudo apt install waydesk
 `waydesk` is the server and the desktop (the shell, the dock, a file manager and a terminal). On a server that should only run the RDP part, `waydesk-server` alone is enough. The RDP port is **closed to the network** until you open it.
 
 ## On Arch Linux {bar: terminal}
-Arch (x86_64 and Arch Linux ARM) has its own signed repository, with the same key. It installs the server and its sessions (plain sway, or the desktop you set for an account); the Waydesk shell, launcher and dock are Debian and Ubuntu packages.
+Arch (x86_64 and Arch Linux ARM) has its own signed repository, with the same key. It installs the server and its sessions (plain Sway, or the desktop you set for an account); the Waydesk shell, launcher and dock are Debian and Ubuntu packages.
 
 ```console
 $ curl -fsSL https://waydesk.dev/arch/waydesk.gpg | sudo pacman-key --add -
@@ -89,7 +89,7 @@ carol              cosmic    running     920 MB       -     3%  31.3 GB renderD1
 dave               hyprland  running     866 MB       -     6%  31.3 GB renderD128 vaapi@renderD128             -    quickshell 567 MB, Hyprland 363 MB, Xwayland 253 MB
 ```
 
-Real output from the Intel test server (an i7-7700 with an HD 630, running Arch): four accounts, one on each desktop, all drawn on the GPU and encoded by VAAPI. The `DESKTOP` column says which desktop each account runs. The systems and clients that were tried are on [Limits and status](/docs/limits/).
+Real output from the Intel test server (an i7-7700 with an HD 630, running Arch): four accounts, one on each desktop, all drawn on the GPU and encoded by VAAPI. The `DESKTOP` column says which desktop each account runs. The systems and clients tried so far are on [Limits and status](/docs/limits/).
 
 ## What you get {bar: desktop}
 - **A desktop of your own for every account**, with a shell, a dock, a file manager and your applications. Reconnect and the windows are where you left them: closing the RDP window does not end the session.
