@@ -52,9 +52,12 @@ ssh "$HOST" "mkdir -p '$DIR' && cd '$DIR' && find pool -type f -printf '%s %p\n'
 # to upload: local entries (same size and name) that are not on the server; to delete: server entries that are not local any more
 # (set differences with awk, not comm: comm needs both lists sorted the same way, and the Mac and the server sort + ~ and _ differently, which made it
 # report files that were there as missing, and then delete them by name after they had been uploaded: 2026-10-23)
-notin() { awk 'NR==FNR { seen[$0]; next } !($0 in seen)' "$2" "$1"; }   # the lines of $1 that are not in $2
+notin() { awk 'FILENAME == ARGV[1] { seen[$0]; next } !($0 in seen)' "$2" "$1"; }   # the lines of $1 that are not in $2
 notin "$tmp/local.txt" "$tmp/remote.txt" | cut -d' ' -f2- > "$tmp/upload.txt"
-notin "$tmp/remote.txt" "$tmp/local.txt" | cut -d' ' -f2- > "$tmp/delete.txt"
+notin "$tmp/remote.txt" "$tmp/local.txt" | cut -d' ' -f2- > "$tmp/delete-all.txt"
+# a file that is replaced under the same name (a rebuild with the same version, other size) is in both lists: it is uploaded over the old one and must NOT be deleted after
+cut -d' ' -f2- "$tmp/local.txt" > "$tmp/local-names.txt"
+awk 'FILENAME == ARGV[1] { keep[$0]; next } !($0 in keep)' "$tmp/local-names.txt" "$tmp/delete-all.txt" > "$tmp/delete.txt"
 echo "packages to upload: $(wc -l < "$tmp/upload.txt" | tr -d ' ')   to remove from the server: $(wc -l < "$tmp/delete.txt" | tr -d ' ')"
 sed 's/^/  + /' "$tmp/upload.txt"; sed 's/^/  - /' "$tmp/delete.txt"
 # A package that disappears from the repository altogether (no version of it left in the new pool) breaks every package that depends on it: 2026-10-31, the
