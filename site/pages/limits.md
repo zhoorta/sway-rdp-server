@@ -7,7 +7,7 @@ Waydesk is early, free software, written and tested by one person on real server
 
 ## Status {bar: notes}
 - **Early software.** Version 0.5.0. Expect rough edges; [open an issue](https://github.com/zhoorta/waydesk/issues) when you find one.
-- **Systems:** Debian 13 and Ubuntu 26.04, on amd64 and arm64 (the table below). Clean installs of the 0.5.0 packages from the repository passed on both systems and both architectures (the packages were installed in clean containers on 2026-11-01; the sessions were checked on the earlier versions). An upgrade from 0.4.0 was not tested. Arch Linux has a package and a pacman repository ([Other desktops](/docs/desktops/#arch-linux)). COSMIC, KDE Plasma and Hyprland sessions are experimental: tested on Arch, and Plasma also on Debian 13 ([Other desktops](/docs/desktops/)).
+- **Systems:** Debian 13 and Ubuntu 26.04, on amd64 and arm64 (the table below). Clean installs of the 0.5.0 packages from the repository passed on both systems and both architectures (the packages were installed in clean containers on 2026-11-01; the sessions were checked on the earlier versions). Arch Linux has a package and a pacman repository ([Other desktops](/docs/desktops/#arch-linux)). COSMIC, KDE Plasma and Hyprland sessions are experimental: tested on Arch, and Plasma also on Debian 13 ([Other desktops](/docs/desktops/)).
 - **No second factor.** The login is the account's password inside TLS: keep the port behind an SSH tunnel or a [VPN](/docs/vpn/#security-what-protects-the-login).
 - **Not an audited product.** Four internal review passes are written down, with what is still open.
 
