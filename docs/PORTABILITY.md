@@ -85,7 +85,7 @@ Debian client (a `debian:13` container with `freerdp3-x11`, `--network host`, Xv
 - **Found on the way:** two builds writing one file left a `.deb` with a wrong ar member size that `dpkg-deb` accepts and `ar`/apt reject (`make-repo.sh` now reads every package with both); a copy still in progress passed the control-data check (now read completely).
   `waydesk-admin` was also fixed (SIGPIPE).
 
-**Still open for Ubuntu:** clean install from the published repository on fresh Ubuntu servers; the app tests (LibreOffice, VS Code) and capacity on Ubuntu; Ubuntu 24.04 (not built: a different Qt and wlroots); the Flatpak Chromium first-run dialog and its dock icon; `docker-compose` alternatives in other rows if more turn up.
+**Still open for Ubuntu:** (a clean install from the published repository passed on Ubuntu 26.04, amd64 and arm64, in containers on 2026-11-01); the app tests (LibreOffice, VS Code) and capacity on Ubuntu; Ubuntu 24.04 (not built: a different Qt and wlroots); the Flatpak Chromium first-run dialog and its dock icon; `docker-compose` alternatives in other rows if more turn up.
 
 ## Arch and Omarchy (candidate, decided 2026-10-24: not now)
 

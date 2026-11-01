@@ -1,6 +1,6 @@
 # COSMIC sessions
 
-`waydesk-admin users set NAME --desktop cosmic` gives an account the COSMIC desktop (System76's, in Rust). Needs the COSMIC packages (Arch: the `cosmic` group; `start-cosmic`, `cosmic-comp` and the applets must be installed). Experimental.
+`waydesk-admin users set NAME --desktop cosmic` gives an account the COSMIC desktop (System76's, in Rust). Needs the COSMIC packages (Arch: the `cosmic` group; `start-cosmic`, `cosmic-comp` and the applets must be installed). Tested on Arch with an Intel GPU (2026-11-01): login, lock screen, logout, reconnect, clipboard, the hardware encoder, three accounts at once; not measured under load.
 
 ## How it works
 

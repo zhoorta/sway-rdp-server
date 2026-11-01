@@ -1,9 +1,9 @@
 title: Other desktops
 nav: Desktops
 seo_title: COSMIC, KDE Plasma and Hyprland over RDP on a Linux server · Waydesk
-description: Waydesk gives every account the Waydesk desktop by default. An account can have COSMIC, KDE Plasma or Hyprland instead (Hyprland tested, COSMIC and Plasma experimental): how each one runs, what you install, what was tested and what was not.
+description: Waydesk gives every account the Waydesk desktop by default. An account can have COSMIC, KDE Plasma or Hyprland instead (all three tested on Arch): how each one runs, what you install, what was tested and what was not.
 ---
-Every account gets the Waydesk desktop (sway with a shell, a launcher and a dock) unless you choose otherwise. Three other desktops can be given to an account with one command. **Hyprland** was tested on Arch Linux with an Intel GPU (Omarchy 4.0.6 and ML4W); **COSMIC and KDE Plasma are experimental** and were tested on Arch Linux. Plasma was also run on Debian 13 (four accounts at once on a 4-core server); COSMIC and Hyprland were not tested on Debian or Ubuntu, and other GPUs were not tried with Hyprland.
+Every account gets the Waydesk desktop (sway with a shell, a launcher and a dock) unless you choose otherwise. Three other desktops can be given to an account with one command. All three were tested on Arch Linux with an Intel GPU (Hyprland with Omarchy 4.0.6 and ML4W; COSMIC and KDE Plasma with their lock screens, logout and reconnect), none of them under load. Plasma was also run on Debian 13 (four accounts at once on a 4-core server); COSMIC and Hyprland were not tested on Debian or Ubuntu, and other GPUs were not tried with Hyprland.
 
 ## Choose one {bar: terminal}
 ```console

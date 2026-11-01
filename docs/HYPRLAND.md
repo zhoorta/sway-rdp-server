@@ -39,6 +39,10 @@ What a package has to provide for it:
   a password, anyone else gets a polkit dialog ("Authorize running ...") for a password they do not have, and one account's theme would recolour every account's browser.
   `packaging/hyprland/bin/omarchy-theme-set-browser-policy` does nothing instead; installed in `/usr/lib/waydesk/bin`, which is first on the session's `PATH`, it
   affects Waydesk sessions only (a session that was already running keeps asking until it is restarted). The theme itself (bar, terminal, wallpaper) still changes.
+  **That was not enough** (found 2026-11-01): Omarchy's own first start (`omarchy-provision-first-run`, then `install/user/theme.sh`, then `omarchy-theme-set`) calls the real helper, because its install scripts put
+  `$OMARCHY_PATH/bin` first on their own `PATH`, and it waited on the password dialog for good: the account never got a theme (no Style or Background menu, an include error for `foot.ini` in the terminal),
+  and sessions of other accounts sat on the dialog for hours. `packaging/polkit/50-waydesk-no-power.rules` now also answers no, at once, to `pkexec /usr/bin/omarchy-theme-set-browser-policy` for members of
+  `waydesk-users` who are not in `wheel` (both packages). Checked on a new account: the first start sets Omarchy's default theme by itself, with no dialog.
 - **The stand-ins need the right `PATH`.** Omarchy's Hyprland configuration (`default/hypr/envs.lua`) puts `$OMARCHY_PATH/bin` first on `PATH` for everything Hyprland starts, so
   the stand-ins below, in `/usr/lib/waydesk/bin`, were never reached from the menu (found when logout did nothing; a first test had looked at Hyprland's own `PATH`, not the menu's).
   Waydesk therefore starts Hyprland with `--config /usr/lib/waydesk/hyprland.lua` (`packaging/hyprland/waydesk.lua`), which loads the account's own configuration unchanged and
@@ -81,7 +85,7 @@ Nesting it in a wlroots compositor fails too (it wants `xdg_wm_base` version 6, 
 
 ## Not verified
 
-- Audio in the per-user daemon mode (it has none; it needs the root helper), and real applications (Chromium, an office suite, an editor) under Hyprland. Checked since this list was written: the mouse wheel
+- Audio in the per-user daemon mode: it has none by design (it needs the root helper). Sound through the helper, and real applications under Omarchy (tried by hand from the Windows App on macOS, 2026-11-01: they worked), were checked since this list was written, with: the mouse wheel
   (2026-11-01, Windows App on macOS), nine sessions at once (below), twelve sessions of four kinds at once (below), the systemd units (above), sound through the helper (above).
 - The pointer: without the `waydesk-blank` cursor theme (the Waydesk package installs it) Hyprland draws its own cursor into the picture; the Arch package needs it too.
 - The Waydesk desktop (shell, launcher, title-bar buttons) is sway-specific and is not part of a Hyprland session: the account gets
@@ -159,7 +163,7 @@ What it showed about running someone else's configuration:
   polkit rule). Measured on the session: **display off turns the client's picture completely black** (brightness 0.24 to 0.00) until it is switched on again; the **lock screen** (`hyprlock`) shows
   in the RDP picture and **typing the account password through the RDP client unlocks it**. Not measured: how long a reconnecting client has to wait, or whether its first mouse movement
   wakes a display that was switched off while nobody was connected. An administrator who does not want this edits `~/.config/hypr/hypridle.conf` of the account.
-- Not checked: the rest of ML4W (its settings app, its updater, the browser it expects, the AUR packages it offers), more than one ML4W account at a time.
+- **Two ML4W accounts at once** (ML4W 2.16.1 on the i7-7700, 2026-11-01): both sessions came up with the Welcome app, the bar, the dock and the wallpaper, on the VAAPI encoder, about 1.0 GB each, with no configuration error. `config check` warns, as before, that `hypridle.conf` switches the display off after 11 minutes. Not checked by hand: ML4W's settings app, its updater, the browser it expects, the AUR packages it offers.
 - **ML4W's Restart and Shutdown logged the account out.** Its power menu, its keybind and its `shutdown` alias run `hyprshutdown -t 'Shutting down...' --post-cmd 'shutdown -P 0'` (or `reboot`): that
   closes the apps and exits Hyprland, which ends the Waydesk session, and only then asks the system to power off, which the polkit rule refuses. The server stayed up (checked: up since
   the boot of that day, `CanPowerOff` and `CanReboot` answer `no` for the account) but the session was gone. `packaging/hyprland/bin/hyprshutdown`, first on the session's `PATH`, says

@@ -127,7 +127,7 @@ header: no new encoder, no IDR. One IDR in a whole run of the harness, slice del
 
 Also in that patch: with constant quality the coded buffer was a fixed 1.5 MB, and a keyframe of full-screen noise at QP 18 (1.8 MB) overflowed it ("allocated
 memory size is not enough"), which ended the session's connection, again at every reconnect while the noise was on screen. The buffer is now as large as a raw
-NV12 picture. Not yet tried: zero-copy with the fix in Windows App, and the same in sdl-freerdp.
+NV12 picture. Tried since (2026-11-01, Intel HD 630, Windows App on macOS): the VAAPI encoder with the dmabuf capture (22 sessions captured into dmabufs, four of them also fell back to shared memory at times: "the compositor could not render into the dmabuf") showed no veil; sdl-freerdp acknowledged the frames in the log but nobody looked at its picture.
 
 ## NVIDIA, a first look (2026-10-28)
 

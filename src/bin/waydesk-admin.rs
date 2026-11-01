@@ -453,6 +453,21 @@ fn users_sudo(name: &str, on: bool) -> Result<()> {
     set_group(name, SUDO_GROUP, on)
 }
 
+/// The groups `users add` puts the account in, in order: the RDP group unless `--no-rdp`, then `--admin` and `--sudo`.
+fn groups_for_add(rest: &[&str]) -> Vec<&'static str> {
+    let mut v = Vec::new();
+    if !rest.contains(&"--no-rdp") {
+        v.push(RDP_GROUP);
+    }
+    if rest.contains(&"--admin") {
+        v.push(ADMIN_GROUP);
+    }
+    if rest.contains(&"--sudo") {
+        v.push(SUDO_GROUP);
+    }
+    v
+}
+
 fn users_add(name: &str, rest: &[&str], json_out: bool) -> Result<()> {
     for r in rest {
         ensure!(["--admin", "--sudo", "--no-rdp"].contains(r), "unknown option {r} for add");
@@ -461,23 +476,30 @@ fn users_add(name: &str, rest: &[&str], json_out: bool) -> Result<()> {
     ensure!(valid_name(name), "{name:?} is not a valid account name (lower case letters, digits, _ and -, at most 32)");
     // Any account of that name, system accounts too (accounts() only lists the ordinary ones).
     ensure!(run_tool("/usr/bin/getent", &["passwd", name]).is_err(), "{name} exists already");
+    // Every group the account is to join must exist before anything is made: a missing one used to leave an account behind that had no rights and no explanation.
+    let wanted = groups_for_add(rest);
+    for g in &wanted {
+        ensure!(group_gid(g).is_some(), "the group {g} does not exist (is the waydesk package installed?): nothing was made");
+    }
     run_tool("/usr/sbin/useradd", &["-m", "-s", "/bin/bash", name])?;
-    let a = account(name).context("the new account does not look like an ordinary one: remove it by hand")?;
-    let password = random_password()?;
-    set_password(&a.name, &password)?;
-    let mut granted = Vec::new();
-    if !rest.contains(&"--no-rdp") {
-        change_group(&a.name, RDP_GROUP, true)?;
-        granted.push(RDP_GROUP);
-    }
-    if rest.contains(&"--admin") {
-        change_group(&a.name, ADMIN_GROUP, true)?;
-        granted.push(ADMIN_GROUP);
-    }
-    if rest.contains(&"--sudo") {
-        change_group(&a.name, SUDO_GROUP, true)?;
-        granted.push(SUDO_GROUP);
-    }
+    let made = (|| -> Result<(Account, String)> {
+        let a = account(name).context("the new account does not look like an ordinary one")?;
+        let password = random_password()?;
+        set_password(&a.name, &password)?;
+        for g in &wanted {
+            change_group(&a.name, g, true)?;
+        }
+        Ok((a, password))
+    })();
+    let (a, password) = match made {
+        Ok(v) => v,
+        Err(e) => {
+            // Whatever failed, the account is not left half-made.
+            let _ = run_tool("/usr/sbin/userdel", &["-r", name]);
+            bail!("{e:#}: the new account {name} was removed again");
+        }
+    };
+    let granted = wanted;
     if json_out {
         println!("{}", json!({ "name": a.name, "uid": a.uid, "password": password, "groups": granted }));
     } else {
@@ -1498,6 +1520,15 @@ mod tests {
         assert!(valid_password(&p));
         // 256 is a multiple of 32: every letter is as likely as any other.
         assert_eq!(256 % 32, 0);
+    }
+
+    #[test]
+    fn add_puts_the_account_in_the_groups_that_were_asked_for_in_order() {
+        assert_eq!(groups_for_add(&[]), vec![RDP_GROUP]);
+        assert_eq!(groups_for_add(&["--admin"]), vec![RDP_GROUP, ADMIN_GROUP]);
+        assert_eq!(groups_for_add(&["--sudo", "--admin"]), vec![RDP_GROUP, ADMIN_GROUP, SUDO_GROUP]);
+        assert_eq!(groups_for_add(&["--no-rdp"]), Vec::<&str>::new());
+        assert_eq!(groups_for_add(&["--no-rdp", "--sudo"]), vec![SUDO_GROUP]);
     }
 
     #[test]

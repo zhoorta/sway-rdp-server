@@ -1,6 +1,6 @@
 # KDE Plasma sessions
 
-`waydesk-admin users set NAME --desktop plasma` gives an account KDE Plasma (Wayland). Needs Plasma installed (Arch: `plasma-desktop`, plus apps such as `konsole`). Experimental.
+`waydesk-admin users set NAME --desktop plasma` gives an account KDE Plasma (Wayland). Needs Plasma installed (Arch: `plasma-desktop`, plus apps such as `konsole`). Tested on Arch with an Intel GPU (2026-11-01) and, with four accounts, on Debian 13: login, lock screen, logout, reconnect, 30 minutes idle, the hardware encoder; not measured under load.
 
 Plasma's RDP server (KRdp) shares a session that already exists; it does not start one per user on a headless server. Waydesk does, the same way as for COSMIC (docs/COSMIC.md): the session stays a headless sway with one output of the client's size, and its configuration (`/usr/share/waydesk/sway-plasma.conf`) runs `startplasma-wayland`. KWin finds sway's display and runs as a fullscreen window of it; capture and input stay sway's.
 

@@ -13,3 +13,21 @@ polkit.addRule(function(action, subject) {
     }
     return polkit.Result.NOT_HANDLED;
 });
+
+// Omarchy's theme switch (and its first start, which sets the first theme) writes the theme colour into the system-wide managed policy of Chromium, Chrome, Edge and
+// Brave through `pkexec /usr/bin/omarchy-theme-set-browser-policy`. An account outside the group wheel gets a password dialog for a password it does not have, and
+// Omarchy's first start waits on that dialog for good: the account never gets a theme (no Style or Background menu, an include error in the terminal). One account's
+// colour would also recolour every account's browser. This answers no, at once, so that the theme itself (Hyprland, the bar, the terminal, the wallpaper, which is
+// per account) is applied and only the browser policy is skipped; the helper's own failure is not fatal to the theme switch.
+polkit.addRule(function(action, subject) {
+    if (action.id !== "org.freedesktop.policykit.exec") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (action.lookup("program") !== "/usr/bin/omarchy-theme-set-browser-policy") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (subject.isInGroup("waydesk-users") && !subject.isInGroup("wheel")) {
+        return polkit.Result.NO;
+    }
+    return polkit.Result.NOT_HANDLED;
+});
