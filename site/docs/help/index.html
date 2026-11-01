@@ -62,7 +62,7 @@
 </ul>
 <h2>Help</h2>
 <ul>
-<li><a href="/docs/help/" aria-current="page">Troubleshooting</a><ul><li><a href="#where-the-logs-are">Where the logs are</a></li><li><a href="#the-client-cannot-connect">The client cannot connect</a></li><li><a href="#the-login-is-accepted-but-there-is-no-desktop">The login is accepted but there is no desktop</a></li><li><a href="#it-is-slow-or-the-picture-is-poor">It is slow, or the picture is poor</a></li><li><a href="#the-gpu-is-not-used">The GPU is not used</a></li><li><a href="#a-window-is-out-of-reach">A window is out of reach</a></li><li><a href="#still-stuck">Still stuck</a></li></ul></li>
+<li><a href="/docs/help/" aria-current="page">Troubleshooting</a><ul><li><a href="#where-the-logs-are">Where the logs are</a></li><li><a href="#the-client-cannot-connect">The client cannot connect</a></li><li><a href="#the-login-is-accepted-but-there-is-no-desktop">The login is accepted but there is no desktop</a></li><li><a href="#it-is-slow-or-the-picture-is-poor">It is slow, or the picture is poor</a></li><li><a href="#the-gpu-is-not-used">The GPU is not used</a></li><li><a href="#a-window-is-out-of-reach">A window is out of reach</a></li><li><a href="#kdenlive-says-it-crashed-on-its-last-start">Kdenlive says it crashed on its last start</a></li><li><a href="#still-stuck">Still stuck</a></li></ul></li>
 <li><a href="/docs/faq/">FAQ</a></li>
 </ul>
 </nav>
@@ -98,6 +98,10 @@
 <section id="a-window-is-out-of-reach">
 <h2>A window is out of reach</h2>
 <p>Windows can hang over the left and right edges (and below the screen), with 120 pixels left on the screen to grab. <strong>Super+Shift+Up</strong> brings every window entirely back. Super+Up maximises the focused window, Super+Down minimises it, Super+Shift+Down restores a minimised one.</p>
+</section>
+<section id="kdenlive-says-it-crashed-on-its-last-start">
+<h2>Kdenlive says it crashed on its last start</h2>
+<p>Kdenlive keeps its "running" marker in <code>/tmp/kdenlivelock</code>, a file shared by every account on the server. If one account's Kdenlive was killed (or the session ended while it ran), the next account that starts it is asked whether to reset its configuration. Choosing Continue is enough; or remove the file as an administrator (<code>sudo rm /tmp/kdenlivelock</code>).</p>
 </section>
 <section id="still-stuck">
 <h2>Still stuck</h2>

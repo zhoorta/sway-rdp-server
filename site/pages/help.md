@@ -44,5 +44,8 @@ $ waydesk-admin status
 ## A window is out of reach {bar: notes}
 Windows can hang over the left and right edges (and below the screen), with 120 pixels left on the screen to grab. **Super+Shift+Up** brings every window entirely back. Super+Up maximises the focused window, Super+Down minimises it, Super+Shift+Down restores a minimised one.
 
+## Kdenlive says it crashed on its last start {bar: notes}
+Kdenlive keeps its "running" marker in `/tmp/kdenlivelock`, a file shared by every account on the server. If one account's Kdenlive was killed (or the session ended while it ran), the next account that starts it is asked whether to reset its configuration. Choosing Continue is enough; or remove the file as an administrator (`sudo rm /tmp/kdenlivelock`).
+
 ## Still stuck {bar: notes}
 Open an issue on [GitHub](https://github.com/zhoorta/waydesk/issues) with the output of `waydesk-admin status`, `waydesk-admin access show` and the last lines of the journal (passwords and keys never appear in them). For a commercial setup there is [StackCare](https://stackcare.pt/en).
